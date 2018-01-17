@@ -33,6 +33,7 @@
 1016	ERR_PARTITION_BY_RANGE	The column type %1% is currently  not supported in %2% function.
 1017	ERR_SP_FUNCTION_NOT_SUPPORT	Stored function is currently not supported in Columnstore.
 1018	ERR_DBJ_ANTI_NULL	Cannot currently process a disk-based antijoin with a function filter and a NULL join column in the large-side table.
+1019	ERR_DML_INCORECT_IDENT	Incorrect table or column identifier.
 
 # Other errors ...
 2001	ERR_JOIN_TOO_BIG	Join or subselect exceeds memory limit.

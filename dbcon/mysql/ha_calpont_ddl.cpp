@@ -692,13 +692,13 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
         {
             CreateTableStatement* createTable = dynamic_cast <CreateTableStatement*> ( &stmt );
 
-            //@Bug 5767. To handle key words inside `` for a tablename.
+            // Restricted chars section. Should be useless since the backtick quotation commit.
             if (!(boost::iequals(schema, createTable->fTableDef->fQualifiedName->fSchema)) || !(boost::iequals(table, createTable->fTableDef->fQualifiedName->fName)))
             {
                 rc = 1;
                 thd->get_stmt_da()->set_overwrite_status(true);
 
-                thd->raise_error_printf(ER_CHECK_NOT_IMPLEMENTED, (IDBErrorInfo::instance()->errorMsg(ERR_CREATE_DATATYPE_NOT_SUPPORT)).c_str());
+                thd->raise_error_printf(ER_CHECK_NOT_IMPLEMENTED, (IDBErrorInfo::instance()->errorMsg(ERR_DML_INCORECT_IDENT)).c_str());
                 ci->alterTableState = cal_connection_info::NOT_ALTER;
                 ci->isAlter = false;
                 return rc;

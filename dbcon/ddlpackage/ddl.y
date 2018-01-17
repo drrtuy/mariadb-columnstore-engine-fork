@@ -64,6 +64,7 @@ using namespace ddlpackage;
 int ddllex(YYSTYPE* ddllval, void* yyscanner);
 void ddlerror(struct pass_to_bison* x, char const *s);
 char* copy_string(const char *str);
+const char* removeQuotes(const char *ident);
 %}
 
 %expect 17
@@ -121,7 +122,7 @@ REFERENCES RENAME RESTRICT SET SMALLINT TABLE TEXT TIME TINYBLOB TINYTEXT
 TINYINT TO UNIQUE UNSIGNED UPDATE USER SESSION_USER SYSTEM_USER VARCHAR VARBINARY
 VARYING WITH ZONE DOUBLE IDB_FLOAT REAL CHARSET IDB_IF EXISTS CHANGE TRUNCATE
 
-%token <str> IDENT FCONST SCONST CP_SEARCH_CONDITION_TEXT ICONST DATE
+%token <str> IDENT_QUOTED IDENT FCONST SCONST CP_SEARCH_CONDITION_TEXT ICONST DATE
 
 /* Notes:
  * 1. "ata" stands for alter_table_action
@@ -612,11 +613,22 @@ table_name:
 
 qualified_name:
 	IDENT '.' IDENT {$$ = new QualifiedName($1, $3);}
+	| IDENT '.' IDENT_QUOTED {$$ = new QualifiedName($1, $3); $$->removeQuotes(); }
+	| IDENT_QUOTED '.' IDENT {$$ = new QualifiedName($1, $3); $$->removeQuotes(); }
+	| IDENT_QUOTED '.' IDENT_QUOTED {$$ = new QualifiedName($1, $3); $$->removeQuotes(); }
 	| IDENT {
 				if (x->fDBSchema.size())
 					$$ = new QualifiedName((char*)x->fDBSchema.c_str(), $1);
 				else
 				    $$ = new QualifiedName($1);   
+                $$->removeQuotes();
+			}
+	| IDENT_QUOTED {
+				if (x->fDBSchema.size())
+					$$ = new QualifiedName((char*)x->fDBSchema.c_str(), $1);
+				else
+				    $$ = new QualifiedName($1);   
+                $$->removeQuotes();
 			}
 	;
 
@@ -633,6 +645,7 @@ ata_add_column:
 column_name:
 	DATE
 	|IDENT
+    |IDENT_QUOTED { $$ = removeQuotes($1); }
 	;
 
 constraint_name:
@@ -1145,4 +1158,26 @@ opt_column:
 
 %%
 
+const char* removeQuotes(const char *ident)
+{
+    const char quote = '`';
+    size_t len = strlen(ident), i = 0;
+    char* newIdent = new char[len];
+    memset(newIdent, 0, len);
+
+    const char* oldIter = ident;
+    char* newIter = newIdent;
+
+    for(;i < len; i++)
+    {
+        if(oldIter[i] == quote)
+            continue;
+
+        *newIter = oldIter[i];
+        ++newIter;
+    }
+
+    // what to do with the memory consumed by ident?
+    return newIdent;
+}
 

@@ -33,7 +33,6 @@
 using namespace ddlpackage;
 int lineno = 1;
 void ddlerror(struct pass_to_bison* x, char const *s);
-
 static char* scanner_copy(char *str, yyscan_t yyscanner);
 
 %}
@@ -58,10 +57,13 @@ comment ("--"{non_newline}*)
 self			[,()\[\].;\:\+\-\*\/\%\^\<\>\=]
 whitespace ({space}+|{comment})
 
+quote '
+grave_accent `
 digit [0-9]
 ident_start [A-Za-z\200-\377_]
 ident_cont [A-Za-z\200-\377_0-9\$]
 identifier {ident_start}{ident_cont}*
+identifer_quoted {grave_accent}{identifier}{grave_accent} 
 
 integer			[-+]?{digit}+
 decimal			([-+]?({digit}*\.{digit}+)|({digit}+\.{digit}*))
@@ -69,8 +71,6 @@ real			({integer}|{decimal})[Ee][-+]?{digit}+
 realfail1		({integer}|{decimal})[Ee]
 realfail2		({integer}|{decimal})[Ee][-+]
 
-quote '
-grave_accent `
 
 %%
 
@@ -172,13 +172,10 @@ LONGTEXT {return LONGTEXT;}
 }
 
 {identifier} {ddlget_lval(yyscanner)->str = scanner_copy(ddlget_text(yyscanner), yyscanner); return IDENT;}
+{identifer_quoted} {ddlget_lval(yyscanner)->str = scanner_copy(ddlget_text(yyscanner), yyscanner); return IDENT_QUOTED;}
 
 {self} {
     return ddlget_text(yyscanner)[0];
-}
-
-{grave_accent} {
-    /* ignore */
 }
 
 %%
@@ -198,6 +195,10 @@ using namespace ddlpackage;
  */
 void scanner_init(const char* str, yyscan_t yyscanner)
 {
+#ifdef YYDEBUG
+    extern int ddldebug;
+    ddldebug = 1;
+#endif
 	size_t slen = strlen(str);
    scan_data* pScanData = (scan_data*)ddlget_extra(yyscanner);
 

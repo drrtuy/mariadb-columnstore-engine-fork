@@ -511,6 +511,8 @@ struct QualifiedName
     virtual ~QualifiedName()
     {}
 
+    void removeQuotes();
+
     std::string fCatalog;
     std::string fName;
     std::string fSchema;

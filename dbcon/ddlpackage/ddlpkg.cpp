@@ -22,6 +22,7 @@
 ***********************************************************************/
 
 #include <iostream>
+#include <algorithm>
 
 #define DDLPKG_DLLEXPORT
 #include "ddlpkg.h"
@@ -49,6 +50,38 @@ QualifiedName::QualifiedName(const char* catalog, const char* schema, const char
 {
 }
 
+void QualifiedName::removeQuotes()
+{
+    //THD* thd = current_thd;
+    const char quote = '`';
+    string::iterator fNameBegin = fName.begin();
+    string::iterator fNameEnd = fName.end();
+
+    //if(thd->variables.sql_mode & MODE_ANSI_QUOTES)
+    //    quote = '"';
+
+    if (count(fNameBegin, fNameEnd, quote) == 2 && *fNameBegin == quote && *(--fNameEnd) == quote)
+    {
+        string* fNameUpdated = new string(++fNameBegin, fNameEnd);
+        fName.swap(*fNameUpdated);
+        delete fNameUpdated;
+    }
+
+    if (fSchema.size())
+    {
+        string::iterator fSchemaBegin = fSchema.begin();
+        string::iterator fSchemaEnd = fSchema.end();
+
+        if (count(fSchemaBegin, fSchemaEnd, quote) == 2 && *fSchemaBegin == quote && *(--fSchemaEnd) == quote)
+        {
+            string* fSchemaUpdated = new string(++fSchemaBegin, fSchemaEnd);
+            fSchema.swap(*fSchemaUpdated);
+            delete fSchemaUpdated;
+        }
+    }
+
+}
+
 ostream& operator<<(ostream& os, const QualifiedName& qname)
 {
     if (!qname.fCatalog.empty())
@@ -60,7 +93,6 @@ ostream& operator<<(ostream& os, const QualifiedName& qname)
     os << qname.fName;
     return os;
 }
-
 
 /** @brief Map a DECIMAL precision to data width in bytes */
 unsigned int precision_width(unsigned p)

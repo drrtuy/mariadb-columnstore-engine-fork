@@ -37,7 +37,6 @@
 
 namespace ddlpackage
 {
-
 typedef SqlStatementList ParseTree;
 
 /** @brief SqlParser is a class interface around the Bison parser
