@@ -96,7 +96,7 @@ public:
 
     EXPORT virtual ~SqlParser();
 
-    EXPORT int Parse(const char* sqltext);
+    EXPORT int Parse(const char* sqltext, bool modeAnsiQuotes = false);
 
     /** @brief Return the ParseTree if state is Good.  Otherwise
       *	throw a logic_error.

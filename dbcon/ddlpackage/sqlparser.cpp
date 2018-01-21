@@ -63,11 +63,11 @@ void SqlParser::setDefaultSchema(std::string schema)
     x.fDBSchema = schema;
 }
 
-int SqlParser::Parse(const char* sqltext)
+int SqlParser::Parse(const char* sqltext, bool modeAnsiQuotes)
 {
     ddllex_init_extra(&scanData, &x.scanner);
     scanner_init(sqltext, x.scanner);
-    fStatus = ddlparse(&x);
+    fStatus = ddlparse(&x, 1);
     return fStatus;
 }
 

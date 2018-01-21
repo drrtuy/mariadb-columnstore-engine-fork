@@ -50,35 +50,47 @@ QualifiedName::QualifiedName(const char* catalog, const char* schema, const char
 {
 }
 
-void QualifiedName::removeQuotes()
+void QualifiedName::removeQuotes(bool modeAnsiQuotes)
 {
-    //THD* thd = current_thd;
-    const char quote = '`';
-    string::iterator fNameBegin = fName.begin();
-    string::iterator fNameEnd = fName.end();
 
-    //if(thd->variables.sql_mode & MODE_ANSI_QUOTES)
-    //    quote = '"';
+    const char* quotes;
 
-    if (count(fNameBegin, fNameEnd, quote) == 2 && *fNameBegin == quote && *(--fNameEnd) == quote)
+    if ( modeAnsiQuotes )
+        quotes = "`\"";
+    else
+        quotes = "`";
+
+    string::iterator fNameBegin;
+    string::iterator fNameEnd;
+    string::iterator fSchemaBegin;
+    string::iterator fSchemaEnd;
+
+    const char* quote = quotes;
+//    for (; quote != '\0'; quote++)
+    do
     {
-        string* fNameUpdated = new string(++fNameBegin, fNameEnd);
-        fName.swap(*fNameUpdated);
-        delete fNameUpdated;
-    }
-
-    if (fSchema.size())
-    {
-        string::iterator fSchemaBegin = fSchema.begin();
-        string::iterator fSchemaEnd = fSchema.end();
-
-        if (count(fSchemaBegin, fSchemaEnd, quote) == 2 && *fSchemaBegin == quote && *(--fSchemaEnd) == quote)
+        fNameBegin = fName.begin();
+        fNameEnd = fName.end();
+        if (count(fNameBegin, fNameEnd, *quote) == 2 && *fNameBegin == *quote && *(--fNameEnd) == *quote)
         {
-            string* fSchemaUpdated = new string(++fSchemaBegin, fSchemaEnd);
-            fSchema.swap(*fSchemaUpdated);
-            delete fSchemaUpdated;
+            string* fNameUpdated = new string(++fNameBegin, fNameEnd);
+            fName.swap(*fNameUpdated);
+            delete fNameUpdated;
         }
-    }
+
+        if (fSchema.size())
+        {
+            fSchemaBegin = fSchema.begin();
+            fSchemaEnd = fSchema.end();
+            if (count(fSchemaBegin, fSchemaEnd, *quote) == 2 && *fSchemaBegin == *quote && *(--fSchemaEnd) == *quote)
+            {
+                string* fSchemaUpdated = new string(++fSchemaBegin, fSchemaEnd);
+                fSchema.swap(*fSchemaUpdated);
+                delete fSchemaUpdated;
+            }
+        }
+        quote++;
+    } while ( *quote != '\0' );
 
 }
 

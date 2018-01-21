@@ -62,15 +62,15 @@ using namespace std;
 using namespace ddlpackage;	
 
 int ddllex(YYSTYPE* ddllval, void* yyscanner);
-void ddlerror(struct pass_to_bison* x, char const *s);
+void ddlerror(struct pass_to_bison* x, bool modeAnsiQuotes, char const *s);
 char* copy_string(const char *str);
-const char* removeQuotes(const char *ident);
+const char* removeQuotes(const char *ident, bool modeAnsiQuotes);
 %}
 
 %expect 17
 %pure-parser
 %lex-param {void * scanner}
-%parse-param {struct ddlpackage::pass_to_bison * x}
+%parse-param {struct ddlpackage::pass_to_bison * x} {bool modeAnsiQuotes}
 %debug
 
  /* Bison uses this to generate a C union definition.  This is used to
@@ -613,22 +613,22 @@ table_name:
 
 qualified_name:
 	IDENT '.' IDENT {$$ = new QualifiedName($1, $3);}
-	| IDENT '.' IDENT_QUOTED {$$ = new QualifiedName($1, $3); $$->removeQuotes(); }
-	| IDENT_QUOTED '.' IDENT {$$ = new QualifiedName($1, $3); $$->removeQuotes(); }
-	| IDENT_QUOTED '.' IDENT_QUOTED {$$ = new QualifiedName($1, $3); $$->removeQuotes(); }
+	| IDENT '.' IDENT_QUOTED {$$ = new QualifiedName($1, $3); $$->removeQuotes(modeAnsiQuotes); }
+	| IDENT_QUOTED '.' IDENT {$$ = new QualifiedName($1, $3); $$->removeQuotes(modeAnsiQuotes); }
+	| IDENT_QUOTED '.' IDENT_QUOTED {$$ = new QualifiedName($1, $3); $$->removeQuotes(modeAnsiQuotes); }
 	| IDENT {
 				if (x->fDBSchema.size())
 					$$ = new QualifiedName((char*)x->fDBSchema.c_str(), $1);
 				else
 				    $$ = new QualifiedName($1);   
-                $$->removeQuotes();
+                $$->removeQuotes(modeAnsiQuotes);
 			}
 	| IDENT_QUOTED {
 				if (x->fDBSchema.size())
 					$$ = new QualifiedName((char*)x->fDBSchema.c_str(), $1);
 				else
 				    $$ = new QualifiedName($1);   
-                $$->removeQuotes();
+                $$->removeQuotes(modeAnsiQuotes);
 			}
 	;
 
@@ -645,7 +645,7 @@ ata_add_column:
 column_name:
 	DATE
 	|IDENT
-    |IDENT_QUOTED { $$ = removeQuotes($1); }
+    |IDENT_QUOTED { $$ = removeQuotes($1, modeAnsiQuotes); }
 	;
 
 constraint_name:
@@ -1158,24 +1158,45 @@ opt_column:
 
 %%
 
-const char* removeQuotes(const char *ident)
+const char* removeQuotes(const char *ident, bool modeAnsiQuotes)
 {
-    const char quote = '`';
-    size_t len = strlen(ident), i = 0;
+    const char* quotes;
+
+    if ( modeAnsiQuotes )
+        quotes = "`\"";
+    else
+        quotes = "`";
+
+    const char* quote = quotes;
+
+    size_t len = strlen(ident);
     char* newIdent = new char[len];
     memset(newIdent, 0, len);
 
-    const char* oldIter = ident;
-    char* newIter = newIdent;
+    const char* oldIter;
+    char* newIter;
 
-    for(;i < len; i++)
+    do
     {
-        if(oldIter[i] == quote)
-            continue;
+        oldIter = ident;
+        newIter = newIdent;
+        if ( *oldIter == *quote && *(oldIter + len - 1) == *quote )
+        {
+            while ( *oldIter != '\0' )
+            {
+                if( *oldIter == *quote )
+                {
+                    oldIter++;
+                    continue;
+                }
 
-        *newIter = oldIter[i];
-        ++newIter;
-    }
+                *newIter = *oldIter;
+                newIter++; oldIter++;
+            }
+        }
+
+        quote++;
+    } while ( *quote != '\0' ); 
 
     // what to do with the memory consumed by ident?
     return newIdent;

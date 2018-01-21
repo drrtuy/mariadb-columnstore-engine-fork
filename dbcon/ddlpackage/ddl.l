@@ -58,12 +58,14 @@ self			[,()\[\].;\:\+\-\*\/\%\^\<\>\=]
 whitespace ({space}+|{comment})
 
 quote '
+double_quote \"
 grave_accent `
 digit [0-9]
 ident_start [A-Za-z\200-\377_]
 ident_cont [A-Za-z\200-\377_0-9\$]
 identifier {ident_start}{ident_cont}*
 identifer_quoted {grave_accent}{identifier}{grave_accent} 
+identifer_double_quoted {double_quote}{identifier}{double_quote} 
 
 integer			[-+]?{digit}+
 decimal			([-+]?({digit}*\.{digit}+)|({digit}+\.{digit}*))
@@ -167,12 +169,17 @@ LONGTEXT {return LONGTEXT;}
 
 \n { lineno++;}
 
+{double_quote} {
+    /* ignore */
+}
+
 {whitespace} {
     /* ignore */
 }
 
 {identifier} {ddlget_lval(yyscanner)->str = scanner_copy(ddlget_text(yyscanner), yyscanner); return IDENT;}
 {identifer_quoted} {ddlget_lval(yyscanner)->str = scanner_copy(ddlget_text(yyscanner), yyscanner); return IDENT_QUOTED;}
+{identifer_double_quoted} {ddlget_lval(yyscanner)->str = scanner_copy(ddlget_text(yyscanner), yyscanner); return IDENT_QUOTED;}
 
 {self} {
     return ddlget_text(yyscanner)[0];
@@ -180,7 +187,7 @@ LONGTEXT {return LONGTEXT;}
 
 %%
 
-void ddlerror(struct pass_to_bison* x, char const *s)
+void ddlerror(struct pass_to_bison* x, bool modeAnsiQuotes, char const *s)
 {
 	printf("yyerror: %d: %s at %s\n", lineno, s, ddlget_text(x->scanner));
 }
