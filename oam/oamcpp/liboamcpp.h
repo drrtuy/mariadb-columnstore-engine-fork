@@ -747,6 +747,12 @@ typedef std::vector<DeviceNetworkConfig> DeviceNetworkList;
 
 typedef std::vector<std::string> DiskMonitorFileSystems;
 
+/** @brief DBRoot Path List
+ *
+ */
+
+typedef std::vector<std::string> DBRootPathList;
+
 /** @brief DBRoot Config List
  *
  */
@@ -761,6 +767,7 @@ struct DeviceDBRootConfig_s
 {
     uint16_t DeviceID;                 		//!< Device ID
     DBRootConfigList dbrootConfigList;	    //!< DBRoot List
+    DBRootPathList  dbrootPathList;         //!< DBRoot paths list, correlates with DBRoot List
 };
 
 typedef struct DeviceDBRootConfig_s DeviceDBRootConfig;
@@ -2242,7 +2249,7 @@ public:
     /**
     *@brief Get Storage Config Data
     */
-    EXPORT systemStorageInfo_t getStorageConfig();
+    EXPORT systemStorageInfo_t getStorageConfig(bool fillPaths = false);
 
     /**
     *@brief Get PM - DBRoot Config data
