@@ -20,6 +20,8 @@
  * MA 02110-1301, USA.
  */
 
+#include "boost/tuple/tuple.hpp"
+
 #include "idb_mysql.h"
 
 #include "dbrm.h"
@@ -102,6 +104,7 @@ static int is_columnstore_files_fill(THD* thd, TABLE_LIST* tables, COND* cond)
     messageqcpp::MessageQueueClient* msgQueueClient;
     oam::Oam oam_instance;
     int pmId = 0;
+    std::string *DbRootPath;
 
     if (!emp || !emp->isDBRMReady())
     {
@@ -110,6 +113,9 @@ static int is_columnstore_files_fill(THD* thd, TABLE_LIST* tables, COND* cond)
 
     execplan::ObjectIDManager oidm;
     BRM::OID_t MaxOID = oidm.size();
+
+    oam::systemStorageInfo_t storeInfo = oam_instance.getStorageConfig(true);
+    oam::DeviceDBRootList moduleDBRootList = boost::get<2>(storeInfo);
 
     for (BRM::OID_t oid = 3000; oid <= MaxOID; oid++)
     {
@@ -129,13 +135,29 @@ static int is_columnstore_files_fill(THD* thd, TABLE_LIST* tables, COND* cond)
                 continue;
             }
 
-            try
+            pmId = 0;
+            std::string *DbRootPath = NULL;
+            std::vector<oam::DeviceDBRootConfig>::iterator DBRootConfIter = moduleDBRootList.begin();
+
+            while ( !pmId || DBRootConfIter != moduleDBRootList.end() )
             {
-                oam_instance.getDbrootPmConfig(iter->dbRoot, pmId);
+                std::vector<uint16_t>::iterator PmDbRootListIter = DBRootConfIter->dbrootConfigList.begin();
+                std::vector<std::string>::iterator RootPathListIter = DBRootConfIter->dbrootPathList.begin();
+                while ( !pmId || PmDbRootListIter != DBRootConfIter->dbrootConfigList.end() )
+                {
+                    if ( *PmDbRootListIter == iter->dbRoot )
+                    {
+                        pmId = DBRootConfIter->DeviceID;
+                        DbRootPath = &(*RootPathListIter);
+                    }
+                    PmDbRootListIter++;
+                    RootPathListIter++;
+                }
+                DBRootConfIter++;
             }
-            catch (std::runtime_error)
+
+            if ( !pmId || !DbRootPath->size() )
             {
-                // MCOL-1116: If we are here a DBRoot is offline/missing
                 iter++;
                 continue;
             }
@@ -147,9 +169,8 @@ static int is_columnstore_files_fill(THD* thd, TABLE_LIST* tables, COND* cond)
             WriteEngine::Convertor::oid2FileName(oid, oidDirName, dbDir, iter->partitionNum, iter->segmentNum);
             std::stringstream DbRootName;
             DbRootName << "DBRoot" << iter->dbRoot;
-            std::string DbRootPath = config->getConfig("SystemConfig", DbRootName.str());
             fileSize = compressedFileSize = 0;
-            snprintf(fullFileName, WriteEngine::FILE_NAME_SIZE, "%s/%s", DbRootPath.c_str(), oidDirName);
+            snprintf(fullFileName, WriteEngine::FILE_NAME_SIZE, "%s/%s", DbRootPath->c_str(), oidDirName);
 
             std::ostringstream oss;
             oss << "pm" << pmId << "_WriteEngineServer";

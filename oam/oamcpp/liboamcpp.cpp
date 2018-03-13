@@ -5173,7 +5173,7 @@ bool Oam::switchParentOAMModule(std::string moduleName, GRACEFUL_FLAG gracefulfl
  * Get Storage Config Data
  *
  ********************************************************************/
-systemStorageInfo_t Oam::getStorageConfig()
+systemStorageInfo_t Oam::getStorageConfig(bool fillPaths)
 {
     DeviceDBRootList deviceDBRootList;
     std::string storageType = "";
@@ -5225,6 +5225,22 @@ systemStorageInfo_t Oam::getStorageConfig()
             if ( moduleCount > 0 && moduletype == "pm")
             {
                 deviceDBRootList = systemmoduletypeconfig.moduletypeconfig[i].ModuleDBRootList;
+                if ( fillPaths )
+                {
+                    std::vector<DeviceDBRootConfig>::iterator deviceDbRootConfIter = deviceDBRootList.begin();
+                    for ( ;deviceDbRootConfIter != deviceDBRootList.end(); deviceDbRootConfIter++ )
+                    {
+                        std::vector<uint16_t>::iterator dBRootConfigListIter = deviceDbRootConfIter->dbrootConfigList.begin();
+                        for ( ;dBRootConfigListIter != deviceDbRootConfIter->dbrootConfigList.end(); dBRootConfigListIter++)
+                        {
+                            std::stringstream DbRootName;
+                            DbRootName << "DBRoot" << *dBRootConfigListIter;
+                            std::string DbRootPath;
+                            getSystemConfig(DbRootName.str(), DbRootPath);
+                            deviceDbRootConfIter->dbrootPathList.push_back(DbRootPath);
+                        }
+                    }
+                }
                 return boost::make_tuple(storageType, SystemDBRootCount, deviceDBRootList, UMstorageType);
             }
         }
