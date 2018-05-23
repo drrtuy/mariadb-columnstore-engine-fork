@@ -197,7 +197,11 @@ void LimitedOrderBy::finalize()
         fRowGroup.getRow(0, &fRow0);
         queue<RGData> tempQueue;
         uint64_t i = 0;
-
+        uint32_t rSize = fRow0.getSize();
+        // skip first LIMIT rows in RowGroup
+        uint64_t offset = fCount<=fOrderByQueue.size() ? fCount : fOrderByQueue.size();
+        fRow0.nextRow(rSize * ( offset - 1));
+        
         while ((fOrderByQueue.size() > fStart) && (i++ < fCount))
         {
             const OrderByRow& topRow = fOrderByQueue.top();
@@ -205,7 +209,7 @@ void LimitedOrderBy::finalize()
             copyRow(row1, &fRow0);
             //memcpy(fRow0.getData(), topRow.fData, fRow0.getSize());
             fRowGroup.incRowCount();
-            fRow0.nextRow();
+            fRow0.prevRow(rSize);
             fOrderByQueue.pop();
 
             if (fRowGroup.getRowCount() >= fRowsPerRG)
