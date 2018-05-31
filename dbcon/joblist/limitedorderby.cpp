@@ -174,12 +174,14 @@ void LimitedOrderBy::processRow(const rowgroup::Row& row)
 
 void LimitedOrderBy::finalize()
 {
+    queue<RGData> tempQueue1;
+    queue<RGData> tempQueue;
     if (fRowGroup.getRowCount() > 0)
         fDataQueue.push(fData);
 
     // MCOL-1052 The removed check effectively disables sorting,
     // since fStart = 0 if there is no OFFSET;
-    if (true)
+    if (fOrderByQueue.size() > 0)
     {
         uint64_t newSize = fRowsPerRG * fRowGroup.getRowSize();
         fMemSize += newSize;
@@ -191,16 +193,70 @@ void LimitedOrderBy::finalize()
             throw IDBExcept(fErrorCode);
         }
 
+        //fData.reinit(fRowGroup, fRowsPerRG);
+        //fRowGroup.setData(&fData);
+        //fRowGroup.resetRowGroup(0);
+        //fRowGroup.getRow(0, &fRow0);
+        
+        uint64_t offset = 0;
+        uint64_t groups = 0;
+        uint64_t i = 0;
+        list<RGData> tempRGDataList;
+        
+        // Skip first LIMIT rows in RowGroup
+        if ( fCount <= fOrderByQueue.size() )
+        {
+            offset = fCount % fRowsPerRG;
+            if(!offset && fCount > 0)
+                offset = fRowsPerRG;
+            groups = fCount > fRowsPerRG ? fCount / fRowsPerRG + 0.5 : 1;
+        }
+        else
+        {
+            offset = fOrderByQueue.size() % fRowsPerRG;
+            if(!offset && fOrderByQueue.size() > 0)
+                offset = fRowsPerRG;
+            groups = fOrderByQueue.size() > fRowsPerRG ?
+             fOrderByQueue.size() / fRowsPerRG + 0.5: 1;
+        }
+        
+        // Getting new here. Otherwise fData.reinit() 
+        // overwrites later rows data that is in  fOrderByQueue.
+        //fData = *(new RGData); 
+        /*for(i = groups; i > 0; i--)
+        {
+            // создать в цикле groups групп
+            //
+            fMemSize += newSize;
+
+            if (!fRm->getMemory(newSize, fSessionMemLimit))
+            {
+                cerr << IDBErrorInfo::instance()->errorMsg(fErrorCode)
+                     << " @" << __FILE__ << ":" << __LINE__;
+                throw IDBExcept(fErrorCode);
+            }            
+            
+            fData.reinit(fRowGroup, fRowsPerRG);            
+            fRowGroup.setData(&fData); // ?
+            fRowGroup.resetRowGroup(0); // ?
+            tempRGDataList.push_back(fData);
+        }*/
+        
+        list<RGData>::iterator tempListIter = tempRGDataList.begin();
+        
+        //queue<RGData> tempQueue;
+        
+
+        
+        i = 0;
+        uint32_t rSize = fRow0.getSize();
+        uint64_t preLastRowNumb = fRowsPerRG - 1;
         fData.reinit(fRowGroup, fRowsPerRG);
         fRowGroup.setData(&fData);
         fRowGroup.resetRowGroup(0);
-        fRowGroup.getRow(0, &fRow0);
-        queue<RGData> tempQueue;
-        uint64_t i = 0;
-        uint32_t rSize = fRow0.getSize();
-        // skip first LIMIT rows in RowGroup
-        uint64_t offset = fCount<=fOrderByQueue.size() ? fCount : fOrderByQueue.size();
-        fRow0.nextRow(rSize * ( offset - 1));
+        offset = offset != 0 ? offset - 1 : offset;
+        fRowGroup.getRow(offset, &fRow0);
+        //fRow0.nextRow(rSize * ( offset - 1 ));
         
         while ((fOrderByQueue.size() > fStart) && (i++ < fCount))
         {
@@ -209,12 +265,17 @@ void LimitedOrderBy::finalize()
             copyRow(row1, &fRow0);
             //memcpy(fRow0.getData(), topRow.fData, fRow0.getSize());
             fRowGroup.incRowCount();
+            offset--;
             fRow0.prevRow(rSize);
             fOrderByQueue.pop();
 
-            if (fRowGroup.getRowCount() >= fRowsPerRG)
+            //if (fRowGroup.getRowCount() >= fRowsPerRG)
+            if(offset == (uint64_t)-1)
             {
-                tempQueue.push(fData);
+                //tempQueue.push(fData);
+                tempRGDataList.push_front(fData);
+                ////tempListIter--;
+                ////fData = *tempListIter;
                 fMemSize += newSize;
 
                 if (!fRm->getMemory(newSize, fSessionMemLimit))
@@ -223,18 +284,27 @@ void LimitedOrderBy::finalize()
                          << " @" << __FILE__ << ":" << __LINE__;
                     throw IDBExcept(fErrorCode);
                 }
-
-                fData.reinit(fRowGroup, fRowsPerRG);
-                //fData.reset(new uint8_t[fRowGroup.getDataSize(fRowsPerRG)]);
+                
+                fData.reinit(fRowGroup, fRowsPerRG);            
                 fRowGroup.setData(&fData);
-                fRowGroup.resetRowGroup(0);
-                fRowGroup.getRow(0, &fRow0);
+                fRowGroup.resetRowGroup(0); // ?
+                fRowGroup.getRow(preLastRowNumb, &fRow0);
+                offset = preLastRowNumb;
+                //fData.reinit(fRowGroup, fRowsPerRG);
+                //////fData.reset(new uint8_t[fRowGroup.getDataSize(fRowsPerRG)]);
+                ////fRowGroup.setData(&fData);
+                //fRowGroup.resetRowGroup(0);
+                ////fRowGroup.getRow(preLastRowNumb, &fRow0);
             }
         }
 
         if (fRowGroup.getRowCount() > 0)
-            tempQueue.push(fData);
-
+            tempRGDataList.push_front(fData);
+            //tempQueue.push(fData);        
+        
+        for(tempListIter = tempRGDataList.begin(); tempListIter != tempRGDataList.end(); tempListIter++)        
+            tempQueue.push(*tempListIter);
+        
         fDataQueue = tempQueue;
     }
 }
