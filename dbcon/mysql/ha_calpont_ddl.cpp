@@ -663,10 +663,10 @@ int ProcessDDLStatement(string& ddlStatement, string& schema, const string& tabl
     IDBCompressInterface idbCompress;
     parser.Parse(ddlStatement.c_str());
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (!MIGR::infinidb_vtable.cal_conn_info)
+        MIGR::infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(MIGR::infinidb_vtable.cal_conn_info);
 
     if (parser.Good())
     {
@@ -1962,7 +1962,7 @@ int ha_calpont_impl_create_(const char* name, TABLE* table_arg, HA_CREATE_INFO* 
     bool isCreate = true;
 
     // relate to bug 1793. Make sure this is not for a select statement because
-    if (db == "calpontsys" && thd->infinidb_vtable.vtable_state == THD::INFINIDB_INIT
+    if (db == "calpontsys" && MIGR::infinidb_vtable.vtable_state == MIGR::INFINIDB_INIT
             && tbl != "systable"
             && tbl != "syscolumn" && tbl != "sysindex"
             && tbl != "sysconstraint" && tbl != "sysindexcol"
@@ -1992,7 +1992,7 @@ int ha_calpont_impl_create_(const char* name, TABLE* table_arg, HA_CREATE_INFO* 
             return 0;
         }
 
-        if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ALTER_VTABLE) //check if it is select
+        if (MIGR::infinidb_vtable.vtable_state == MIGR::INFINIDB_ALTER_VTABLE) //check if it is select
         {
             return 0;
         }
@@ -2054,7 +2054,7 @@ int ha_calpont_impl_create_(const char* name, TABLE* table_arg, HA_CREATE_INFO* 
         return 1;
     }
 
-    int compressiontype = thd->variables.infinidb_compression_type;
+    int compressiontype = MIGR::infinidb_compression_type;
 
     if (compressiontype == 1) compressiontype = 2;
 
@@ -2066,7 +2066,7 @@ int ha_calpont_impl_create_(const char* name, TABLE* table_arg, HA_CREATE_INFO* 
     }
 
     if ( compressiontype == MAX_INT )
-        compressiontype = thd->variables.infinidb_compression_type;
+        compressiontype = MIGR::infinidb_compression_type;
     else if ( compressiontype < 0 )
     {
         string emsg = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE);
@@ -2248,12 +2248,12 @@ extern "C"
         if ( thd->db )
             db = thd->db;
 
-        int compressiontype = thd->variables.infinidb_compression_type;
+        int compressiontype = MIGR::infinidb_compression_type;
 
         if (compressiontype == 1) compressiontype = 2;
 
         if ( compressiontype == MAX_INT )
-            compressiontype = thd->variables.infinidb_compression_type;
+            compressiontype = MIGR::infinidb_compression_type;
 
         //hdfs
         if ((compressiontype == 0) && (useHdfs))

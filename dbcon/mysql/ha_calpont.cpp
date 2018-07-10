@@ -1156,8 +1156,8 @@ create_calpont_group_by_handler(THD* thd, Query* query)
 {
     ha_calpont_group_by_handler* handler = NULL;
 
-    if ( thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE
-            && thd->variables.infinidb_vtable_mode == 0)
+    //if ( MIGR::infinidb_vtable.vtable_state == MIGR::INFINIDB_DISABLE_VTABLE
+    //        && MIGR::infinidb_vtable_mode == 0)
     {
         handler = new ha_calpont_group_by_handler(thd, query);
 
@@ -1181,11 +1181,11 @@ int ha_calpont_group_by_handler::init_scan()
     DBUG_ENTER("ha_calpont_group_by_handler::init_scan");
 
     // Save vtable_state to restore the after we inited.
-    THD::infinidb_state oldState = thd->infinidb_vtable.vtable_state;
+    MIGR::infinidb_state oldState = MIGR::infinidb_vtable.vtable_state;
     // MCOL-1052 Should be removed after cleaning the code up.
-    thd->infinidb_vtable.vtable_state = THD::INFINIDB_CREATE_VTABLE;
+    MIGR::infinidb_vtable.vtable_state = MIGR::INFINIDB_CREATE_VTABLE;
     int rc = ha_calpont_impl_group_by_init(this, table);
-    thd->infinidb_vtable.vtable_state = oldState;
+    MIGR::infinidb_vtable.vtable_state = oldState;
 
     DBUG_RETURN(rc);
 }

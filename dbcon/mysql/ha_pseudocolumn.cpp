@@ -54,10 +54,10 @@ int64_t idblocalpm()
 {
     THD* thd = current_thd;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (!MIGR::infinidb_vtable.cal_conn_info)
+        MIGR::infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(MIGR::infinidb_vtable.cal_conn_info);
 
     if (ci->localPm == -1)
     {
@@ -485,10 +485,10 @@ execplan::ReturnedColumn* buildPseudoColumn(Item* item,
         bool& nonSupport,
         uint32_t pseudoType)
 {
-    if (!(gwi.thd->infinidb_vtable.cal_conn_info))
-        gwi.thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (!(MIGR::infinidb_vtable.cal_conn_info))
+        MIGR::infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(gwi.thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(MIGR::infinidb_vtable.cal_conn_info);
 
     Item_func* ifp = (Item_func*)item;
 

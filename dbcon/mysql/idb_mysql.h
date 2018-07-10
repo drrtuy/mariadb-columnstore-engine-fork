@@ -107,6 +107,104 @@ inline char* idb_mysql_query_str(THD* thd)
 }
 }
 
+class MIGR
+{
+    public:
+        enum infinidb_state
+          {
+            INFINIDB_INIT_CONNECT = 0,      // intend to use to drop leftover vtable when logon. not being used now.
+            INFINIDB_INIT,
+            INFINIDB_CREATE_VTABLE,
+            INFINIDB_ALTER_VTABLE,
+            INFINIDB_SELECT_VTABLE,              
+            INFINIDB_DROP_VTABLE,  
+            INFINIDB_DISABLE_VTABLE,
+            INFINIDB_REDO_PHASE1,       // post process requires to re-create vtable
+            INFINIDB_ORDER_BY,          // for InfiniDB handler to ignore the 2nd scan for order by
+            INFINIDB_REDO_QUERY,        // redo query with the normal mysql path
+            INFINIDB_ERROR_REDO_PHASE1,
+            INFINIDB_ERROR = 32,
+          };
+            static ulong infinidb_vtable_mode; //status
+            static ulong infinidb_decimal_scale; //vars
+            static my_bool infinidb_use_decimal_scale; //vars
+            static my_bool infinidb_ordered_only; //vars
+            static ulong infinidb_string_scan_threshold; 
+            static ulong infinidb_compression_type;
+            static ulong infinidb_stringtable_threshold;
+            static ulong infinidb_diskjoin_smallsidelimit;
+            static ulong infinidb_diskjoin_largesidelimit;
+            static ulong infinidb_diskjoin_bucketsize;
+            static ulong infinidb_um_mem_limit;
+            static my_bool infinidb_varbin_always_hex;
+            static my_bool infinidb_double_for_decimal_math;
+            static ulong infinidb_local_query;
+            static my_bool infinidb_use_import_for_batchinsert;
+            static ulong infinidb_import_for_batchinsert_delimiter;
+            static ulong infinidb_import_for_batchinsert_enclosed_by;
+            static ulong infinidb_columnstore_cs_local_query;
+          
+          struct INFINIDB_VTABLE
+          {
+            String original_query;
+            String create_vtable_query;
+            String alter_vtable_query;
+            String select_vtable_query;
+            String drop_vtable_query;   
+            String insert_vtable_query;
+            infinidb_state vtable_state;  // flag for InfiniDB MySQL virtual table structure
+            bool autoswitch;
+            bool has_order_by;
+            bool duplicate_field_name; // @bug 1928. duplicate field name in create_phase will be ingored.
+            bool call_sp;
+            bool override_largeside_estimate;
+            void* cal_conn_info;
+            bool isUnion;
+            bool impossibleWhereOnUnion;
+            bool isInsertSelect;
+            bool isUpdateWithDerive;
+            bool isInfiniDBDML; // default false
+            bool hasInfiniDBTable; // default false
+            bool isNewQuery;
+            
+            INFINIDB_VTABLE() : cal_conn_info(NULL) {init();}
+            void init()
+            {
+                vtable_state = INFINIDB_CREATE_VTABLE;
+                autoswitch = false;
+                has_order_by = false;
+                duplicate_field_name = false;
+                call_sp = false;
+                override_largeside_estimate = false;
+                if (cal_conn_info)
+                {
+                    // Kludge because cal_conn_info is created in the engine and just left
+                    // laying about. It can't be reused unless an init function is made.
+                    // This whole mechanism should change when INFINIFB_VTABLE is created
+                    // via API
+                    // If we can't get the structure to work via api, then we need to rethink
+                    // how cal_conn_info is created and destroyed. Perhaps include the definition
+                    // of cal_connection_info here and control its creation more systematically.
+                    free(cal_conn_info);
+                }
+                cal_conn_info = NULL;
+                isUnion = false;
+                impossibleWhereOnUnion = false;
+                isUpdateWithDerive = false;
+                isInfiniDBDML = false;
+                hasInfiniDBTable = false;
+                isNewQuery = true;
+                MIGR::infinidb_vtable_mode = 1;
+                MIGR::infinidb_decimal_scale = 0;
+                MIGR::infinidb_columnstore_cs_local_query = 0;                
+            }
+          };      
+
+       
+      static INFINIDB_VTABLE infinidb_vtable;                  // InfiniDB custom structure
+ 
+};
+
 #endif
 // vim:ts=4 sw=4:
 
