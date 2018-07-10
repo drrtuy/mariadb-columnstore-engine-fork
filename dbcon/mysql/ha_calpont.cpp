@@ -1101,44 +1101,6 @@ struct st_mysql_storage_engine columnstore_storage_engine =
 struct st_mysql_storage_engine infinidb_storage_engine =
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
 
-#if 0
-static ulong srv_enum_var = 0;
-static ulong srv_ulong_var = 0;
-
-const char* enum_var_names[] =
-{
-    "e1", "e2", NullS
-};
-
-TYPELIB enum_var_typelib =
-{
-    array_elements(enum_var_names) - 1, "enum_var_typelib",
-    enum_var_names, NULL
-};
-
-static MYSQL_SYSVAR_ENUM(
-    enum_var,                       // name
-    srv_enum_var,                   // varname
-    PLUGIN_VAR_RQCMDARG,            // opt
-    "Sample ENUM system variable.", // comment
-    NULL,                           // check
-    NULL,                           // update
-    0,                              // def
-    &enum_var_typelib);             // typelib
-
-static MYSQL_SYSVAR_ULONG(
-    ulong_var,
-    srv_ulong_var,
-    PLUGIN_VAR_RQCMDARG,
-    "0..1000",
-    NULL,
-    NULL,
-    8,
-    0,
-    1000,
-    0);
-#endif
-
 /*@brief  create_calpont_group_by_handler- Creates handler*/
 /***********************************************************
  * DESCRIPTION:
@@ -1219,11 +1181,72 @@ int ha_calpont_group_by_handler::end_scan()
     DBUG_RETURN(rc);
 }
 
+#if 0
+static ulong srv_enum_var = 0;
+static ulong srv_ulong_var = 0;
 
-static struct st_mysql_sys_var* calpont_system_variables[] =
+const char* enum_var_names[] =
 {
-//  MYSQL_SYSVAR(enum_var),
-//  MYSQL_SYSVAR(ulong_var),
+    "e1", "e2", NullS
+};
+
+TYPELIB enum_var_typelib =
+{
+    array_elements(enum_var_names) - 1, "enum_var_typelib",
+    enum_var_names, NULL
+};
+
+static MYSQL_SYSVAR_ENUM(
+    enum_var,                       // name
+    srv_enum_var,                   // varname
+    PLUGIN_VAR_RQCMDARG,            // opt
+    "Sample ENUM system variable.", // comment
+    NULL,                           // check
+    NULL,                           // update
+    0,                              // def
+    &enum_var_typelib);             // typelib
+
+static MYSQL_SYSVAR_ULONG(
+    ulong_var,
+    srv_ulong_var,
+    PLUGIN_VAR_RQCMDARG,
+    "0..1000",
+    NULL,
+    NULL,
+    8,
+    0,
+    1000,
+    0);
+#endif
+
+// CS status variables
+volatile ulong cs_vtable_mode_var = 1;
+
+// CS system variables
+static ulong cs_local_query_var = 0;
+static MYSQL_SYSVAR_ULONG(
+  cs_local_query,
+  cs_local_query_var,
+  PLUGIN_VAR_RQCMDARG,
+  "ColumnStore local query knob",
+  NULL,
+  NULL,
+  0,
+  0,
+  1,
+  0
+);
+
+static struct st_mysql_sys_var* columnstore_system_variables[] =
+{
+    MYSQL_SYSVAR(cs_local_query),
+    NULL
+};
+
+struct st_mysql_show_var columnstore_status_variables[] =
+{
+    { "columnstore_vtable_mode", 
+        (char*) &cs_vtable_mode_var, SHOW_ULONG },
     NULL
 };
 
@@ -1238,8 +1261,8 @@ mysql_declare_plugin(columnstore)
     columnstore_init_func,                        /* Plugin Init */
     columnstore_done_func,                        /* Plugin Deinit */
     0x0100 /* 1.0 */,
-    NULL,                                         /* status variables */
-    calpont_system_variables,                     /* system variables */
+    columnstore_status_variables,                 /* status variables */
+    columnstore_system_variables,                 /* system variables */
     NULL,                                         /* reserved */
     0                                             /* config flags */
 },
@@ -1251,10 +1274,10 @@ mysql_declare_plugin(columnstore)
     "Columnstore storage engine (deprecated: use columnstore)",
     PLUGIN_LICENSE_GPL,
     infinidb_init_func,                           /* Plugin Init */
-    infinidb_done_func,                            /* Plugin Deinit */
+    infinidb_done_func,                           /* Plugin Deinit */
     0x0100 /* 1.0 */,
-    NULL,                                         /* status variables */
-    calpont_system_variables,                     /* system variables */
+    columnstore_status_variables,                 /* status variables */
+    columnstore_system_variables,                 /* system variables */
     NULL,                                         /* reserved */
     0                                             /* config flags */
 }

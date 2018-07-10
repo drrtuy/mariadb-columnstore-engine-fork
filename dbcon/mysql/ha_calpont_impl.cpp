@@ -195,8 +195,8 @@ void storeNumericField(Field** f, int64_t value, CalpontSystemCatalog::ColType& 
 
             // @bug4388 stick to InfiniDB's scale in case mysql gives wrong scale due
             // to create vtable limitation.
-            if (f2->dec < ct.scale)
-                f2->dec = ct.scale;
+            //if (f2->dec < ct.scale)
+            //    f2->dec = ct.scale;
 
             char buf[256];
             dataconvert::DataConvert::decimalToString(value, (unsigned)ct.scale, buf, 256, ct.colDataType);
@@ -293,8 +293,8 @@ void storeNumericFieldGroupBy(Field** f, int64_t value, CalpontSystemCatalog::Co
 
             // @bug4388 stick to InfiniDB's scale in case mysql gives wrong scale due
             // to create vtable limitation.
-            if (f2->dec < ct.scale)
-                f2->dec = ct.scale;
+            //if (f2->dec < ct.scale)
+            //    f2->dec = ct.scale;
 
             char buf[256];
             dataconvert::DataConvert::decimalToString(value, (unsigned)ct.scale, buf, 256, ct.colDataType);
@@ -751,8 +751,8 @@ int fetchNextRow(uchar* buf, cal_table_info& ti, cal_connection_info* ci, bool h
 
                     //float float_val = *(float*)(&value);
                     //f2->store(float_val);
-                    if (f2->decimals() < (uint32_t)row.getScale(s))
-                        f2->dec = (uint32_t)row.getScale(s);
+                    //if (f2->decimals() < (uint32_t)row.getScale(s))
+                    //    f2->dec = (uint32_t)row.getScale(s);
 
                     f2->store(dl);
 
@@ -781,11 +781,11 @@ int fetchNextRow(uchar* buf, cal_table_info& ti, cal_connection_info* ci, bool h
 
                     //double double_val = *(double*)(&value);
                     //f2->store(double_val);
-                    if ((f2->decimals() == DECIMAL_NOT_SPECIFIED && row.getScale(s) > 0)
-                     || f2->decimals() < row.getScale(s))
-                    {
-                        f2->dec = row.getScale(s);
-                    }
+                    //if ((f2->decimals() == DECIMAL_NOT_SPECIFIED && row.getScale(s) > 0)
+                    // || f2->decimals() < row.getScale(s))
+                    //{
+                    //    f2->dec = row.getScale(s);
+                    //}
 
                     f2->store(dl);
 
