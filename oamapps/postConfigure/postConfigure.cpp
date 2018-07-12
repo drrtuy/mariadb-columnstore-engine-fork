@@ -603,12 +603,13 @@ int main(int argc, char* argv[])
     if ( reuseConfig == "y" )
     {
         cmd = installDir + "/bin/mycnfUpgrade  > /tmp/mycnfUpgrade.log 2>&1";
-        int rtnCode = system(cmd.c_str());
+        /*int rtnCode = system(cmd.c_str());
 
         if (WEXITSTATUS(rtnCode) != 0)
             cout << "Error: Problem upgrade my.cnf, check /tmp/mycnfUpgrade.log" << endl;
         else
             cout << "NOTE: my.cnf file was upgraded based on my.cnf.rpmsave" << endl;
+        */
     }
 
     //check mysql port changes
@@ -5468,7 +5469,7 @@ void setSystemName()
     try
     {
         sysConfig->setConfig(SystemSection, "SystemName", systemName);
-        oam.changeMyCnf( "server_audit_syslog_info", systemName );
+        //oam.changeMyCnf( "server_audit_syslog_info", systemName );
     }
     catch (...)
     {

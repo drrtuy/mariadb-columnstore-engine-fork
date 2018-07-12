@@ -126,6 +126,10 @@ handlerton* calpont_hton;
 static group_by_handler*
 create_calpont_group_by_handler(THD* thd, Query* query);
 
+#include "idb_mysql.h"
+
+MIGR::INFINIDB_VTABLE MIGR::infinidb_vtable = MIGR::INFINIDB_VTABLE();
+
 /* Variables for example share methods */
 
 /*
@@ -250,6 +254,26 @@ static int infinidb_init_func(void* p)
     calpont_hton->commit = calpont_commit;
     calpont_hton->rollback = calpont_rollback;
     calpont_hton->close_connection = calpont_close_connection;
+    /*MIGR::infinidb_vtable_mode = 0;
+    MIGR::infinidb_decimal_scale = 0;
+    MIGR::infinidb_columnstore_cs_local_query = 0;    
+    MIGR::infinidb_compression_type = 2;
+    MIGR::infinidb_decimal_scale = 8;
+    MIGR::infinidb_diskjoin_bucketsize = 100;
+    MIGR::infinidb_diskjoin_largesidelimit = 0;
+    MIGR::infinidb_diskjoin_smallsidelimit = 0;
+    MIGR::infinidb_double_for_decimal_math = 0;
+    MIGR::infinidb_import_for_batchinsert_delimiter = 7;
+    MIGR::infinidb_import_for_batchinsert_enclosed_by = 17;
+    MIGR::infinidb_local_query = 0;
+    MIGR::infinidb_ordered_only = 0;
+    MIGR::infinidb_string_scan_threshold = 10;
+    MIGR::infinidb_stringtable_threshold = 20;
+    MIGR::infinidb_um_mem_limit = 0;
+    MIGR::infinidb_use_decimal_scale = 0;
+    MIGR::infinidb_use_import_for_batchinsert = 0;
+    MIGR::infinidb_varbin_always_hex = 0;
+    */
     DBUG_RETURN(0);
 }
 

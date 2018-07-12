@@ -125,24 +125,24 @@ class MIGR
             INFINIDB_ERROR_REDO_PHASE1,
             INFINIDB_ERROR = 32,
           };
-            static ulong infinidb_vtable_mode; //status
-            static ulong infinidb_decimal_scale; //vars
-            static my_bool infinidb_use_decimal_scale; //vars
-            static my_bool infinidb_ordered_only; //vars
-            static ulong infinidb_string_scan_threshold; 
-            static ulong infinidb_compression_type;
-            static ulong infinidb_stringtable_threshold;
-            static ulong infinidb_diskjoin_smallsidelimit;
-            static ulong infinidb_diskjoin_largesidelimit;
-            static ulong infinidb_diskjoin_bucketsize;
-            static ulong infinidb_um_mem_limit;
-            static my_bool infinidb_varbin_always_hex;
-            static my_bool infinidb_double_for_decimal_math;
-            static ulong infinidb_local_query;
-            static my_bool infinidb_use_import_for_batchinsert;
-            static ulong infinidb_import_for_batchinsert_delimiter;
-            static ulong infinidb_import_for_batchinsert_enclosed_by;
-            static ulong infinidb_columnstore_cs_local_query;
+            const static ulong infinidb_vtable_mode = 0; //status
+            const static ulong infinidb_decimal_scale = 8; //vars
+            const static my_bool infinidb_use_decimal_scale = 0; //vars
+            const static my_bool infinidb_ordered_only = 0; //vars
+            const static ulong infinidb_string_scan_threshold = 10;
+            const static ulong infinidb_compression_type = 2;
+            const static ulong infinidb_stringtable_threshold = 20;
+            const static ulong infinidb_diskjoin_smallsidelimit = 0;
+            const static ulong infinidb_diskjoin_largesidelimit = 0;
+            const static ulong infinidb_diskjoin_bucketsize = 100;
+            const static ulong infinidb_um_mem_limit = 0;
+            const static my_bool infinidb_varbin_always_hex = 0;
+            const static my_bool infinidb_double_for_decimal_math = 0;
+            const static ulong infinidb_local_query = 0;
+            const static my_bool infinidb_use_import_for_batchinsert = 0;
+            const static ulong infinidb_import_for_batchinsert_delimiter = 7;
+            const static ulong infinidb_import_for_batchinsert_enclosed_by = 17;
+            const static ulong infinidb_columnstore_cs_local_query = 0;
           
           struct INFINIDB_VTABLE
           {
@@ -150,7 +150,7 @@ class MIGR
             String create_vtable_query;
             String alter_vtable_query;
             String select_vtable_query;
-            String drop_vtable_query;   
+            String drop_vtable_query;
             String insert_vtable_query;
             infinidb_state vtable_state;  // flag for InfiniDB MySQL virtual table structure
             bool autoswitch;
@@ -170,7 +170,7 @@ class MIGR
             INFINIDB_VTABLE() : cal_conn_info(NULL) {init();}
             void init()
             {
-                vtable_state = INFINIDB_CREATE_VTABLE;
+                vtable_state = INFINIDB_DISABLE_VTABLE;
                 autoswitch = false;
                 has_order_by = false;
                 duplicate_field_name = false;
@@ -194,15 +194,31 @@ class MIGR
                 isInfiniDBDML = false;
                 hasInfiniDBTable = false;
                 isNewQuery = true;
-                MIGR::infinidb_vtable_mode = 1;
-                MIGR::infinidb_decimal_scale = 0;
-                MIGR::infinidb_columnstore_cs_local_query = 0;                
+                /*
+                    MIGR::infinidb_decimal_scale = 0;
+                    MIGR::infinidb_columnstore_cs_local_query = 0;    
+                    MIGR::infinidb_compression_type = 2;
+                    MIGR::infinidb_decimal_scale = 8;
+                    MIGR::infinidb_diskjoin_bucketsize = 100;
+                    MIGR::infinidb_diskjoin_largesidelimit = 0;
+                    MIGR::infinidb_diskjoin_smallsidelimit = 0;
+                    MIGR::infinidb_double_for_decimal_math = 0;
+                    MIGR::infinidb_import_for_batchinsert_delimiter = 7;
+                    MIGR::infinidb_import_for_batchinsert_enclosed_by = 17;
+                    MIGR::infinidb_local_query = 0;
+                    MIGR::infinidb_ordered_only = 0;
+                    MIGR::infinidb_string_scan_threshold = 10;
+                    MIGR::infinidb_stringtable_threshold = 20;
+                    MIGR::infinidb_um_mem_limit = 0;
+                    MIGR::infinidb_use_decimal_scale = 0;
+                    MIGR::infinidb_use_import_for_batchinsert = 0;
+                    MIGR::infinidb_varbin_always_hex = 0;
+                    */
             }
           };      
 
        
-      static INFINIDB_VTABLE infinidb_vtable;                  // InfiniDB custom structure
- 
+      static INFINIDB_VTABLE infinidb_vtable;                  // InfiniDB custom structure 
 };
 
 #endif
