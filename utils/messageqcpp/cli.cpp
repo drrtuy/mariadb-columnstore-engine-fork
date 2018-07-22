@@ -10,8 +10,10 @@ using namespace config;
 
 int main(int argc, char** argv)
 {
-    Config* cf = Config::makeConfig("./Columnstore.xml");
-    MessageQueueClient mqc("server1", cf);
+    Config* cf = Config::makeConfig("/Columnstore.xml");
+    //MessageQueueClient mqc("server1", cf);
+    uint16_t port = 7601;
+    MessageQueueClient mqc("localhost", port);
 
     ByteStream obs;
     string msg("Hello, world!");
