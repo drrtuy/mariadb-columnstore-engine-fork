@@ -2148,7 +2148,7 @@ SimpleColumn* buildSimpleColFromDerivedTable(gp_walk_info& gwi, Item_field* ifp)
     {
         gwi.fatalParseError = true;
         Message::Args args;
-        string name;
+        string name = "";
 
         if (ifp->db_name)
             name += string(ifp->db_name) + ".";
@@ -2156,7 +2156,9 @@ SimpleColumn* buildSimpleColFromDerivedTable(gp_walk_info& gwi, Item_field* ifp)
         if (ifp->table_name)
             name += string(ifp->table_name) + ".";
 
-        name += ifp->name;
+        if (ifp->name)
+            name += ifp->name;
+
         args.add(name);
         gwi.parseErrorText = IDBErrorInfo::instance()->errorMsg(ERR_UNKNOWN_COL, args);
     }
