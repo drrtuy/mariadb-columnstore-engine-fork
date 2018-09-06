@@ -3079,6 +3079,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
         idbassert(ci->cal_conn_hndl != 0);
         ci->cal_conn_hndl->csc = csc;
         idbassert(ci->cal_conn_hndl->exeMgr != 0);
+        
 
         try
         {
@@ -3409,6 +3410,7 @@ internal_error:
 
 int ha_calpont_impl_rnd_next(uchar* buf, TABLE* table)
 {
+    cerr << "ha_calpont_impl_rnd_next table:" << table << endl;
     THD* thd = current_thd;
 
     /* If this node is the slave, ignore DML to IDB tables */
@@ -3533,6 +3535,7 @@ int ha_calpont_impl_rnd_next(uchar* buf, TABLE* table)
 
 int ha_calpont_impl_rnd_end(TABLE* table)
 {
+    cerr << "ha_calpont_impl_rnd_end() table:" << table << endl;
     int rc = 0;
     THD* thd = current_thd;
     cal_connection_info* ci = NULL;
@@ -5095,6 +5098,7 @@ int ha_calpont_impl_group_by_init(ha_calpont_group_by_handler* group_hand, TABLE
 {
     string tableName = group_hand->table_list->table->s->table_name.str;
     IDEBUG( cout << "group_by_init for table " << tableName << endl );
+    cout << "group_by_init for table " << tableName << endl;
     THD* thd = current_thd;
 
     //check whether the system is ready to process statement.
@@ -5215,7 +5219,7 @@ int ha_calpont_impl_group_by_init(ha_calpont_group_by_handler* group_hand, TABLE
         // if the previous query has error, re-establish the connection
         if (ci->queryState != 0)
         {
-            sm::sm_cleanup(ci->cal_conn_hndl);
+            //sm::sm_cleanup(ci->cal_conn_hndl);
             ci->cal_conn_hndl = 0;
         }
 
@@ -5236,6 +5240,8 @@ int ha_calpont_impl_group_by_init(ha_calpont_group_by_handler* group_hand, TABLE
         }
 
         hndl = ci->cal_conn_hndl;
+        
+        ci->cal_conn_hndl_st.push(ci->cal_conn_hndl);
 
         if (!csep)
             csep.reset(new CalpontSelectExecutionPlan());
@@ -5439,11 +5445,15 @@ int ha_calpont_impl_group_by_init(ha_calpont_group_by_handler* group_hand, TABLE
                 idbassert(hndl != 0);
                 hndl->csc = csc;
 
+                // The next section is useless
                 if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE)
                     ti.conn_hndl = hndl;
                 else
+                {
                     ci->cal_conn_hndl = hndl;
-
+                    ci->cal_conn_hndl_st.pop();
+                    ci->cal_conn_hndl_st.push(ci->cal_conn_hndl);
+                }
                 try
                 {
                     hndl->connect();
@@ -5476,10 +5486,13 @@ int ha_calpont_impl_group_by_init(ha_calpont_group_by_handler* group_hand, TABLE
             (thd->infinidb_vtable.vtable_state == THD::INFINIDB_DISABLE_VTABLE) ||
             (thd->infinidb_vtable.vtable_state == THD::INFINIDB_REDO_QUERY))
     {
-        if (ti.tpl_ctx == 0)
+        // tps_ctx must be 0 
+        if (ti.tpl_ctx_st.size() == 0)
         {
             ti.tpl_ctx = new sm::cpsm_tplh_t();
+            ti.tpl_ctx_st.push(ti.tpl_ctx);
             ti.tpl_scan_ctx = sm::sp_cpsm_tplsch_t(new sm::cpsm_tplsch_t());
+            ti.tpl_scan_ctx_st.push(ti.tpl_scan_ctx);
         }
 
         // make sure rowgroup is null so the new meta data can be taken. This is for some case mysql
@@ -5678,6 +5691,7 @@ int ha_calpont_impl_group_by_next(ha_calpont_group_by_handler* group_hand, TABLE
     {
         // fetchNextRow interface forces to use buf.
         unsigned char buf;
+        cerr << "ha_calpont_impl_group_by_next ti:" << &ti << " ci:" << &ci << endl; 
         rc = fetchNextRow(&buf, ti, ci, true);
     }
     catch (std::exception& e)
@@ -5714,6 +5728,7 @@ int ha_calpont_impl_group_by_next(ha_calpont_group_by_handler* group_hand, TABLE
 
 int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE* table)
 {
+    cerr << "ha_calpont_impl_group_by_end() group_hand:" << group_hand << endl;
     int rc = 0;
     THD* thd = current_thd;
     cal_connection_info* ci = NULL;
@@ -5802,6 +5817,9 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
             ci->cal_conn_hndl = 0;
             // clear querystats because no query stats available for cancelled query
             ci->queryStats = "";
+            ci->cal_conn_hndl_st.pop();
+            if ( ci->cal_conn_hndl_st.size() )
+                ci->cal_conn_hndl = ci->cal_conn_hndl_st.top();
         }
 
         return 0;
@@ -5829,6 +5847,9 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
         }
 
         ti.tpl_scan_ctx.reset();
+        ti.tpl_scan_ctx_st.pop();
+        if ( ti.tpl_scan_ctx_st.size() )
+            ti.tpl_scan_ctx =  ti.tpl_scan_ctx_st.top();
 
         try
         {
@@ -5865,6 +5886,19 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
     }
 
     ti.tpl_ctx = 0;
+
+    ti.tpl_ctx_st.pop();
+    if ( ti.tpl_ctx_st.size() )
+        ti.tpl_ctx = ti.tpl_ctx_st.top();
+
+    cerr << "group_by_end ci->cal_conn_hndl_st.size(): " << ci->cal_conn_hndl_st.size() << endl;
+
+    if ( ci->cal_conn_hndl_st.size() )
+    {
+        ci->cal_conn_hndl_st.pop();
+        if ( ci->cal_conn_hndl_st.size() )
+            ci->cal_conn_hndl = ci->cal_conn_hndl_st.top();        
+    }
 
     ci->tableMap[table] = ti;
 

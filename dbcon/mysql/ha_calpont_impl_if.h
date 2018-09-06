@@ -187,10 +187,13 @@ struct cal_table_info
     { }
     ~cal_table_info() {}
     sm::cpsm_tplh_t* tpl_ctx;
+    std::stack<sm::cpsm_tplh_t*> tpl_ctx_st;
     sm::sp_cpsm_tplsch_t tpl_scan_ctx;
+    std::stack<sm::sp_cpsm_tplsch_t> tpl_scan_ctx_st;
     unsigned c; // for debug purpose
     TABLE* msTablePtr; // no ownership
     sm::cpsm_conhdl_t* conn_hndl;
+    std::stack<sm::cpsm_conhdl_t*> conn_hndl_st;
     gp_walk_info* condInfo;
     execplan::SCSEP csep;
     bool moreRows; //are there more rows to consume (b/c of limit)
@@ -273,6 +276,7 @@ struct cal_connection_info
     }
 
     sm::cpsm_conhdl_t* cal_conn_hndl;
+    std::stack<sm::cpsm_conhdl_t*> cal_conn_hndl_st;
     int queryState;
     CalTableMap tableMap;
     sm::tableid_t currentTable;

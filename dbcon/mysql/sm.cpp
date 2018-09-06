@@ -61,6 +61,7 @@ using namespace sm;
 // @bug 159 fix. clean up routine when error happened
 void cleanup(cpsm_conhdl_t* hndl)
 {
+    cerr << "cleanup() for cpsm_conhdl_t" << endl;
     // remove system catalog instance for this statement.
     CalpontSystemCatalog::removeCalpontSystemCatalog(hndl->sessionID);
     hndl->queryState = NO_QUERY;
@@ -69,6 +70,10 @@ void cleanup(cpsm_conhdl_t* hndl)
 
 status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, int* killed)
 {
+    if ( hndl && ntplsch && killed )
+        cerr << "tpl_scan_fetch_getband() hndl=" << hndl << " sp_cpsm_tplsch_t=" << &ntplsch << "int:" << *killed << endl;
+    else
+        cerr << "tpl_scan_fetch_getband() hndl=" << hndl << " sp_cpsm_tplsch_t=" << &ntplsch << endl;
     // @bug 649 check keybandmap first
     map<int, int>::iterator keyBandMapIter = hndl->keyBandMap.find(ntplsch->key);
 
@@ -140,11 +145,12 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 
                 if (killed && *killed)
                     return SQL_KILLED;
-
+                cerr << "tpl_scan_fetch_getband() ExeMgr.read()" << endl;
                 ntplsch->bs = hndl->exeMgr->read();
 
                 if (ntplsch->bs.length() != 0)
                 {
+                    cerr << "tpl_scan_fetch_getband() deserializeTable() 1" << endl;
                     ntplsch->deserializeTable(ntplsch->bs);
 
                     if (ntplsch->rowGroup && ntplsch->rowGroup->getRGData() == NULL)
@@ -157,6 +163,7 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 
                         while (timeout)
                         {
+                            cerr << "tpl_scan_fetch_getband() timeout" << endl;
                             timeout = false;
                             ntplsch->bs = hndl->exeMgr->getClient()->read(&t, &timeout);
 
@@ -166,10 +173,11 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 
                         if (ntplsch->bs.length() == 0)
                         {
+                            cerr << "tpl_scan_fetch_getband() lost conn" << endl;
                             hndl->curFetchTb = 0;
                             return logging::ERR_LOST_CONN_EXEMGR;
                         }
-
+                        cerr << "tpl_scan_fetch_getband() deserializeTable() 2" << endl;
                         ntplsch->deserializeTable(ntplsch->bs);
                     }
 
@@ -183,6 +191,7 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
                 }
                 else // @todo error handling
                 {
+                    cerr << "tpl_scan_fetch_getband() error" << endl;
                     hndl->curFetchTb = 0;
 
                     if (ntplsch->saveFlag == NO_SAVE)
@@ -196,6 +205,7 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
             // All done with this table. reset curFetchTb when finish SOCKET reading
             if (ntplsch->getRowCount() == 0)
             {
+                cerr << "tpl_scan_fetch_getband() SQL_NOT_FOUND" << endl;
                 hndl->curFetchTb = 0;
 
                 if (ntplsch->saveFlag == NO_SAVE)
@@ -222,6 +232,7 @@ status_t tpl_scan_fetch_getband(cpsm_conhdl_t* hndl, sp_cpsm_tplsch_t& ntplsch, 
 
 void end_query(cpsm_conhdl_t* hndl)
 {
+    cerr << "end_query() for hndl=" << hndl << endl;
     // remove system catalog instance for this statement.
     // @bug 695. turn on system catalog session cache for FE
     // CalpontSystemCatalog::removeCalpontSystemCatalog(hndl->sessionID);
@@ -269,6 +280,7 @@ void sighandler(int sig_num)
 
 namespace sm
 {
+std::ofstream smlog;
 #ifdef _MSC_VER
 const std::string DEFAULT_SAVE_PATH = "C:\\Calpont\\tmp";
 #else
@@ -280,7 +292,7 @@ tpl_open ( tableid_t tableid,
            cpsm_tplh_t*	ntplh,
            cpsm_conhdl_t*	conn_hdl)
 {
-    SMDEBUGLOG << "tpl_open: " << conn_hdl << " tableid: " << tableid << endl;
+    SMDEBUGLOG << "tpl_open: ntplh: " << ntplh << " conn_hdl: " << conn_hdl << " tableid: " << tableid << endl;
 
     // if first time enter this function for a statement, set
     // queryState to QUERY_IN_PRCOESS and get execution plan.
@@ -351,7 +363,7 @@ status_t
 tpl_scan_close ( sp_cpsm_tplsch_t& ntplsch )
 {
 #if IDB_SM_DEBUG
-    SMDEBUGLOG << "tpl_scan_close: ";
+    SMDEBUGLOG << "tpl_scan_close: ntplsch " << ntplsch;
 
     if (ntplsch)
         SMDEBUGLOG << " tableid: " << ntplsch->tableid << endl;
@@ -369,7 +381,7 @@ tpl_close ( cpsm_tplh_t* ntplh,
 {
     cpsm_conhdl_t* hndl = *conn_hdl;
 #if IDB_SM_DEBUG
-    SMDEBUGLOG << "tpl_close: " << hndl;
+    SMDEBUGLOG << "tpl_close: hndl" << hndl << " ntplh " << ntplh;
 
     if (ntplh)
         SMDEBUGLOG << " tableid: " << ntplh->tableid;
@@ -436,9 +448,9 @@ sm_init ( uint32_t sid,
 {
     // clear file content
 #if IDB_SM_DEBUG
-    smlog.close();
-    smlog.open("/tmp/sm.log");
-    SMDEBUGLOG << "sm_init: " << dboptions << endl;
+//    smlog.close();
+    //smlog.open("/tmp/sm.log");
+    SMDEBUGLOG << "sm_init: " << endl;
 #endif
 
     // @bug5660 Connection changes related to the local pm setting
@@ -474,7 +486,7 @@ sm_cleanup ( cpsm_conhdl_t* conn_hdl )
 {
 #if IDB_SM_DEBUG
     SMDEBUGLOG << "sm_cleanup: " << conn_hdl << endl;
-    SMDEBUGLOG.close();
+    //SMDEBUGLOG.close();
 #endif
 
     delete conn_hdl;

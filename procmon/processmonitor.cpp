@@ -2786,7 +2786,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
                 close(fd);
             }
 
-            if ( LogFile == "off" )
+            /*if ( LogFile == "off" )
             {
                 fd = open("/dev/null", O_WRONLY); //Should be fd 1
 
@@ -2804,7 +2804,7 @@ pid_t ProcessMonitor::startProcess(string processModuleType, string processName,
                     close(fd);
                 }
             }
-            else
+            else*/
             {
                 // open STDOUT & STDERR to log file
 //				log.writeLog(__LINE__, "STDOUT  to " + outFileName, LOG_TYPE_DEBUG);

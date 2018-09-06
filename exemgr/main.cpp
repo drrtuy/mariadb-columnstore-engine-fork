@@ -1398,7 +1398,7 @@ int main(int argc, char* argv[])
     // This is unset due to the way we start it
     program_invocation_short_name = const_cast<char*>("ExeMgr");
 
-    gDebug = 0;
+    gDebug = 5;
     bool eFlg = false;
     int c;
 

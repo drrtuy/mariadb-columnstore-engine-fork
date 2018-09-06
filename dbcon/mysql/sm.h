@@ -37,8 +37,8 @@
 #include "calpontselectexecutionplan.h"
 #include "querystats.h"
 
-#define IDB_SM_DEBUG 0
-#define IDB_SM_PROFILE 0
+#define IDB_SM_DEBUG 1
+#define IDB_SM_PROFILE 1
 
 #if defined(_MSC_VER) && defined(xxxDLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -60,12 +60,12 @@ const int SQL_NOT_FOUND = -1000;
 const int SQL_KILLED = -1001;
 const int CALPONT_INTERNAL_ERROR = -1007;
 
-#if IDB_SM_DEBUG
-extern std::ofstream smlog;
-#define SMDEBUGLOG smlog
-#else
-#define SMDEBUGLOG if (false) std::cerr
-#endif
+//#if IDB_SM_DEBUG
+//extern std::ofstream smlog;
+//#define SMDEBUGLOG smlog
+//#else
+#define SMDEBUGLOG std::cerr
+//#endif
 extern const std::string DEFAULT_SAVE_PATH;
 
 typedef uint64_t tableid_t;
@@ -127,7 +127,7 @@ struct Profiler
 /** @brief Calpont table scan handle */
 struct cpsm_tplsch_t
 {
-    cpsm_tplsch_t() : tableid(0), rowsreturned(0), rowGroup(0), traceFlags(0), bandID(0), saveFlag(0), bandsReturned(0),
+    cpsm_tplsch_t() : tableid(0), rowsreturned(0), rowGroup(0), traceFlags(1), bandID(0), saveFlag(0), bandsReturned(0),
         ctp(0) {}
     ~cpsm_tplsch_t()
     {
