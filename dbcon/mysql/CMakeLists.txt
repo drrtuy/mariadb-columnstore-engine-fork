@@ -22,7 +22,7 @@ SET ( libcalmysql_SRCS
 add_definitions(-DMYSQL_DYNAMIC_PLUGIN)
 #add_definitions(-DDEBUG_WALK_COND)
 #add_definitions(-DIDB_SM_PROFILE)
-#add_definitions(-DIDB_SM_DEBUG)
+add_definitions(-DIDB_SM_DEBUG)
 
 
 set_source_files_properties(ha_calpont.cpp PROPERTIES COMPILE_FLAGS "-fno-rtti -fno-implicit-templates")

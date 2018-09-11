@@ -363,7 +363,7 @@ status_t
 tpl_scan_close ( sp_cpsm_tplsch_t& ntplsch )
 {
 #if IDB_SM_DEBUG
-    SMDEBUGLOG << "tpl_scan_close: ntplsch " << ntplsch;
+   SMDEBUGLOG << "tpl_scan_close: ntplsch " << ntplsch;
 
     if (ntplsch)
         SMDEBUGLOG << " tableid: " << ntplsch->tableid << endl;
@@ -383,7 +383,7 @@ tpl_close ( cpsm_tplh_t* ntplh,
 #if IDB_SM_DEBUG
     SMDEBUGLOG << "tpl_close: hndl" << hndl << " ntplh " << ntplh;
 
-    if (ntplh)
+     (ntplh)
         SMDEBUGLOG << " tableid: " << ntplh->tableid;
 
     SMDEBUGLOG << endl;

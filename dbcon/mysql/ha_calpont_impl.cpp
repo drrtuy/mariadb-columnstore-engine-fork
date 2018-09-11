@@ -5487,7 +5487,7 @@ int ha_calpont_impl_group_by_init(ha_calpont_group_by_handler* group_hand, TABLE
             (thd->infinidb_vtable.vtable_state == THD::INFINIDB_REDO_QUERY))
     {
         // tps_ctx must be 0 
-        if (ti.tpl_ctx_st.size() == 0)
+        //if (ti.tpl_ctx_st.size() == 0)
         {
             ti.tpl_ctx = new sm::cpsm_tplh_t();
             ti.tpl_ctx_st.push(ti.tpl_ctx);
@@ -5573,6 +5573,7 @@ error:
 
     if (ci->cal_conn_hndl)
     {
+        // end_query() should be called here.
         sm::sm_cleanup(ci->cal_conn_hndl);
         ci->cal_conn_hndl = 0;
     }
@@ -5584,6 +5585,7 @@ internal_error:
 
     if (ci->cal_conn_hndl)
     {
+        // end_query() should be called here.
         sm::sm_cleanup(ci->cal_conn_hndl);
         ci->cal_conn_hndl = 0;
     }
@@ -5817,9 +5819,12 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
             ci->cal_conn_hndl = 0;
             // clear querystats because no query stats available for cancelled query
             ci->queryStats = "";
-            ci->cal_conn_hndl_st.pop();
             if ( ci->cal_conn_hndl_st.size() )
-                ci->cal_conn_hndl = ci->cal_conn_hndl_st.top();
+            {
+                ci->cal_conn_hndl_st.pop();
+                if ( ci->cal_conn_hndl_st.size() )
+                    ci->cal_conn_hndl = ci->cal_conn_hndl_st.top();
+            }
         }
 
         return 0;
@@ -5847,10 +5852,12 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
         }
 
         ti.tpl_scan_ctx.reset();
-        ti.tpl_scan_ctx_st.pop();
         if ( ti.tpl_scan_ctx_st.size() )
-            ti.tpl_scan_ctx =  ti.tpl_scan_ctx_st.top();
-
+        {
+            ti.tpl_scan_ctx_st.pop();
+            if ( ti.tpl_scan_ctx_st.size() )
+                ti.tpl_scan_ctx =  ti.tpl_scan_ctx_st.top();
+        }
         try
         {
             if(hndl)
@@ -5887,10 +5894,12 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
 
     ti.tpl_ctx = 0;
 
-    ti.tpl_ctx_st.pop();
     if ( ti.tpl_ctx_st.size() )
-        ti.tpl_ctx = ti.tpl_ctx_st.top();
-
+    {
+        ti.tpl_ctx_st.pop();
+        if ( ti.tpl_ctx_st.size() )
+            ti.tpl_ctx = ti.tpl_ctx_st.top();
+    }
     cerr << "group_by_end ci->cal_conn_hndl_st.size(): " << ci->cal_conn_hndl_st.size() << endl;
 
     if ( ci->cal_conn_hndl_st.size() )
