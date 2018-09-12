@@ -37,8 +37,8 @@
 #include "calpontselectexecutionplan.h"
 #include "querystats.h"
 
-#define IDB_SM_DEBUG 1
-#define IDB_SM_PROFILE 1
+#define IDB_SM_DEBUG 0
+#define IDB_SM_PROFILE 0
 
 #if defined(_MSC_VER) && defined(xxxDLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -60,12 +60,12 @@ const int SQL_NOT_FOUND = -1000;
 const int SQL_KILLED = -1001;
 const int CALPONT_INTERNAL_ERROR = -1007;
 
-//#if IDB_SM_DEBUG
-//extern std::ofstream smlog;
-//#define SMDEBUGLOG smlog
-//#else
+#if IDB_SM_DEBUG
+extern std::ofstream smlog;
+#define SMDEBUGLOG smlog
+#else
 #define SMDEBUGLOG std::cerr
-//#endif
+#endif
 extern const std::string DEFAULT_SAVE_PATH;
 
 typedef uint64_t tableid_t;

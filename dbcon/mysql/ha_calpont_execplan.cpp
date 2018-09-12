@@ -1679,6 +1679,7 @@ bool buildPredicateItem(Item_func* ifp, gp_walk_info* gwip)
 
         if (ifp->next && ifp->next->type() == Item::SUBSELECT_ITEM && gwip->lastSub)
         {
+            cerr << "buildPredicateItem() Not:" << endl;
             gwip->lastSub->handleNot();
             return false;
         }
@@ -2344,6 +2345,7 @@ void collectAllCols(gp_walk_info& gwi, Item_field* ifp)
 
 void buildSubselectFunc(Item_func* ifp, gp_walk_info* gwip)
 {
+    cerr << "buildSubselectFunc() enter" << endl;
     // @bug 3035
     if (!isPredicateFunction(ifp, gwip))
     {
@@ -2359,15 +2361,34 @@ void buildSubselectFunc(Item_func* ifp, gp_walk_info* gwip)
 #if MYSQL_VERSION_ID >= 50172
 
         // changes comply with mysql 5.1.72
+        cerr << "buildSubselectFunc() type: " << ifp->arguments()[i]->type() << endl;        
         if (ifp->arguments()[i]->type() == Item::FUNC_ITEM &&
                 string(((Item_func*)ifp->arguments()[i])->func_name()) == "<in_optimizer>")
         {
+            cerr << "buildSubselectFunc() func_name : " << string(((Item_func*)ifp->arguments()[i])->func_name()) << endl;
+            cerr << "buildSubselectFunc() functype: " << ifp->functype() << endl;
             if (ifp->functype() == Item_func::NOT_FUNC)
             {
                 if (gwip->lastSub)
+                {
                     gwip->lastSub->handleNot();
+                    cerr << "buildSubselectFunc() Not1" << endl;
+                }
             }
         }
+        if (ifp->arguments()[i]->type() == Item::EXPR_CACHE_ITEM)
+        {
+            cerr << "buildSubselectFunc() functype: " << ifp->functype() << endl;
+            if (ifp->functype() == Item_func::NOT_FUNC)
+            {
+                if (gwip->lastSub)
+                {
+                    gwip->lastSub->handleNot();
+                    cerr << "buildSubselectFunc() Not2" << endl;
+                }
+            }
+        }
+        
 
 #endif
 
@@ -2391,7 +2412,10 @@ void buildSubselectFunc(Item_func* ifp, gp_walk_info* gwip)
                     if (ifp->functype() == Item_func::NOT_FUNC)
                     {
                         if (gwip->lastSub)
+                        {
                             gwip->lastSub->handleNot();
+                            cerr << "buildSubselectFunc() Not3" << endl;
+                        }
                     }
 
                     break;
