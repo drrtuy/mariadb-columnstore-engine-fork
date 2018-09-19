@@ -58,6 +58,10 @@ namespace joblist
 
 DiskJoinStep::DiskJoinStep() { }
 
+DiskJoinStep::DiskJoinStep(CartJoinStep* t, int djsIndex, int joinIndex, bool lastOne) : JobStep(*t), cjs(t),
+    mainThread(0), joinerIndex(joinIndex), closedOutput(false)
+{ }
+
 DiskJoinStep::DiskJoinStep(TupleHashJoinStep* t, int djsIndex, int joinIndex, bool lastOne) : JobStep(*t), thjs(t),
     mainThread(0), joinerIndex(joinIndex), closedOutput(false)
 {

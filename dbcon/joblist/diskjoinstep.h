@@ -18,6 +18,7 @@
 #include "jobstep.h"
 #include "tuplehashjoin.h"
 #include "joinpartition.h"
+#include "cartesianjoin.h"
 #include "../../utils/threadpool/prioritythreadpool.h"
 
 #ifndef DISKJOINSTEP_H
@@ -31,6 +32,7 @@ class DiskJoinStep : public JobStep
 public:
     DiskJoinStep();
     DiskJoinStep(TupleHashJoinStep*, int djsIndex, int joinerIndex, bool lastOne);
+    DiskJoinStep(CartJoinStep*, int djsIndex, int joinerIndex, bool lastOne);
     virtual ~DiskJoinStep();
 
     void run();
@@ -53,6 +55,7 @@ private:
 
     boost::shared_array<int> LOMapping, SOMapping, SjoinFEMapping, LjoinFEMapping;
     TupleHashJoinStep* thjs;
+    CartJoinStep* cjs;
     boost::shared_ptr<funcexp::FuncExpWrapper> fe;
     bool typeless;
     JoinType joinType;

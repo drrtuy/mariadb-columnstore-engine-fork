@@ -799,7 +799,7 @@ new_plan:
                     }
                 }
 
-
+                cerr << "ExeMgr main(): " << jl << endl;
                 jl->doQuery();
 
                 CalpontSystemCatalog::OID tableOID;
@@ -1047,7 +1047,7 @@ new_plan:
                 } // End of loop to process tables
 
                 // @bug 828
-                if (csep.traceOn())
+                //if (csep.traceOn())
                     jl->graph(csep.sessionID());
 
                 if (needDbProfEndStatementMsg)
@@ -1432,7 +1432,7 @@ int main(int argc, char* argv[])
     // This is unset due to the way we start it
     program_invocation_short_name = const_cast<char*>("ExeMgr");
 
-    gDebug = 0;
+    gDebug = 4;
     bool eFlg = false;
     int c;
 

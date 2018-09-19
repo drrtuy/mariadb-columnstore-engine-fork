@@ -20,6 +20,7 @@ SET ( libcalmysql_SRCS
     ha_pseudocolumn.cpp)
 
 add_definitions(-DMYSQL_DYNAMIC_PLUGIN)
+add_definitions(-DDEBUG_WALK_COND)
 
 set_source_files_properties(ha_calpont.cpp PROPERTIES COMPILE_FLAGS "-fno-rtti -fno-implicit-templates")
 

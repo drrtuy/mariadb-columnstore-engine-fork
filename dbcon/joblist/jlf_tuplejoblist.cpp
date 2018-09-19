@@ -3927,7 +3927,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
     deliverySteps.clear();
 
     // Check if the tables and joins can be used to construct a spanning tree.
-    spanningTreeCheck(tableInfoMap, joinSteps, jobInfo);
+    //spanningTreeCheck(tableInfoMap, joinSteps, jobInfo);
 
     // 1. combine job steps for each table
     TableInfoMap::iterator mit;

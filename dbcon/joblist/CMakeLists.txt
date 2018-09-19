@@ -51,6 +51,7 @@ set(joblist_LIB_SRCS
     tupleannexstep.cpp
     tupleconstantstep.cpp
     tuplehashjoin.cpp
+    cartesianjoin.cpp
     tuplehavingstep.cpp
     tupleunion.cpp
     unique32generator.cpp

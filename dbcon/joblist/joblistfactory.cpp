@@ -1987,7 +1987,7 @@ SJLP makeJobList_(
     jobInfo.queryType = csep->queryType();
     jobInfo.csc = csc;
     //TODO: clean up the vestiges of the bool trace
-    jobInfo.trace = csep->traceOn();
+    jobInfo.trace = true;//csep->traceOn();
     jobInfo.traceFlags = csep->traceFlags();
     jobInfo.isExeMgr = isExeMgr;
 //	jobInfo.tryTuples = tryTuples; // always tuples after release 3.0
@@ -2034,7 +2034,8 @@ SJLP makeJobList_(
 
         struct timeval stTime;
 
-        if (jobInfo.trace)
+        //if (jobInfo.trace)
+        if(true)
         {
             ostringstream oss;
             oss << endl;
