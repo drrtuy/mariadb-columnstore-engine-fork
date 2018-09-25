@@ -1327,7 +1327,7 @@ void BatchPrimitiveProcessor::executeTupleCartJoin()
                     continue;
                 }
 
-                getJoinResults(oldRow, j, tSmallSideMatches[j][newRowCount]);
+                getJoinResults(oldRow, j, tSmallSideMatches[j][newRowCount], true);
                 //matchCount = tSmallSideMatches[j][newRowCount].size();
                 matchCount = 1;
 
@@ -2726,8 +2726,18 @@ void BatchPrimitiveProcessor::initGJRG()
     gjrgRowNumber = 0;
 }
 
-inline void BatchPrimitiveProcessor::getJoinResults(const Row& r, uint32_t jIndex, vector<uint32_t>& v)
+inline void BatchPrimitiveProcessor::getJoinResults(const Row& r, 
+    uint32_t jIndex,
+    vector<uint32_t>& v,
+    bool cartesian)
 {
+    if ( cartesian )
+    {
+        TJoiner::iterator it;
+        for (it = tJoiners[jIndex]->begin(); it != tJoiners[jIndex]->end(); ++it)
+            v.push_back(it->second);
+        return;
+    }
     if (!typelessJoin[jIndex])
     {
         if (r.isNullValue(largeSideKeyColumns[jIndex]))
