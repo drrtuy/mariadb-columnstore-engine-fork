@@ -62,6 +62,7 @@ using namespace dataconvert;
 #include "tupleannexstep.h"
 #include "tupleconstantstep.h"
 #include "tuplehashjoin.h"
+#include "cartesianjoin.h"
 #include "tuplehavingstep.h"
 #include "tupleunion.h"
 #include "windowfunctionstep.h"
@@ -320,15 +321,16 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(spjs.get());
     TupleHashJoinStep* thjs = dynamic_cast<TupleHashJoinStep*>(spjs.get());
     SubAdapterStep* sas = dynamic_cast<SubAdapterStep*>(spjs.get());
+    CartJoinStep* cjs = dynamic_cast<CartJoinStep*>(spjs.get());
 
-    if (!bps && !thjs && !sas)
+    if (!bps && !thjs && !sas && !cjs)
         throw runtime_error("Bad last step");
 
     // original output rowgroup of the step
     TupleJobStep* tjs = dynamic_cast<TupleJobStep*>(spjs.get());
     const RowGroup* rg0 = &(tjs->getOutputRowGroup());
 
-    if (jobInfo.trace) cout << "Output RowGroup 0: " << rg0->toString() << endl;
+    if (jobInfo.trace) cerr << "Output RowGroup 0: " << rg0->toString() << endl;
 
     // Construct a rowgroup that matches the select columns
     TupleInfoVector v = jobInfo.pjColList;
@@ -403,7 +405,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
         }
 
         // last step can be tbps (no join) or thjs, either one can have a group 3 expression
-        if (bps || thjs)
+        if (bps || thjs || cjs)
         {
             tjs->setOutputRowGroup(rg01);
             tjs->setFcnExpGroup3(exps);
@@ -420,6 +422,8 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     {
         if (thjs && thjs->hasFcnExpGroup2())
             thjs->setFE23Output(rg1);
+        else if (cjs && cjs->hasFcnExpGroup2())
+            cjs->setFE23Output(rg1);
         else
             tjs->setOutputRowGroup(rg1);
     }
@@ -430,6 +434,8 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     {
         if (thjs != NULL) //setup a few things for the final thjs step...
             thjs->outputAssociation(JobStepAssociation());
+        else if (cjs != NULL) //setup a few things for the final thjs step...
+            cjs->outputAssociation(JobStepAssociation());
 
         deliverySteps[CNX_VTABLE_ID] = spjs;
     }
@@ -514,7 +520,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
             dynamic_cast<TupleDeliveryStep*>(deliverySteps[CNX_VTABLE_ID].get());
         RowGroup rg2 = ds->getDeliveredRowGroup();
 
-        if (jobInfo.trace) cout << "Output RowGroup 2: " << rg2.toString() << endl;
+        if (jobInfo.trace) cerr << "Output RowGroup 2: " << rg2.toString() << endl;
 
         AnyDataListSPtr spdlIn(new AnyDataList());
         RowGroupDL* dlIn = new RowGroupDL(1, jobInfo.fifoSize);
@@ -573,7 +579,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     {
         TupleDeliveryStep* ds = dynamic_cast<TupleDeliveryStep*>(deliverySteps[CNX_VTABLE_ID].get());
 
-        if (ds) cout << "Delivered RowGroup: " << ds->getDeliveredRowGroup().toString() << endl;
+        if (ds) cerr << "Delivered RowGroup: " << ds->getDeliveredRowGroup().toString() << endl;
     }
 }
 
@@ -2126,6 +2132,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
         BatchPrimitive* bps = dynamic_cast<BatchPrimitive*>(spjs.get());
         SubAdapterStep* tsas = dynamic_cast<SubAdapterStep*>(spjs.get());
         TupleHashJoinStep* thjs = dynamic_cast<TupleHashJoinStep*>(spjs.get());
+        CartJoinStep* cjs = dynamic_cast<CartJoinStep*>(spjs.get());
 
         // @bug6158, try to put BPS on large side if possible
         if (tsas && smallSides.size() == 1)
@@ -2133,8 +2140,9 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
             SJSTEP sspjs = tableInfoMap[cId].fQuerySteps.back(), get();
             BatchPrimitive* sbps = dynamic_cast<BatchPrimitive*>(sspjs.get());
             TupleHashJoinStep* sthjs = dynamic_cast<TupleHashJoinStep*>(sspjs.get());
+            CartJoinStep* scjs = dynamic_cast<CartJoinStep*>(sspjs.get());
 
-            if (sbps || (sthjs && sthjs->tokenJoin() == cId))
+            if (sbps || (sthjs && sthjs->tokenJoin() == cId) || (scjs && scjs->tokenJoin() == cId))
             {
                 SP_JoinInfo largeJoinInfo(new JoinInfo);
                 largeJoinInfo->fTableOid = tableInfoMap[large].fTableOid;
@@ -2160,11 +2168,12 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 
                 bps = sbps;
                 thjs = sthjs;
+                cjs = scjs;
                 tsas = NULL;
             }
         }
 
-        if (!bps && !thjs && !tsas)
+        if (!bps && !thjs && !cjs && !tsas)
         {
             if (dynamic_cast<SubQueryStep*>(spjs.get()))
                 throw IDBExcept(ERR_NON_SUPPORT_SUB_QUERY_TYPE);
@@ -2180,7 +2189,12 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
             dcf = thjs->getLargeKeys().size();
             largeSideRG = thjs->getLargeRowGroup();
         }
-
+        else if (cjs && cjs->tokenJoin() == large)
+        {
+            dcf = cjs->getLargeKeys().size();
+            largeSideRG = cjs->getLargeRowGroup();
+        }
+        
         // info for debug trace
         vector<string> tableNames;
         vector<string> traces;
@@ -2189,7 +2203,7 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
         sort(smallSides.begin(), smallSides.end(), joinInfoCompare);
         int64_t lastJoinId = smallSides.back()->fJoinData.fJoinId;
 
-        // get info to config the TupleHashjoin
+        // get info to config the TupleHashjoin || Cartesian join
         DataListVec smallSideDLs;
         vector<RowGroup> smallSideRGs;
         vector<JoinType> jointypes;
@@ -2270,7 +2284,14 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
             traces.push_back(oss.str());
         }
 
-        if (bps || tsas)
+        // MCOL-131. Is is a Cartesian JOIN? 
+        // TODO How to find small table tid? tableInfoMap[large].fAdjacentList
+        pair<uint32_t, uint32_t> tablePair(large,1);
+        TableJoinMap::iterator tjmi = jobInfo.tableJoinMap.find(tablePair);
+        bool hasCartesian = ( tjmi != jobInfo.tableJoinMap.end() ) 
+            ? tjmi->second.fHasCartesian : false ;
+
+        if (!hasCartesian && ( bps || tsas ))
         {
             thjs = new TupleHashJoinStep(jobInfo);
             thjs->tableOid1(smallSides[0]->fTableOid);
@@ -2310,6 +2331,46 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
             tableInfoMap[large].fQuerySteps.push_back(spjs);
             tableInfoMap[large].fDl = spdl;
         }
+        else if ( hasCartesian && ( bps || tsas ) )
+        {
+            cjs = new CartJoinStep(jobInfo);
+            cjs->tableOid1(smallSides[0]->fTableOid);
+            cjs->tableOid2(tableInfoMap[large].fTableOid);
+            cjs->alias1(smallSides[0]->fAlias);
+            cjs->alias2(tableInfoMap[large].fAlias);
+            cjs->view1(smallSides[0]->fView);
+            cjs->view2(tableInfoMap[large].fView);
+            cjs->schema1(smallSides[0]->fSchema);
+            cjs->schema2(tableInfoMap[large].fSchema);
+            cjs->setLargeSideBPS(bps);
+            cjs->joinId(lastJoinId);
+
+            if (dynamic_cast<TupleBPS*>(bps) != NULL)
+                bps->incWaitToRunStepCnt();
+
+            SJSTEP spjs(cjs);
+
+            JobStepAssociation inJsa;
+            inJsa.outAdd(smallSideDLs, 0);
+            inJsa.outAdd(tableInfoMap[large].fDl);
+            cjs->inputAssociation(inJsa);
+            cjs->setLargeSideDLIndex(inJsa.outSize() - 1);
+
+            JobStepAssociation outJsa;
+            AnyDataListSPtr spdl(new AnyDataList());
+            RowGroupDL* dl = new RowGroupDL(1, jobInfo.fifoSize);
+            spdl->rowGroupDL(dl);
+            dl->OID(large);
+            outJsa.outAdd(spdl);
+            cjs->outputAssociation(outJsa);
+
+            cjs->configSmallSideRG(smallSideRGs, tableNames);
+            cjs->configLargeSideRG(tableInfoMap[large].fRowGroup);
+            cjs->configJoinKeyIndex(jointypes, typeless, smallKeyIndices, largeKeyIndices);
+
+            tableInfoMap[large].fQuerySteps.push_back(spjs);
+            tableInfoMap[large].fDl = spdl;
+        }
         else
         {
             JobStepAssociation inJsa = thjs->inputAssociation();
@@ -2328,17 +2389,20 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 
         RowGroup rg;
         constructJoinedRowGroup(rg, link, prevLarge, root, tableSet, tableInfoMap, jobInfo);
-        thjs->setOutputRowGroup(rg);
+        if( !hasCartesian )
+            thjs->setOutputRowGroup(rg);
+        else
+            cjs->setOutputRowGroup(rg);
         tableInfoMap[large].fRowGroup = rg;
 
         if (jobInfo.trace)
         {
-            cout << boldStart  << "\n====== join info ======\n" << boldStop;
+            cerr << boldStart  << "\n====== join info ======\n" << boldStop;
 
             for (vector<string>::iterator t = traces.begin(); t != traces.end(); ++t)
-                cout << *t;
+                cerr << *t;
 
-            cout << "RowGroup join result: " << endl << rg.toString() << endl << endl;
+            cerr << "RowGroup join result: " << endl << rg.toString() << endl << endl;
         }
 
         // check if any cross-table expressions can be evaluated after the join
@@ -3332,7 +3396,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
     if (jobInfo.trace)
     {
         const boost::shared_ptr<TupleKeyInfo>& keyInfo = jobInfo.keyInfo;
-        cout << "query steps:" << endl;
+        cerr << "query steps:" << endl;
 
         for (JobStepVector::iterator i = querySteps.begin(); i != querySteps.end(); ++i)
         {
@@ -3340,35 +3404,48 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 
             if (thjs == NULL)
             {
-                int64_t id = ((*i)->tupleId() != (uint64_t) - 1) ? (*i)->tupleId() : -1;
-                cout << typeid(*(i->get())).name() << ": " << (*i)->oid() << " " << id << " "
-                     << (int)((id != -1) ? getTableKey(jobInfo, id) : -1) << endl;
+                CartJoinStep* cjs = dynamic_cast<CartJoinStep*>(i->get());
+                if(cjs)
+                {
+                    int64_t id1 = (cjs->tupleId1() != (uint64_t) - 1) ? cjs->tupleId1() : -1;
+                    int64_t id2 = (cjs->tupleId2() != (uint64_t) - 1) ? cjs->tupleId2() : -1;
+                    cerr << typeid(*cjs).name() << ": " << cjs->oid1() << " " << id1 << " "
+                         << (int)((id1 != -1) ? getTableKey(jobInfo, id1) : -1) << " - "
+                         << cjs->getJoinType() << " - " << cjs->oid2() << " " << id2 << " "
+                         << (int)((id2 != -1) ? getTableKey(jobInfo, id2) : -1) << endl;
+                }
+                else
+                {
+                    int64_t id = ((*i)->tupleId() != (uint64_t) - 1) ? (*i)->tupleId() : -1;
+                    cerr << typeid(*(i->get())).name() << ": " << (*i)->oid() << " " << id << " "
+                         << (int)((id != -1) ? getTableKey(jobInfo, id) : -1) << endl;
+                }
             }
             else
             {
                 int64_t id1 = (thjs->tupleId1() != (uint64_t) - 1) ? thjs->tupleId1() : -1;
                 int64_t id2 = (thjs->tupleId2() != (uint64_t) - 1) ? thjs->tupleId2() : -1;
-                cout << typeid(*thjs).name() << ": " << thjs->oid1() << " " << id1 << " "
+                cerr << typeid(*thjs).name() << ": " << thjs->oid1() << " " << id1 << " "
                      << (int)((id1 != -1) ? getTableKey(jobInfo, id1) : -1) << " - "
                      << thjs->getJoinType() << " - " << thjs->oid2() << " " << id2 << " "
                      << (int)((id2 != -1) ? getTableKey(jobInfo, id2) : -1) << endl;
             }
         }
 
-        cout << "project steps:" << endl;
+        cerr << "project steps:" << endl;
 
         for (JobStepVector::iterator i = projectSteps.begin(); i != projectSteps.end(); ++i)
         {
-            cout << typeid(*(i->get())).name() << ": " << (*i)->oid() << " "
+            cerr << typeid(*(i->get())).name() << ": " << (*i)->oid() << " "
                  << (*i)->tupleId() << " " << getTableKey(jobInfo, (*i)->tupleId()) << endl;
         }
 
-        cout << "delivery steps:" << endl;
+        cerr << "delivery steps:" << endl;
 
         for (DeliveredTableMap::iterator i = deliverySteps.begin(); i != deliverySteps.end(); ++i)
             cout << typeid(*(i->second.get())).name() << endl;
 
-        cout << "\nTable Info:  (key  oid  name alias view sub)" << endl;
+        cerr << "\nTable Info:  (key  oid  name alias view sub)" << endl;
 
         for (uint32_t i = 0; i < keyInfo->tupleKeyVec.size(); ++i)
         {
@@ -3395,7 +3472,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
             }
         }
 
-        cout << "\nTupleKey vector:  (tupleKey  oid  tableKey  name  alias view sub)" << endl;
+        cerr << "\nTupleKey vector:  (tupleKey  oid  tableKey  name  alias view sub)" << endl;
 
         for (uint32_t i = 0; i < keyInfo->tupleKeyVec.size(); ++i)
         {
@@ -3428,11 +3505,11 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
             if (view.length() < 1) view = "N/A";
 
             int sid = keyInfo->tupleKeyVec[i].fSubId;
-            cout << i << "\t" << oid << "\t" << tid << "\t" << name << "\t" << alias
+            cerr << i << "\t" << oid << "\t" << tid << "\t" << name << "\t" << alias
                  << "\t" << view << "\t" << hex << sid << dec << endl;
         }
 
-        cout << endl;
+        cerr << endl;
     }
 
 
@@ -3547,6 +3624,7 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
     {
         // Separate table joins from other predicates.
         TupleHashJoinStep* thjs = dynamic_cast<TupleHashJoinStep*>(it->get());
+        CartJoinStep* cjs = dynamic_cast<CartJoinStep*>(it->get());
         ExpressionStep* exps = dynamic_cast<ExpressionStep*>(it->get());
         SubAdapterStep* subs = dynamic_cast<SubAdapterStep*>(it->get());
 
@@ -3685,6 +3763,150 @@ void associateTupleJobSteps(JobStepVector& querySteps, JobStepVector& projectSte
 
             // need id to keep the join order
             m1->second.fJoinId = m2->second.fJoinId = thjs->joinId();
+        }
+        // Cartesian join step
+        else if (cjs != NULL && cjs->tupleId1() != cjs->tupleId2())
+        {
+            // simple column and constant column semi join
+            if (cjs->tableOid2() == 0 && cjs->schema2().empty())
+            {
+                jobInfo.correlateSteps.push_back(*it++);
+                continue;
+            }
+
+            // check correlated join step
+            JoinType joinType = cjs->getJoinType();
+
+            if (joinType & CORRELATED)
+            {
+                // one of the tables is in outer query
+                jobInfo.correlateSteps.push_back(*it++);
+                continue;
+            }
+
+            // Save the join topology.
+            uint32_t key1 = cjs->tupleId1();
+            uint32_t key2 = cjs->tupleId2();
+            uint32_t tid1 = getTableKey(jobInfo, key1);
+            uint32_t tid2 = getTableKey(jobInfo, key2);
+
+            if (cjs->dictOid1() > 0)
+                key1 = jobInfo.keyInfo->dictKeyMap[key1];
+
+            if (cjs->dictOid2() > 0)
+                key2 = jobInfo.keyInfo->dictKeyMap[key2];
+
+            // not correlated
+            joinSteps.push_back(*it);
+            tableInfoMap[tid1].fJoinKeys.push_back(key1);
+            tableInfoMap[tid2].fJoinKeys.push_back(key2);
+
+            // save the function join expressions
+            boost::shared_ptr<FunctionJoinInfo> fji = cjs->funcJoinInfo();
+
+            if (fji)
+            {
+                if (fji->fStep[0])
+                {
+                    tableInfoMap[tid1].fFuncJoinExps.push_back(fji->fStep[0]);
+                    vector<uint32_t>& cols = tableInfoMap[tid1].fColsInFuncJoin;
+                    cols.insert(cols.end(), fji->fColumnKeys[0].begin(), fji->fColumnKeys[0].end());
+                }
+
+                if (fji->fStep[1])
+                {
+                    tableInfoMap[tid2].fFuncJoinExps.push_back(fji->fStep[1]);
+                    vector<uint32_t>& cols = tableInfoMap[tid2].fColsInFuncJoin;
+                    cols.insert(cols.end(), fji->fColumnKeys[1].begin(), fji->fColumnKeys[1].end());
+                }
+            }
+
+            // keep a join map
+            pair<uint32_t, uint32_t> tablePair(tid1, tid2);
+            TableJoinMap::iterator m1 = jobInfo.tableJoinMap.find(tablePair);
+            TableJoinMap::iterator m2 = jobInfo.tableJoinMap.end();
+
+            if (m1 == jobInfo.tableJoinMap.end())
+            {
+                tableInfoMap[tid1].fAdjacentList.push_back(tid2);
+                tableInfoMap[tid2].fAdjacentList.push_back(tid1);
+
+                m1 = jobInfo.tableJoinMap.insert(m1, make_pair(make_pair(tid1, tid2), JoinData()));
+                m2 = jobInfo.tableJoinMap.insert(m1, make_pair(make_pair(tid2, tid1), JoinData()));
+
+                TupleInfo ti1(getTupleInfo(key1, jobInfo));
+                TupleInfo ti2(getTupleInfo(key2, jobInfo));
+
+                if (ti1.width > 8 || ti2.width > 8)
+                    m1->second.fTypeless = m2->second.fTypeless = true;
+                else
+                    m1->second.fTypeless = m2->second.fTypeless = false;
+            }
+            else
+            {
+                m2 = jobInfo.tableJoinMap.find(make_pair(tid2, tid1));
+                m1->second.fTypeless = m2->second.fTypeless = true;
+            }
+
+            if (m1 == jobInfo.tableJoinMap.end() || m2 == jobInfo.tableJoinMap.end())
+                throw runtime_error("Bad table map.");
+
+            // Keep a map of the join (table, key) pairs
+            m1->second.fLeftKeys.push_back(key1);
+            m1->second.fRightKeys.push_back(key2);
+
+            m2->second.fLeftKeys.push_back(key2);
+            m2->second.fRightKeys.push_back(key1);
+
+            // Keep a map of the join type between the keys.
+            // OUTER join and SEMI/ANTI join are mutually exclusive.
+            if (joinType == LEFTOUTER)
+            {
+                m1->second.fTypes.push_back(SMALLOUTER);
+                m2->second.fTypes.push_back(LARGEOUTER);
+                jobInfo.outerOnTable.insert(tid2);
+            }
+            else if (joinType == RIGHTOUTER)
+            {
+                m1->second.fTypes.push_back(LARGEOUTER);
+                m2->second.fTypes.push_back(SMALLOUTER);
+                jobInfo.outerOnTable.insert(tid1);
+            }
+            else if ((joinType & SEMI) &&
+                     ((joinType & LEFTOUTER) == LEFTOUTER || (joinType & RIGHTOUTER) == RIGHTOUTER))
+            {
+                // @bug3998, DML UPDATE borrows "SEMI" flag,
+                // allowing SEMI and LARGEOUTER combination to support update with outer join.
+                if ((joinType & LEFTOUTER) == LEFTOUTER)
+                {
+                    joinType ^= LEFTOUTER;
+                    m1->second.fTypes.push_back(joinType);
+                    m2->second.fTypes.push_back(joinType | LARGEOUTER);
+                    jobInfo.outerOnTable.insert(tid2);
+                }
+                else
+                {
+                    joinType ^= RIGHTOUTER;
+                    m1->second.fTypes.push_back(joinType | LARGEOUTER);
+                    m2->second.fTypes.push_back(joinType);
+                    jobInfo.outerOnTable.insert(tid1);
+                }
+            }
+            else if (joinType & CARTESIAN)
+            {
+                m1->second.fHasCartesian = true;
+                m2->second.fHasCartesian = true;
+                m1->second.fTypes.push_back(joinType);
+                m2->second.fTypes.push_back(joinType);
+            }
+            else
+            {
+                m1->second.fTypes.push_back(joinType);
+                m2->second.fTypes.push_back(joinType);
+            }
+
+            // need id to keep the join order
+            m1->second.fJoinId = m2->second.fJoinId = cjs->joinId();
         }
         // Separate the expressions
         else if (exps != NULL && subs == NULL)

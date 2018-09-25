@@ -95,7 +95,7 @@ CartJoinStep::CartJoinStep(const JobInfo& jobInfo) :
     pmMemLimit = resourceManager->getHjPmMaxMemorySmallSide(fSessionId);
     uniqueLimit = resourceManager->getHjCPUniqueLimit();
 
-    fExtendedInfo = "THJS: ";
+    fExtendedInfo = "CHJS: ";
     joinType = INIT;
     joinThreadCount = resourceManager->getJlNumScanReceiveThreads();
     largeBPS = NULL;
@@ -839,7 +839,7 @@ void CartJoinStep::hjRunner()
         if (tbpsJoiners[i]->inPM() && doUM)
         {
 #ifdef JLF_DEBUG
-            cout << "moving join " << i << " to UM (PM join can't follow a UM join)\n";
+            cerr << "moving join " << i << " to UM (PM join can't follow a UM join)\n";
 #endif
             tbpsJoiners[i]->setInUM();
         }

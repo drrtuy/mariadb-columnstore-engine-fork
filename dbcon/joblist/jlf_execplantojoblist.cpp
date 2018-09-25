@@ -81,6 +81,7 @@ using namespace logging;
 #include "jobstep.h"
 #include "primitivestep.h"
 #include "tuplehashjoin.h"
+#include "cartesianjoin.h"
 #include "tupleunion.h"
 #include "expressionstep.h"
 #include "tupleconstantstep.h"
@@ -1316,6 +1317,283 @@ const JobStepVector doJoin(
     return jsv;
 }
 
+const JobStepVector doCartesianJoin(
+    SimpleColumn* sc1, SimpleColumn* sc2, JobInfo& jobInfo, const SOP& sop, SimpleFilter* sf)
+{
+    if ((sc1->resultType().colDataType == CalpontSystemCatalog::VARBINARY ||
+            sc1->resultType().colDataType == CalpontSystemCatalog::BLOB))
+        throw runtime_error("VARBINARY/BLOB in join is not supported.");
+
+    //The idea here is to take the two SC's and pipe them into a HJ step. The output of the HJ step
+    // is 2 DL's (one for each table) that are the minimum rid list for each side of the join.
+    CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
+    CalpontSystemCatalog::OID tableOid2 = tableOid(sc2, jobInfo.csc);
+    string alias1(extractTableAlias(sc1));
+    string alias2(extractTableAlias(sc2));
+    string view1(sc1->viewName());
+    string view2(sc2->viewName());
+    string schema1(sc1->schemaName());
+    string schema2(sc2->schemaName());
+
+    CalpontSystemCatalog::ColType ct1 = sc1->colType();
+    CalpontSystemCatalog::ColType ct2 = sc2->colType();
+    PseudoColumn* pc1 = dynamic_cast<PseudoColumn*>(sc1);
+    PseudoColumn* pc2 = dynamic_cast<PseudoColumn*>(sc2);
+
+//XXX use this before connector sets colType in sc correctly.
+//    type of pseudo column is set by connector
+    if (!sc1->schemaName().empty() && sc1->isInfiniDB() && !pc1)
+        ct1 = jobInfo.csc->colType(sc1->oid());
+
+    if (!sc2->schemaName().empty() && sc2->isInfiniDB() && !pc2)
+        ct2 = jobInfo.csc->colType(sc2->oid());
+
+//X
+    uint64_t joinInfo = sc1->joinInfo() | sc2->joinInfo();
+
+    if (sc1->schemaName().empty())
+    {
+        SimpleColumn* tmp = (sc1);
+        updateDerivedColumn(jobInfo, tmp, ct1);
+    }
+
+    if (sc2->schemaName().empty())
+    {
+        SimpleColumn* tmp = (sc2);
+        updateDerivedColumn(jobInfo, tmp, ct2);
+    }
+
+    //@bug 566 Dont do a hash join if the table and the alias are the same
+    //Bug 590
+    if (tableOid1 == tableOid2 && alias1 == alias2 && view1 == view2 && joinInfo == 0)
+    {
+        if (sc1->schemaName().empty() || !compatibleColumnTypes(ct1, ct2, false))
+        {
+            cout << "doJoin(): danger place 1" << endl;
+            return doFilterExpression(sc1, sc2, jobInfo, sop);
+        }
+
+        JobStepVector colFilter = doColFilter(sc1, sc2, jobInfo, sop, sf);
+        //jsv.insert(jsv.end(), colFilter.begin(), colFilter.end());
+        return colFilter;
+    }
+
+    // different tables
+    /*if (!compatibleColumnTypes(ct1, ct2, true))
+    {
+        cout << "doJoin(): danger place 2" << endl;
+        JobStepVector jsv;
+        jsv = doFilterExpression(sc1, sc2, jobInfo, sop);
+        uint32_t t1 = makeTableKey(jobInfo, sc1);
+        uint32_t t2 = makeTableKey(jobInfo, sc2);
+        jobInfo.incompatibleJoinMap[t1] = t2;
+        jobInfo.incompatibleJoinMap[t2] = t1;
+
+        return jsv;
+    }*/
+
+    pColStep* pcs1 = NULL;
+    CalpontSystemCatalog::OID oid1 = sc1->oid();
+    CalpontSystemCatalog::OID dictOid1 = isDictCol(ct1);
+
+    if (sc1->schemaName().empty() == false)
+    {
+        if (pc1 == NULL)
+            pcs1 = new pColStep(oid1, tableOid1, ct1, jobInfo);
+        else
+            pcs1 = new PseudoColStep(oid1, tableOid1, pc1->pseudoType(), ct1, jobInfo);
+
+        pcs1->alias(alias1);
+        pcs1->view(view1);
+        pcs1->name(sc1->columnName());
+        pcs1->schema(sc1->schemaName());
+        pcs1->cardinality(sc1->cardinality());
+    }
+
+    pColStep* pcs2 = NULL;
+    CalpontSystemCatalog::OID oid2 = sc2->oid();
+    CalpontSystemCatalog::OID dictOid2 = isDictCol(ct2);
+
+    if (sc2->schemaName().empty() == false)
+    {
+        if (pc2 == NULL)
+            pcs2 = new pColStep(oid2, tableOid2, ct2, jobInfo);
+        else
+            pcs2 = new PseudoColStep(oid2, tableOid2, pc2->pseudoType(), ct2, jobInfo);
+
+        pcs2->alias(alias2);
+        pcs2->view(view2);
+        pcs2->name(sc2->columnName());
+        pcs2->schema(sc2->schemaName());
+        pcs2->cardinality(sc2->cardinality());
+    }
+
+    JoinType jt = CARTESIAN;
+    //JoinType jt = INNER;
+
+    /*if (sc1->returnAll() && sc2->returnAll())
+    {
+        // Due to current connector limitation, INNER may have both returnAll set.
+        // @bug3037, compound outer join may have both flag set if not the 1st pair.
+        //jt = INNER;
+    }
+    else if (sc1->returnAll())
+    {
+        jt = LEFTOUTER;
+    }
+    else if (sc2->returnAll())
+    {
+        jt = RIGHTOUTER;
+    }*/
+
+    //Associate the steps
+    JobStepVector jsv;
+    SJSTEP step;
+
+    // bug 1495 compound join, v-table handles string join and compound join the same way
+    AnyDataListSPtr spdl1(new AnyDataList());
+    RowGroupDL* dl1 = new RowGroupDL(1, jobInfo.fifoSize);
+    spdl1->rowGroupDL(dl1);
+    dl1->OID(oid1);
+
+    if (pcs1)
+    {
+        JobStepAssociation outJs1;
+        outJs1.outAdd(spdl1);
+        pcs1->outputAssociation(outJs1);
+
+        step.reset(pcs1);
+        jsv.push_back(step);
+    }
+
+    AnyDataListSPtr spdl2(new AnyDataList());
+    RowGroupDL* dl2 = new RowGroupDL(1, jobInfo.fifoSize);
+    spdl2->rowGroupDL(dl2);
+    dl2->OID(oid2);
+
+    if (pcs2)
+    {
+        JobStepAssociation outJs2;
+        outJs2.outAdd(spdl2);
+        pcs2->outputAssociation(outJs2);
+
+        step.reset(pcs2);
+        jsv.push_back(step);
+    }
+
+    CartJoinStep* thj = new CartJoinStep(jobInfo);
+    thj->tableOid1(tableOid1);
+    thj->tableOid2(tableOid2);
+    thj->alias1(alias1);
+    thj->alias2(alias2);
+    thj->view1(view1);
+    thj->view2(view2);
+    thj->schema1(schema1);
+    thj->schema2(schema2);
+    thj->oid1(oid1);
+    thj->oid2(oid2);
+    thj->dictOid1(dictOid1);
+    thj->dictOid2(dictOid2);
+    thj->sequence1(sc1->sequence());
+    thj->sequence2(sc2->sequence());
+    thj->column1(sc1);
+    thj->column2(sc2);
+
+    // MCOL-334 joins in views need to have higher priority than SEMI/ANTI
+    /*if (!view1.empty() && view1 == view2)
+    {
+        thj->joinId(-1);
+    }
+    else
+    {
+        thj->joinId((joinInfo == 0) ? (++jobInfo.joinNum) : 0);
+    }*/
+
+    // Check if SEMI/ANTI join.
+    // INNER/OUTER join and SEMI/ANTI are mutually exclusive,
+    /*if (joinInfo != 0)
+    {
+        // @bug3998, keep the OUTER join type
+        // jt = INIT;
+
+        if (joinInfo & JOIN_SEMI)
+            jt |= SEMI;
+
+        if (joinInfo & JOIN_ANTI)
+            jt |= ANTI;
+
+        if (joinInfo & JOIN_SCALAR)
+            jt |= SCALAR;
+
+        if (joinInfo & JOIN_NULL_MATCH)
+            jt |= MATCHNULLS;
+
+        if (joinInfo & JOIN_CORRELATED)
+            jt |= CORRELATED;
+
+        if (joinInfo & JOIN_OUTER_SELECT)
+            jt |= LARGEOUTER;
+
+        if (sc1->joinInfo() & JOIN_CORRELATED)
+            thj->correlatedSide(1);
+        else if (sc2->joinInfo() & JOIN_CORRELATED)
+            thj->correlatedSide(2);
+    }*/
+
+    thj->setJoinType(jt);
+
+    JobStepAssociation outJs3;
+    outJs3.outAdd(spdl1);
+    outJs3.outAdd(spdl2);
+    thj->inputAssociation(outJs3);
+    step.reset(thj);
+
+    TupleInfo ti1(setTupleInfo(ct1, oid1, jobInfo, tableOid1, sc1, alias1));
+
+    if (pcs1)
+    {
+        pcs1->tupleId(ti1.key);
+        thj->tupleId1(ti1.key);
+
+        if (dictOid1 > 0)
+        {
+            ti1 = setTupleInfo(ct1, dictOid1, jobInfo, tableOid1, sc1, alias1);
+            jobInfo.keyInfo->dictOidToColOid[dictOid1] = oid1;
+            jobInfo.keyInfo->dictKeyMap[pcs1->tupleId()] = ti1.key;
+            jobInfo.tokenOnly[pcs1->tupleId()] = false;
+//                     thj->tupleId1(ti1.key);
+        }
+    }
+    else
+    {
+        thj->tupleId1(getTupleKey(jobInfo, sc1));
+    }
+
+    TupleInfo ti2(setTupleInfo(ct2, oid2, jobInfo, tableOid2, sc2, alias2));
+
+    if (pcs2)
+    {
+        pcs2->tupleId(ti2.key);
+        thj->tupleId2(pcs2->tupleId());
+
+        if (dictOid2 > 0)
+        {
+            TupleInfo ti2(setTupleInfo(ct2, dictOid2, jobInfo, tableOid2, sc2, alias2));
+            jobInfo.keyInfo->dictOidToColOid[dictOid2] = oid2;
+            jobInfo.keyInfo->dictKeyMap[pcs2->tupleId()] = ti2.key;
+            jobInfo.tokenOnly[pcs2->tupleId()] = false;
+//                     thj->tupleId2(ti2.key);
+        }
+    }
+    else
+    {
+        thj->tupleId2(getTupleKey(jobInfo, sc2));
+    }
+
+    jsv.push_back(step);
+
+    return jsv;
+}
 
 const JobStepVector doSemiJoin(const SimpleColumn* sc, const ReturnedColumn* rc, JobInfo& jobInfo)
 {
@@ -2084,6 +2362,406 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
              ", right = " << rhsType << boldStop << endl;
 
         throw logic_error("doSimpleFilter: Unhandled SimpleFilter.");
+    }
+
+    return jsv;
+}
+
+const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo)
+{
+    JobStepVector jsv;
+
+    //if (oj == 0) return jsv;
+
+    cout << "doCartJoinFilter " << endl;
+    //cout << *oj << endl;
+
+    // MCOL-131 Must be mostly useless
+    // Parse the join on filter to join steps and an expression step, if any.
+    stack<ParseTree*> nodeStack;        // stack used for pre-order traverse
+    set<ParseTree*> doneNodes;          // solved joins and simple filters
+    map<ParseTree*, ParseTree*> cpMap;  // <child, parent> link for node removal
+    JobStepVector join;                 // join step with its projection steps
+    bool keepFilters = false;           // keep filters for cross engine step
+
+    // To compromise the front end difficulty on setting outer attributes.
+    set<uint64_t> tablesInOuter;
+
+    // root
+    //ParseTree* filters = new ParseTree(*(oj->pt().get()));
+    //nodeStack.push(filters);
+    //cpMap[filters] = NULL;
+
+    // @bug5311, optimization for outer join on clause
+    set<uint64_t> tablesInJoin;
+
+    // @bug3683, function join
+    vector<pair<ParseTree*, SJSTEP> > fjCandidates;
+
+    // while stack is not empty
+    //while (!nodeStack.empty())
+    {
+        //ParseTree* cn = nodeStack.top();  // current node
+        //nodeStack.pop();
+        //TreeNode*  tn = cn->data();
+        //Operator* op = dynamic_cast<Operator*>(tn);  // AND | OR
+
+        //if (op != NULL && (*op == opOR || *op == opor))
+        //    continue;
+
+        // join is expressed as SimpleFilter
+        //SimpleFilter* sf = dynamic_cast<SimpleFilter*>(tn);
+
+        //if (sf != NULL)
+        {
+            //if (sf->joinFlag() == SimpleFilter::ANTI)
+            //    throw runtime_error("Anti join is not currently supported");
+
+            //ReturnedColumn* lhs = sf->lhs();
+            //ReturnedColumn* rhs = sf->rhs();
+            //SOP sop = sf->op();
+
+            //SimpleColumn* sc1 = dynamic_cast<SimpleColumn*>(lhs);
+            //SimpleColumn* sc2 = dynamic_cast<SimpleColumn*>(rhs);
+            
+            SimpleColumn* sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
+            SimpleColumn* sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
+            
+            //if ((sc1 != NULL && sc2 != NULL) && (sop->data() == "=") &&
+            //        (sc1->tableName() != sc2->tableName() ||
+            //         sc1->tableAlias() != sc2->tableAlias() ||
+            //         sc1->viewName() != sc2->viewName()))
+            {
+                // @bug3037, workaround on join order, wish this can be corrected soon,
+                // cascade outer table attribute.
+                CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
+                uint64_t tid1 = getTableKey(
+                                    jobInfo, tableOid1, sc1->tableAlias(), sc1->schemaName(), sc1->viewName());
+                CalpontSystemCatalog::OID tableOid2 = tableOid(sc2, jobInfo.csc);
+                uint64_t tid2 = getTableKey(
+                                    jobInfo, tableOid2, sc2->tableAlias(), sc2->schemaName(), sc2->viewName());
+
+                if (tablesInOuter.find(tid1) != tablesInOuter.end())
+                    sc1->returnAll(true);
+                else if (tablesInOuter.find(tid2) != tablesInOuter.end())
+                    sc2->returnAll(true);
+
+                if (sc1->returnAll() && !sc2->returnAll())
+                    tablesInOuter.insert(tid1);
+                else if (!sc1->returnAll() && sc2->returnAll())
+                    tablesInOuter.insert(tid2);
+
+                tablesInJoin.insert(tid1);
+                tablesInJoin.insert(tid2);
+
+                SOP sop;
+                join = doCartesianJoin(sc1, sc2, jobInfo, sop, NULL);//sop, sf);
+                // set cardinality for the hashjoin step.
+                //uint32_t card = sf->cardinality();
+
+                /*if (sf->cardinality() > sc1->cardinality() &&
+                        sf->cardinality() > sc2->cardinality())
+                    card = ((sc1->cardinality() > sc2->cardinality()) ?
+                            sc1->cardinality() : sc2->cardinality());
+                */
+                join[join.size() - 1].get()->cardinality(12);
+
+                jsv.insert(jsv.end(), join.begin(), join.end());
+                //doneNodes.insert(cn);
+            }
+            /*else
+            {
+                ExpressionStep* es = new ExpressionStep(jobInfo);
+
+                if (es == NULL)
+                    throw runtime_error("Failed to create ExpressionStep 2");
+
+                SJSTEP sjstep;
+                es->expressionFilter(sf, jobInfo);
+                sjstep.reset(es);
+
+                if (es->functionJoinInfo())
+                    fjCandidates.push_back(make_pair(cn, sjstep));
+            }*/
+        }
+
+        // Add right and left to the stack.
+        /*ParseTree* right = cn->right();
+
+        if (right != NULL)
+        {
+            cpMap[right] = cn;
+            nodeStack.push(right);
+        }
+
+        ParseTree* left  = cn->left();
+
+        if (left != NULL)
+        {
+            cpMap[left] = cn;
+            nodeStack.push(left);
+        }
+        */
+    }
+
+    // check if there are any join steps in jsv.
+    bool isOk = true;
+    CartJoinStep* thjs = NULL;
+
+    for (JobStepVector::iterator i = jsv.begin(); i != jsv.end(); i++)
+    {
+        if (dynamic_cast<CartJoinStep*>(i->get()) != thjs)
+            thjs = dynamic_cast<CartJoinStep*>(i->get());
+    }
+
+    /*// no simple column join found, try function join
+    if (thjs == NULL)
+    {
+        // check any expressions can be converted to function joins.
+        vector<pair<ParseTree*, SJSTEP> >::iterator i = fjCandidates.begin();
+
+        while (i != fjCandidates.end())
+        {
+            ExpressionStep* es = dynamic_cast<ExpressionStep*>((i->second).get());
+            SJSTEP sjstep = expressionToFuncJoin(es, jobInfo);
+            idbassert(sjstep.get());
+            jsv.push_back(sjstep);
+
+            doneNodes.insert(i->first);
+
+            i++;
+        }
+    }
+
+    // check again if we got a join step.
+    for (JobStepVector::iterator i = jsv.begin(); i != jsv.end(); i++)
+    {
+        if (dynamic_cast<TupleHashJoinStep*>(i->get()) != thjs)
+            thjs = dynamic_cast<TupleHashJoinStep*>(i->get());
+    }*/
+    
+    if (thjs != NULL)
+    {
+        // @bug5311, optimization for outer join on clause, move out small side simple filters.
+        // some repeat code, but better done after join sides settled.
+        //nodeStack.push(filters);
+        //cpMap[filters] = NULL;
+
+        // while stack is not empty
+        /*while (!nodeStack.empty())
+        {
+            ParseTree* cn = nodeStack.top();  // current node
+            nodeStack.pop();
+            TreeNode*  tn = cn->data();
+            Operator* op = dynamic_cast<Operator*>(tn);  // AND | OR
+
+            if (op != NULL && (*op == opOR || *op == opor))
+                continue;
+
+            SimpleFilter* sf = dynamic_cast<SimpleFilter*>(tn);
+
+            if ((sf != NULL) && (doneNodes.find(cn) == doneNodes.end()))
+            {
+                // joins are done, this is not a join.
+                ReturnedColumn* lhs = sf->lhs();
+                ReturnedColumn* rhs = sf->rhs();
+                SOP sop = sf->op();
+
+                // handle simple-simple | simple-constant | constant-simple
+                SimpleColumn* sc  = NULL;
+                SimpleColumn* sc1 = dynamic_cast<SimpleColumn*>(lhs);
+                SimpleColumn* sc2 = dynamic_cast<SimpleColumn*>(rhs);
+
+                if ((sc1 != NULL && sc2 != NULL) &&
+                        (sc1->tableName() == sc2->tableName() &&
+                         sc1->tableAlias() == sc2->tableAlias() &&
+                         sc1->viewName() == sc2->viewName()))
+                {
+                    sc = sc1; // same table, just check sc1
+                }
+                else if (sc1 != NULL && dynamic_cast<ConstantColumn*>(rhs) != NULL)
+                {
+                    sc = sc1;
+                }
+                else if (sc2 != NULL && dynamic_cast<ConstantColumn*>(lhs) != NULL)
+                {
+                    sc = sc2;
+                }
+
+                if (sc != NULL)
+                {
+                    CalpontSystemCatalog::OID tblOid = tableOid(sc, jobInfo.csc);
+                    uint64_t tid = getTableKey(
+                                       jobInfo, tblOid, sc->tableAlias(), sc->schemaName(), sc->viewName());
+
+                    // skip outer table filters or table not directly involved in the outer join
+                    if (tablesInOuter.find(tid) != tablesInOuter.end() ||
+                            tablesInJoin.find(tid)  == tablesInJoin.end())
+                        continue;
+
+                    JobStepVector sfv = doSimpleFilter(sf, jobInfo);
+                    ExpressionStep* es = NULL;
+
+                    for (JobStepVector::iterator k = sfv.begin(); k != sfv.end(); k++)
+                    {
+                        k->get()->onClauseFilter(true);
+
+                        if ((es = dynamic_cast<ExpressionStep*>(k->get())) != NULL)
+                            es->associatedJoinId(thjs->joinId());
+                    }
+
+                    jsv.insert(jsv.end(), sfv.begin(), sfv.end());
+
+                    // MCOL-1182 if we are doing a join between a cross engine
+                    // step and a constant then keep the filter for the cross
+                    // engine step instead of deleting it further down.
+                    if (!sc->isInfiniDB())
+                    {
+                        keepFilters = true;
+                    }
+
+                    doneNodes.insert(cn);
+                }
+            }
+
+            // Add right and left to the stack.
+            ParseTree* right = cn->right();
+
+            if (right != NULL)
+            {
+                cpMap[right] = cn;
+                nodeStack.push(right);
+            }
+
+            ParseTree* left  = cn->left();
+
+            if (left != NULL)
+            {
+                cpMap[left] = cn;
+                nodeStack.push(left);
+            }
+        }*/
+ 
+        // remove joins from the original filters
+        ParseTree* nullTree = NULL;
+
+        /*for (set<ParseTree*>::iterator i = doneNodes.begin(); i != doneNodes.end() && isOk; i++)
+        {
+            ParseTree* c = *i;
+            map<ParseTree*, ParseTree*>::iterator j = cpMap.find(c);
+
+            if (j == cpMap.end())
+            {
+                isOk = false;
+                continue;
+            }
+
+            ParseTree* p = j->second;
+
+            if (p == NULL)
+            {
+                filters = NULL;
+
+                if (!keepFilters)
+                {
+                    delete c;
+                }
+            }
+            else
+            {
+                map<ParseTree*, ParseTree*>::iterator k = cpMap.find(p);
+
+                if (k == cpMap.end())
+                {
+                    isOk = false;
+                    continue;
+                }
+
+                ParseTree* pp = k->second;
+
+                if (pp == NULL)
+                {
+                    if (p->left() == c)
+                        filters = p->right();
+                    else
+                        filters = p->left();
+
+                    cpMap[filters] = NULL;
+                }
+                else
+                {
+                    if (p->left() == c)
+                    {
+                        if (pp->left() == p)
+                            pp->left(p->right());
+                        else
+                            pp->right(p->right());
+
+                        cpMap[p->right()] = pp;
+                    }
+                    else
+                    {
+                        if (pp->left() == p)
+                            pp->left(p->left());
+                        else
+                            pp->right(p->left());
+
+                        cpMap[p->left()] = pp;
+                    }
+                }
+
+                p->left(nullTree);
+                p->right(nullTree);
+
+                if (!keepFilters)
+                {
+                    delete p;
+                    delete c;
+                }
+            }
+        }
+
+        // construct an expression step, if additional comparison exists.
+        if (isOk && filters != NULL && filters->data() != NULL)
+        {
+            ExpressionStep* es = new ExpressionStep(jobInfo);
+
+            if (es == NULL)
+                throw runtime_error("Failed to create ExpressionStep 1");
+
+            es->expressionFilter(filters, jobInfo);
+            es->associatedJoinId(thjs->joinId());
+            SJSTEP sjstep(es);
+            jsv.push_back(sjstep);
+        }*/
+    }
+    /*else
+    {
+        // Due to Calpont view handling, some joins may treated as expressions.
+        ExpressionStep* es = new ExpressionStep(jobInfo);
+
+        if (es == NULL)
+            throw runtime_error("Failed to create ExpressionStep 1");
+
+        es->expressionFilter(filters, jobInfo);
+        SJSTEP sjstep(es);
+        jsv.push_back(sjstep);
+    }*/
+
+    //delete filters;
+    
+    if (!isOk)
+    {
+        throw runtime_error("Failed to parse join condition.");
+    }
+
+    if (jobInfo.trace)
+    {
+        ostringstream oss;
+        oss << "\nCartesianJoinOn steps: " << endl;
+        ostream_iterator<JobStepVector::value_type> oIter(oss, "\n");
+        copy(jsv.begin(), jsv.end(), oIter);
+        cout << oss.str();
     }
 
     return jsv;
@@ -3376,8 +4054,16 @@ namespace joblist
 /* static */ void
 JLF_ExecPlanToJobList::walkTree(ParseTree* n, JobInfo& jobInfo)
 {
-    TreeNode* tn = n->data();
     JobStepVector jsv;
+    
+    if ( !n )
+    {
+        jsv = doCartesianJoinFilter(jobInfo);
+        JLF_ExecPlanToJobList::addJobSteps(jsv, jobInfo, false);
+        return;
+    }
+
+    TreeNode* tn = n->data();
     TreeNodeType tnType = TreeNode2Type(tn);
 
     switch (tnType)

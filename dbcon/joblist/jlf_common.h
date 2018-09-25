@@ -94,8 +94,9 @@ struct JoinData
     std::vector<uint32_t> fRightKeys;
     std::vector<JoinType> fTypes; // joblisttypes.h: INNER, LEFTOUTER, RIGHTOUTER
     bool fTypeless;
+    bool fHasCartesian;
 
-    JoinData() : fJoinId(-1), fTypeless(false) {}
+    JoinData() : fJoinId(-1), fTypeless(false), fHasCartesian(false) {}
 };
 
 typedef std::stack<JobStepVector> JobStepVectorStack;
@@ -189,6 +190,7 @@ struct JobInfo
         constantCol(CONST_COL_NONE),
         hasDistinct(false),
         hasAggregation(false),
+        hasCartesianJoin(false),
         limitStart(0),
         limitCount(-1),
         joinNum(0),
@@ -297,6 +299,7 @@ struct JobInfo
     // mixed outer join
     std::map<int, uint64_t> tableSize;
     int64_t joinNum;
+    bool hasCartesianJoin;
 
     // for subquery
     boost::shared_ptr<int> subCount;      // # of subqueries in the query statement

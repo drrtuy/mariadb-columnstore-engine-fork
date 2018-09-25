@@ -91,7 +91,7 @@ const uint32_t DEFAULT_EXTENTS_PER_SEG_FILE = 2;
 #if THROTTLE_DEBUG
 #define THROTTLEDEBUG std::cout
 #else
-#define THROTTLEDEBUG if (false) std::cout
+#define THROTTLEDEBUG if (true) std::cerr
 #endif
 namespace joblist
 {

@@ -303,6 +303,7 @@ private:
     typedef std::vector<uint32_t> MatchedData[LOGICAL_BLOCK_RIDS];
     boost::shared_array<MatchedData> tSmallSideMatches;
     void executeTupleJoin();
+    void executeTupleCartJoin();
     bool getTupleJoinRowGroupData;
     std::vector<rowgroup::RowGroup> smallSideRGs;
     rowgroup::RowGroup largeSideRG;
@@ -324,6 +325,7 @@ private:
     boost::scoped_array<boost::scoped_ptr<funcexp::FuncExpWrapper> > joinFEFilters;
     bool hasJoinFEFilters;
     bool hasSmallOuterJoin;
+    bool hasCartesianJoin;
 
     /* extra typeless join vars & fcns*/
     boost::shared_array<bool> typelessJoin;

@@ -22,6 +22,7 @@ set(PrimProc_SRCS
     ../../utils/common/crashtrace.cpp)
 
 #PrimProc_CXXFLAGS = $(march_flags) $(AM_CXXFLAGS)
+add_definitions(-DJLF_DEBUG)
 
 add_executable(PrimProc ${PrimProc_SRCS})
 
