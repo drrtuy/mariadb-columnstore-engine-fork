@@ -1369,7 +1369,7 @@ const JobStepVector doCartesianJoin(
     {
         if (sc1->schemaName().empty() || !compatibleColumnTypes(ct1, ct2, false))
         {
-            cout << "doJoin(): danger place 1" << endl;
+            cerr << "doJoin(): danger place 1" << endl;
             return doFilterExpression(sc1, sc2, jobInfo, sop);
         }
 
@@ -2367,16 +2367,15 @@ const JobStepVector doSimpleFilter(SimpleFilter* sf, JobInfo& jobInfo)
     return jsv;
 }
 
-const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo)
+const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = NULL)
 {
     JobStepVector jsv;
+    bool noFilters = ( cjf == 0 ) ? true : false;
 
-    //if (oj == 0) return jsv;
-
-    cout << "doCartJoinFilter " << endl;
+    cerr << "doCartJoinFilter " << endl;
     //cout << *oj << endl;
 
-    // MCOL-131 Must be mostly useless
+    // MCOL-131 Must be useless
     // Parse the join on filter to join steps and an expression step, if any.
     stack<ParseTree*> nodeStack;        // stack used for pre-order traverse
     set<ParseTree*> doneNodes;          // solved joins and simple filters
@@ -2423,10 +2422,23 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo)
 
             //SimpleColumn* sc1 = dynamic_cast<SimpleColumn*>(lhs);
             //SimpleColumn* sc2 = dynamic_cast<SimpleColumn*>(rhs);
+            SimpleColumn* sc1;
+            SimpleColumn* sc2;
             
-            SimpleColumn* sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
-            SimpleColumn* sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
-            
+            // MCOL-131 find an apropiate columns
+            if ( noFilters == true )
+            {
+                UniqId uid1 = jobInfo.keyInfo.get()->tupleKeyVec[0];
+                UniqId uid2 = jobInfo.keyInfo.get()->tupleKeyVec[1];
+                CalpontSystemCatalog::TOPair tp1 = jobInfo.csc.get()->anyColumnInTable(make_table(uid1.fSchema, uid1.fTable));
+                CalpontSystemCatalog::TOPair tp2 = jobInfo.csc.get()->anyColumnInTable(make_table(uid2.fSchema, uid2.fTable));
+                sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
+                sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
+                
+            }
+            //sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
+            //sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
+                
             //if ((sc1 != NULL && sc2 != NULL) && (sop->data() == "=") &&
             //        (sc1->tableName() != sc2->tableName() ||
             //         sc1->tableAlias() != sc2->tableAlias() ||
@@ -2455,7 +2467,7 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo)
                 tablesInJoin.insert(tid2);
 
                 SOP sop;
-                join = doCartesianJoin(sc1, sc2, jobInfo, sop, NULL);//sop, sf);
+                join = doCartesianJoin(sc1, sc2, jobInfo, sop, NULL);
                 // set cardinality for the hashjoin step.
                 //uint32_t card = sf->cardinality();
 

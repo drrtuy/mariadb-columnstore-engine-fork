@@ -199,6 +199,19 @@ SimpleColumn::SimpleColumn (const SimpleColumn& rhs, const uint32_t sessionID):
 {
 }
 
+SimpleColumn::SimpleColumn(const std::string& schema,
+    const std::string& table,
+    const std::string& col,
+    CalpontSystemCatalog::OID oidobj) :
+    ReturnedColumn(0),
+    fSchemaName (schema),
+    fTableName (table),
+    fColumnName (col),
+    fOid (0),
+    fIsInfiniDB (true)
+{
+}
+
 SimpleColumn::~SimpleColumn()
 {}
 /**

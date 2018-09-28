@@ -72,6 +72,10 @@ public:
                  const bool isInfiniDB,
                  const uint32_t sessionID = 0);
     SimpleColumn(const SimpleColumn& rhs, const uint32_t sessionID = 0);
+    SimpleColumn(const std::string& schema,
+                 const std::string& table,
+                 const std::string& col,
+                 CalpontSystemCatalog::OID oidobj);
 
     /**
      * Destructor

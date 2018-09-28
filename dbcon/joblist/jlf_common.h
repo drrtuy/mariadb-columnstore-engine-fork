@@ -190,10 +190,10 @@ struct JobInfo
         constantCol(CONST_COL_NONE),
         hasDistinct(false),
         hasAggregation(false),
-        hasCartesianJoin(false),
         limitStart(0),
         limitCount(-1),
         joinNum(0),
+        hasCartesianJoin(false),
         subLevel(0),
         subNum(0),
         subId(0),
@@ -299,6 +299,8 @@ struct JobInfo
     // mixed outer join
     std::map<int, uint64_t> tableSize;
     int64_t joinNum;
+    
+    // Cartesian JOIN
     bool hasCartesianJoin;
 
     // for subquery

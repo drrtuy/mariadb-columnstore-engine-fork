@@ -1623,8 +1623,9 @@ void parseExecutionPlan(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo,
 {
     ParseTree* filters = csep->filters();
     jobInfo.deliveredCols = csep->returnedCols();
-
-    if (filters != 0 || csep->tableList().size() > 1)
+    
+    // MCOL-131 Change the first predicate
+    if (filters == 0 && csep->tableList().size() > 1)
     {
         jobInfo.hasCartesianJoin = true;
         JLF_ExecPlanToJobList::walkTree(filters, jobInfo);

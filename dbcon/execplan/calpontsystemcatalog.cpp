@@ -3479,6 +3479,395 @@ const CalpontSystemCatalog::TableName CalpontSystemCatalog::tableName(const OID&
     return tableName;
 }
 
+/*
+ * Find and return TOPair for a first random column of a table.
+ * tableName 
+ * returns ROPair with columns information
+ */
+const CalpontSystemCatalog::TOPair CalpontSystemCatalog::anyColumnInTable(const TableName& tableName)
+{
+    TableName aTableName(tableName);
+    transform( aTableName.schema.begin(), aTableName.schema.end(), aTableName.schema.begin(), to_lower() );
+    transform( aTableName.table.begin(), aTableName.table.end(), aTableName.table.begin(), to_lower() );
+
+    if (aTableName.schema.empty() || aTableName.table.empty())
+        throw runtime_error("ColumnRIDs: Invalid table name");
+
+    if (aTableName.schema != CALPONT_SCHEMA)
+        DEBUG << "Enter columnRIDs: " << tableName.schema << "|" << tableName.table << endl;
+
+    TOPair tp;
+
+    //Check whether cache needs to be flushed
+    if ( aTableName.schema != CALPONT_SCHEMA)
+    {
+        checkSysCatVer();
+    }
+
+    //boost::mutex::scoped_lock lk1(fTableInfoMapLock);
+    //TableInfoMap::const_iterator ti_iter = fTableInfoMap.find(aTableName);
+
+    // search fOIDmap for system catalog tables
+    // or if fTableInfoMap has entry for this table, column oids are cached.
+    // because columnRIDs(), colType() and tableInfo() are actually binded.
+#if BOOST_VERSION < 103800
+    boost::mutex::scoped_lock lk2(fOIDmapLock, false);
+#else
+    boost::mutex::scoped_lock lk2(fOIDmapLock, boost::defer_lock);
+#endif
+    boost::mutex::scoped_lock lk3(fColinfomapLock);
+
+    //if (aTableName.schema == CALPONT_SCHEMA) || ti_iter != fTableInfoMap.end())
+    {
+        if (aTableName.schema == CALPONT_SCHEMA)
+            lk3.unlock(); // There is no lock taken yet.
+        //else
+        //    rl.resize(ti_iter->second.numOfCols);
+
+        if (aTableName.schema != CALPONT_SCHEMA)
+            DEBUG << "for " << aTableName << ", searching " << fOIDmap.size() << " oids" << endl;
+
+        lk2.lock();
+        OIDmap::const_iterator iter = fOIDmap.begin();
+
+        while ( iter != fOIDmap.end() )
+        {
+            TableColName tableColName = make_tcn((*iter).first.schema, 
+                (*iter).first.table, (*iter).first.column);
+
+            if ( tableColName.schema == aTableName.schema
+                    && tableColName.table == aTableName.table )
+            {
+                tp.objnum = (*iter).second;
+                tp.tcn = make_tcn(aTableName.schema, aTableName.table, tableColName.column);
+            }
+            iter++;
+        }
+
+        if (aTableName.schema != CALPONT_SCHEMA)
+            DEBUG << aTableName << "." << tp.tcn.column << " was picked from the cache." << endl;
+
+        return tp;
+    }
+
+    //lk1.unlock(); tableinfomap 
+    //lk3.unlock(); colInfoMap
+
+    if (aTableName.schema != CALPONT_SCHEMA)
+        DEBUG << aTableName << " was not cached, fetching..." << endl;
+
+    // get real data from system catalog for all user tables. don't check cache
+    // because cache may not have complete columns for this table
+    // SQL statement: select objectid,columnname from syscolumn where schema=tableName.schema and
+    // tablename=tableName.table;
+    CalpontSelectExecutionPlan csep;
+    CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
+    CalpontSelectExecutionPlan::FilterTokenList filterTokenList;
+    CalpontSelectExecutionPlan::ColumnMap colMap;
+
+    string columnlength = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + COLUMNLEN_COL;
+    string objectid = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + OBJECTID_COL;
+    string datatype = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + DATATYPE_COL;
+    string dictobjectid = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + DICTOID_COL;
+    string listobjectid = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + LISTOBJID_COL;
+    string treeobjectid = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + TREEOBJID_COL;
+    string columnposition = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + COLUMNPOS_COL;
+    string scale = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + SCALE_COL;
+    string precision = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + PRECISION_COL;
+    string defaultvalue = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + DEFAULTVAL_COL;
+    // the following columns will be save in cache although it's not needed for now
+    string columnname = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + COLNAME_COL;
+    string tablename = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + TABLENAME_COL;
+    string schemaname = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + SCHEMA_COL;
+    string nullable = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + NULLABLE_COL;
+    string compressiontype = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + COMPRESSIONTYPE_COL;
+    string autoIncrement = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + AUTOINC_COL;
+    string nextVal = CALPONT_SCHEMA + "." + SYSCOLUMN_TABLE + "." + NEXTVALUE_COL;
+
+    SimpleColumn* col[17];
+    col[0] = new SimpleColumn(columnlength, fSessionID);
+    col[1] = new SimpleColumn(objectid, fSessionID);
+    col[2] = new SimpleColumn(datatype, fSessionID);
+    col[3] = new SimpleColumn(dictobjectid, fSessionID);
+    col[4] = new SimpleColumn(listobjectid, fSessionID);
+    col[5] = new SimpleColumn(treeobjectid, fSessionID);
+    col[6] = new SimpleColumn(columnposition, fSessionID);
+    col[7] = new SimpleColumn(scale, fSessionID);
+    col[8] = new SimpleColumn(precision, fSessionID);
+    col[9] = new SimpleColumn(defaultvalue, fSessionID);
+    col[10] = new SimpleColumn(schemaname, fSessionID);
+    col[11] = new SimpleColumn(tablename, fSessionID);
+    col[12] = new SimpleColumn(columnname, fSessionID);
+    col[13] = new SimpleColumn(nullable, fSessionID);
+    col[14] = new SimpleColumn(compressiontype, fSessionID);
+    col[15] = new SimpleColumn(autoIncrement, fSessionID);
+    col[16] = new SimpleColumn(nextVal, fSessionID);
+
+    SRCP srcp;
+    srcp.reset(col[0]);
+    colMap.insert(CMVT_(columnlength, srcp));
+    srcp.reset(col[1]);
+    colMap.insert(CMVT_(objectid, srcp));
+    srcp.reset(col[2]);
+    colMap.insert(CMVT_(datatype, srcp));
+    srcp.reset(col[3]);
+    colMap.insert(CMVT_(dictobjectid, srcp));
+    srcp.reset(col[4]);
+    colMap.insert(CMVT_(listobjectid, srcp));
+    srcp.reset(col[5]);
+    colMap.insert(CMVT_(treeobjectid, srcp));
+    srcp.reset(col[6]);
+    colMap.insert(CMVT_(columnposition, srcp));
+    srcp.reset(col[7]);
+    colMap.insert(CMVT_(scale, srcp));
+    srcp.reset(col[8]);
+    colMap.insert(CMVT_(precision, srcp));
+
+    srcp.reset(col[9]);
+    colMap.insert(CMVT_(defaultvalue, srcp));
+    srcp.reset(col[10]);
+    colMap.insert(CMVT_(schemaname, srcp));
+    srcp.reset(col[11]);
+    colMap.insert(CMVT_(tablename, srcp));
+    srcp.reset(col[12]);
+    colMap.insert(CMVT_(columnname, srcp));
+    srcp.reset(col[13]);
+    colMap.insert(CMVT_(nullable, srcp));
+    srcp.reset(col[14]);
+    colMap.insert(CMVT_(compressiontype, srcp));
+    srcp.reset(col[15]);
+    colMap.insert(CMVT_(autoIncrement, srcp));
+    srcp.reset(col[16]);
+    colMap.insert(CMVT_(nextVal, srcp));
+    csep.columnMapNonStatic(colMap);
+
+    srcp.reset(col[1]->clone());
+    returnedColumnList.push_back(srcp);
+    csep.returnedCols(returnedColumnList);
+
+    OID oid[17];
+
+    for (int i = 0; i < 17; i++)
+        oid[i] = col[i]->oid();
+
+    oid[12] = DICTOID_SYSCOLUMN_COLNAME;
+    // Filters
+    SimpleFilter* f1 = new SimpleFilter (opeq,
+                                         col[10]->clone(),
+                                         new ConstantColumn(aTableName.schema, ConstantColumn::LITERAL));
+    filterTokenList.push_back(f1);
+    filterTokenList.push_back(new Operator("and"));
+
+    SimpleFilter* f2 = new SimpleFilter (opeq,
+                                         col[11]->clone(),
+                                         new ConstantColumn(aTableName.table, ConstantColumn::LITERAL));
+    filterTokenList.push_back(f2);
+    csep.filterTokenList(filterTokenList);
+
+    ostringstream oss;
+    oss << "select objectid,columnname from syscolumn where schema='" << aTableName.schema << "' and tablename='" <<
+        aTableName.table << "' --columnRIDs/";
+
+    if (fIdentity == EC) oss << "EC";
+    else oss << "FE";
+
+    csep.data(oss.str());
+    NJLSysDataList sysDataList;
+    getSysData (csep, sysDataList, SYSCOLUMN_TABLE);
+
+    vector<ColumnResult*>::const_iterator it;
+    //ColType ct;
+    //ColType* ctList = NULL;
+    //TableInfo ti;
+    //ti.tablewithautoincr = NO_AUTOINCRCOL;
+
+    /*List = new ColType[ti.numOfCols];
+
+            for (int i = 0 ; i < (*it)->dataCount(); i++)
+            {
+                ROPair rp;
+//                 rp.rid = -1;
+                rp.objnum = (*it)->GetData(i);
+
+                if (fIdentity == EC)
+                    rp.rid = (*it)->GetRid(i);
+
+                DEBUG << rp.rid << " ";
+                rl.push_back(rp);
+                ColType ct;
+                ct.columnOID = rp.objnum;
+                ctList[i] = ct;
+            }
+
+            DEBUG << endl;
+        }
+        else if ((*it)->ColumnOID() == oid[15]) //autoincrement
+        {
+
+            for (int i = 0 ; i < (*it)->dataCount(); i++)
+            {
+                ostringstream os;
+                os << (char) (*it)->GetData(i);
+
+                if (os.str().compare("y") == 0)
+                {
+                    ti.tablewithautoincr = AUTOINCRCOL;
+                    break;
+                }
+            }
+        }
+
+        lk1.lock();
+        fTableInfoMap[aTableName] = ti;
+        lk1.unlock();
+    }*/
+
+    // loop 2nd time to make sure rl has been populated.
+    for (it = sysDataList.begin(); it != sysDataList.end(); it++)
+    {
+        if ((*it)->ColumnOID() == oid[1]) // objectid
+        {
+            // 0 means first column in the return result set
+            tp.objnum = (*it)->GetData(0);
+        }
+        else if ((*it)->ColumnOID() == oid[12]) // columnname
+        {
+            lk2.lock();
+
+            for (int i = 0; i < (*it)->dataCount(); i++)
+            {
+                TableColName tcn = make_tcn(aTableName.schema, aTableName.table, (*it)->GetStringData(0));
+                fOIDmap[tcn] = tp.objnum;
+            }
+
+            lk2.unlock();
+            break;
+        }
+        /*else if ((*it)->ColumnOID() == oid[0])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].colWidth = (*it)->GetData(i);
+        }
+        else if ((*it)->ColumnOID() == oid[2])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].colDataType = (ColDataType)((*it)->GetData(i));
+        }
+        else if ((*it)->ColumnOID() == oid[3])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].ddn.dictOID = ((*it)->GetData(i));
+        }
+        else if ((*it)->ColumnOID() == oid[4])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].ddn.listOID = ((*it)->GetData(i));
+        }
+        else if ((*it)->ColumnOID() == oid[5])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].ddn.treeOID = ((*it)->GetData(i));
+        }
+        else if ((*it)->ColumnOID() == oid[6])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].colPosition = ((*it)->GetData(i));
+        }
+        else if ((*it)->ColumnOID() == oid[7])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].scale = ((*it)->GetData(i));
+        }
+        else if ((*it)->ColumnOID() == oid[8])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].precision = ((*it)->GetData(i));
+        }
+        // TODO: check datatype to call GetData() or GetStringData()
+        else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_DEFAULTVAL)
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+            {
+                ctList[i].defaultValue = ((*it)->GetStringData(i));
+
+                if ((!ctList[i].defaultValue.empty()) || (ctList[i].defaultValue.length() > 0))
+                {
+                    if (ctList[i].constraintType != NOTNULL_CONSTRAINT)
+                        ctList[i].constraintType = DEFAULT_CONSTRAINT;
+                }
+            }
+        }
+        else if ((*it)->ColumnOID() == oid[13])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                if ((*it)->GetData(i) == 0)
+                    ctList[i].constraintType = NOTNULL_CONSTRAINT;
+        }
+        else if ((*it)->ColumnOID() == oid[14])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].compressionType = ctList[i].ddn.compressionType = ((*it)->GetData(i));
+        }
+        else if ((*it)->ColumnOID() == oid[15])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+            {
+                ostringstream os;
+                os << (char) (*it)->GetData(i);
+
+                if (os.str().compare("y") == 0)
+                    ctList[i].autoincrement = true;
+                else
+                    ctList[i].autoincrement = false;
+            }
+        }
+        else if ((*it)->ColumnOID() == oid[16])
+        {
+            for (int i = 0; i < (*it)->dataCount(); i++)
+                ctList[i].nextvalue = ((*it)->GetData(i));
+        }*/
+    }
+
+    // MCOL-895 sort ctList, we can't specify an ORDER BY to do this yet
+    //std::sort(ctList, ctList + ti.numOfCols, ctListSort);
+
+    // populate colinfo cache
+    lk3.lock();
+
+    //for (int i = 0; i < ti.numOfCols; i++)
+    //fColinfomap[ctList[i].columnOID] = ctList[i];
+
+    lk3.unlock();
+
+    // Re-sort the output based on the sorted ctList
+    // Don't need to do this for the cached list as this will be already sorted
+    //RIDList rlOut;
+
+    /*
+    for (int i = 0; i < ti.numOfCols; i++)
+    {
+        OID objid = ctList[i].columnOID;
+
+        for (size_t j = 0; j < rl.size(); j++)
+        {
+            if (rl[j].objnum == objid)
+            {
+                rlOut.push_back(rl[j]);
+            }
+        }
+    }
+    */
+
+    //delete [] ctList;
+    if (it != sysDataList.end())
+    {
+        return tp;
+    }
+
+    Message::Args args;
+    args.add("Couldn't find a column for '" + tableName.schema + "." + tableName.table + "'");
+    throw IDBExcept(ERR_TABLE_NOT_IN_CATALOG, args);
+}
 
 const CalpontSystemCatalog::ROPair CalpontSystemCatalog::tableRID(const TableName& tableName)
 {

@@ -529,6 +529,16 @@ public:
     typedef std::vector<IndexName> IndexNameList;
     typedef std::vector<TableColName> TableColNameList;
 
+    /** the type of a <TableColName, object number> pair
+     *
+     */
+    struct TOPair
+    {
+        TOPair() : objnum(0) { }
+        OID objnum;
+        TableColName tcn;
+    };
+
     /** the type of a System Change Number
      *
      */
@@ -685,6 +695,12 @@ public:
      * deprecated.
      */
     const ROPair columnRID(const TableColName& tableColName);
+    
+    /** return the TOPair of a column
+     *
+     * Returns <TableColName, OID> pair that describes a random column from the table.
+     */
+    const TOPair anyColumnInTable(const TableName& tableName);
 
     /** return the RID's of the columns for a table
      *
