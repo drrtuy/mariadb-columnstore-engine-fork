@@ -108,7 +108,8 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor() :
     prefetchThreshold(0),
     hasDictStep(false),
     sockIndex(0),
-    endOfJoinerRan(false)
+    endOfJoinerRan(false),
+    hasCartesianJoin(false)
 {
     pp.setLogicalBlockMode(true);
     pp.setBlockPtr((int*) blockData);
@@ -149,7 +150,8 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream& b, double prefetch,
     prefetchThreshold(prefetch),
     hasDictStep(false),
     sockIndex(0),
-    endOfJoinerRan(false)
+    endOfJoinerRan(false),
+    hasCartesianJoin(false)
 {
     pp.setLogicalBlockMode(true);
     pp.setBlockPtr((int*) blockData);
@@ -287,8 +289,9 @@ void BatchPrimitiveProcessor::initBPP(ByteStream& bs)
                     hasSmallOuterJoin = true;
 
                 if (joinTypes[i] & CARTESIAN)
+                {
                     hasCartesianJoin = true;
-
+                }
                 if (!typelessJoin[i])
                 {
                     bs >> joinNullValues[i];
@@ -957,7 +960,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
     outputRG.getRow(0, &oldRow);
     outputRG.getRow(0, &newRow);
 
-    cerr << "before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
+    cerr << "executeTupleJoin() before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
     for (i = 0; i < ridCount && !sendThread->aborted(); i++, oldRow.nextRow())
     {
         /* Decide whether this large-side row belongs in the output.  The breaks
@@ -1199,230 +1202,32 @@ void BatchPrimitiveProcessor::executeTupleCartJoin()
 {
     uint32_t newRowCount = 0, i, j;
     vector<uint32_t> matches;
-    uint64_t largeKey;
+    //uint64_t largeKey;
     TypelessData tlLargeKey;
 
     preJoinRidCount = ridCount;
     outputRG.getRow(0, &oldRow);
     outputRG.getRow(0, &newRow);
 
-    cerr << "before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
+    cerr << "executeTupleCartJoin() before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
     for (i = 0; i < ridCount && !sendThread->aborted(); i++, oldRow.nextRow())
     {
-        /* Decide whether this large-side row belongs in the output.  The breaks
-         * in the loop mean that it doesn't.
-         *
-         * In English the logic is:
-         * 		Reject the row if there's no match and it's not an anti or an outer join
-         *      or if there is a match and it's an anti join with no filter.
-         * 		If there's an antijoin with a filter nothing can be eliminated at this stage.
-         * 		If there's an antijoin where the join op should match NULL values, and there
-         * 		  are NULL values to match against, but there is no filter, all rows can be eliminated.
-         */
-
         cerr << "large side row: " << oldRow.toString() << endl;
         for (j = 0; j < joinerCount; j++)
         {
-            bool found = true;
-
-            if (UNLIKELY(joinTypes[j] & ANTI))
-            {
-                if (joinTypes[j] & WITHFCNEXP)
-                    continue;
-                else if (doMatchNulls[j])
-                    break;
-            }
-
-            if (LIKELY(!typelessJoin[j]))
-            {
-                cerr << "not typeless join\n";
-                bool isNull = false;
-                uint32_t colIndex = largeSideKeyColumns[j];
-
-                if (oldRow.isUnsigned(colIndex))
-                    largeKey = oldRow.getUintField(colIndex);
-                else
-                    largeKey = oldRow.getIntField(colIndex);
-
-                //found = (tJoiners[j]->find(largeKey) != tJoiners[j]->end());
-                //isNull = oldRow.isNullValue(colIndex);
-                /* These conditions define when the row is NOT in the result set:
-                 *    - if the key is not in the small side, and the join isn't a large-outer or anti join
-                 *    - if the key is NULL, and the join isn't anti- or large-outer
-                 *    - if it's an anti-join and the key is either in the small side or it's NULL
-                 */
-
-                if (((!found || isNull) && !(joinTypes[j] & (LARGEOUTER | ANTI))) ||
-                        ((joinTypes[j] & ANTI) && ((isNull && (joinTypes[j] & MATCHNULLS)) || (found && !isNull))))
-                {
-                    cerr << " - not in the result set\n";
-                    break;
-                }
-
-                //else
-                //	cout << " - in the result set\n";
-            }
-            else
-            {
-                cerr << " typeless join\n";
-                // the null values are not sent by UM in typeless case.  null -> !found
-                tlLargeKey = makeTypelessKey(oldRow, tlLargeSideKeyColumns[j], tlKeyLengths[j],
-                                             &tmpKeyAllocators[j]);
-                //found = tlJoiners[j]->find(tlLargeKey) != tlJoiners[j]->end();
-
-                if ((!found && !(joinTypes[j] & (LARGEOUTER | ANTI))) ||
-                        (joinTypes[j] & ANTI))
-                {
-
-                    /* Separated the ANTI join logic for readability.
-                     *
-                     */
-                    if (joinTypes[j] & ANTI)
-                    {
-                        if (found)
-                            break;
-                        else if (joinTypes[j] & MATCHNULLS)
-                        {
-                            bool hasNull = false;
-
-                            for (uint32_t z = 0; z < tlLargeSideKeyColumns[j].size(); z++)
-                                if (oldRow.isNullValue(tlLargeSideKeyColumns[j][z]))
-                                {
-                                    hasNull = true;
-                                    break;
-                                }
-
-                            if (hasNull)  // keys with nulls match everything
-                                break;
-                            else
-                                continue;    // non-null keys not in the small side
-
-                            // are in the result
-                        }
-                        else    // signifies a not-exists query
-                            continue;
-                    }
-
-                    break;
-                }
-            }
+            //getJoinResults(oldRow, j, tSmallSideMatches[j][newRowCount], true);
+            TJoiner::iterator it;
+            for (it = tJoiners[j]->begin(); it != tJoiners[j]->end(); ++it)
+                tSmallSideMatches[j][newRowCount].push_back(it->second);
         }
 
-        if (j == joinerCount)
-        {
-            for (j = 0; j < joinerCount; j++)
-            {
-                uint32_t matchCount;
+        values[newRowCount] = values[i];
+        relRids[newRowCount] = relRids[i];
+        copyRow(oldRow, &newRow);
+        cerr << "joined row: " << newRow.toString() << endl;
 
-                /* The result is already known if...
-                 *   -- anti-join with no fcnexp
-                 *   -- semi-join with no fcnexp and not scalar
-                 *
-                 * The ANTI join case isn't just a shortcut.  getJoinResults() will produce results
-                 * for a different case and generate the wrong result.  Need to fix that, later.
-                 */
-                if ((joinTypes[j] & (SEMI | ANTI)) && !(joinTypes[j] & WITHFCNEXP) && !(joinTypes[j] & SCALAR))
-                {
-                    tSmallSideMatches[j][newRowCount].push_back(-1);
-                    continue;
-                }
-
-                getJoinResults(oldRow, j, tSmallSideMatches[j][newRowCount], true);
-                //matchCount = tSmallSideMatches[j][newRowCount].size();
-                matchCount = 1;
-
-                /*if (joinTypes[j] & WITHFCNEXP)
-                {
-                    vector<uint32_t> newMatches;
-                    applyMapping(joinFEMappings[joinerCount], oldRow, &joinFERow);
-
-                    for (uint32_t k = 0; k < matchCount; k++)
-                    {
-                        if (tSmallSideMatches[j][newRowCount][k] == (uint32_t) - 1)
-                            smallRows[j].setPointer(smallNullPointers[j]);
-                        else
-                        {
-                            smallSideRGs[j].getRow(tSmallSideMatches[j][newRowCount][k], &smallRows[j]);
-                            //uint64_t rowOffset = ((uint64_t) tSmallSideMatches[j][newRowCount][k]) *
-                            //		smallRows[j].getSize() + smallSideRGs[j].getEmptySize();
-                            //smallRows[j].setData(&smallSideRowData[j][rowOffset]);
-                        }
-
-                        applyMapping(joinFEMappings[j], smallRows[j], &joinFERow);
-
-                        if (joinFEFilters[j]->evaluate(&joinFERow))
-                        {
-                            // The first match includes it in a SEMI join result and excludes it from an ANTI join
-                            // result.  If it's SEMI & SCALAR however, it needs to continue.
-                            //
-                            newMatches.push_back(tSmallSideMatches[j][newRowCount][k]);
-
-                            if ((joinTypes[j] & ANTI) || ((joinTypes[j] & (SEMI | SCALAR)) == SEMI))
-                                break;
-                        }
-                    }
-
-                    tSmallSideMatches[j][newRowCount].swap(newMatches);
-                    matchCount = tSmallSideMatches[j][newRowCount].size();
-                }*/
-
-                /*if (matchCount == 0 && (joinTypes[j] & LARGEOUTER))
-                {
-                    tSmallSideMatches[j][newRowCount].push_back(-1);
-                    matchCount = 1;
-                }*/
-
-                /* Scalar check */
-                if ((joinTypes[j] & SCALAR) && matchCount > 1)
-                    throw scalar_exception();
-
-                /* Reverse the result for anti-join */
-                if (joinTypes[j] & ANTI)
-                {
-                    if (matchCount == 0)
-                    {
-                        tSmallSideMatches[j][newRowCount].push_back(-1);
-                        matchCount = 1;
-                    }
-                    else
-                    {
-                        tSmallSideMatches[j][newRowCount].clear();
-                        matchCount = 0;
-                    }
-                }
-
-                /* For all join types, no matches here means it's not in the result */
-                if (matchCount == 0)
-                    break;
-
-                /* Pair non-scalar semi-joins with a NULL row */
-                if ((joinTypes[j] & SEMI) && !(joinTypes[j] & SCALAR))
-                {
-                    tSmallSideMatches[j][newRowCount].clear();
-                    tSmallSideMatches[j][newRowCount].push_back(-1);
-                    matchCount = 1;
-                }
-            }
-
-            /* Finally, copy the row into the output */
-            if (j == joinerCount)
-            {
-                if (i != newRowCount)
-                {
-                    values[newRowCount] = values[i];
-                    relRids[newRowCount] = relRids[i];
-                    copyRow(oldRow, &newRow);
-                    cerr << "joined row: " << newRow.toString() << endl;
-                    //memcpy(newRow.getData(), oldRow.getData(), oldRow.getSize());
-                }
-
-                newRowCount++;
-                newRow.nextRow();
-            }
-
-            //else
-            //	cout << "j != joinerCount\n";
-        }
+        newRowCount++;
+        newRow.nextRow();
     }
 
     ridCount = newRowCount;
@@ -1706,13 +1511,13 @@ void BatchPrimitiveProcessor::execute()
 
 #ifdef PRIMPROC_STOPWATCH
                 stopwatch->start("-- executeTupleJoin()");
-                if ( hasCartesianJoin )
+                if ( hasCartesianJoin == true )
                     executeTupleCartJoin();
                 else
                     executeTupleJoin();
                 stopwatch->stop("-- executeTupleJoin()");
 #else
-                if ( hasCartesianJoin )
+                if ( hasCartesianJoin == true )
                     executeTupleCartJoin();
                 else
                     executeTupleJoin();
@@ -2728,16 +2533,8 @@ void BatchPrimitiveProcessor::initGJRG()
 
 inline void BatchPrimitiveProcessor::getJoinResults(const Row& r, 
     uint32_t jIndex,
-    vector<uint32_t>& v,
-    bool cartesian)
+    vector<uint32_t>& v)
 {
-    if ( cartesian )
-    {
-        TJoiner::iterator it;
-        for (it = tJoiners[jIndex]->begin(); it != tJoiners[jIndex]->end(); ++it)
-            v.push_back(it->second);
-        return;
-    }
     if (!typelessJoin[jIndex])
     {
         if (r.isNullValue(largeSideKeyColumns[jIndex]))
