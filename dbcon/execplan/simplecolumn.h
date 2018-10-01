@@ -75,7 +75,9 @@ public:
     SimpleColumn(const std::string& schema,
                  const std::string& table,
                  const std::string& col,
-                 CalpontSystemCatalog::OID oidobj);
+                 CalpontSystemCatalog::OID oidobj,
+                 CalpontSystemCatalog::ColType ct,
+                 const std::string& tableAlias = std::string());
 
     /**
      * Destructor

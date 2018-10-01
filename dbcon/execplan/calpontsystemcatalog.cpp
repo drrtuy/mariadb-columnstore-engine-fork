@@ -3480,11 +3480,11 @@ const CalpontSystemCatalog::TableName CalpontSystemCatalog::tableName(const OID&
 }
 
 /*
- * Find and return TOPair for a first random column of a table.
+ * Find and return TOCTuple for a first random column of a table.
  * tableName 
- * returns ROPair with columns information
+ * returns TOCTuple with columns information
  */
-const CalpontSystemCatalog::TOPair CalpontSystemCatalog::anyColumnInTable(const TableName& tableName)
+const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(const TableName& tableName)
 {
     TableName aTableName(tableName);
     transform( aTableName.schema.begin(), aTableName.schema.end(), aTableName.schema.begin(), to_lower() );
@@ -3496,7 +3496,7 @@ const CalpontSystemCatalog::TOPair CalpontSystemCatalog::anyColumnInTable(const 
     if (aTableName.schema != CALPONT_SCHEMA)
         DEBUG << "Enter columnRIDs: " << tableName.schema << "|" << tableName.table << endl;
 
-    TOPair tp;
+    TOCTuple tp;
 
     //Check whether cache needs to be flushed
     if ( aTableName.schema != CALPONT_SCHEMA)
@@ -3861,6 +3861,7 @@ const CalpontSystemCatalog::TOPair CalpontSystemCatalog::anyColumnInTable(const 
     //delete [] ctList;
     if (it != sysDataList.end())
     {
+        tp.ct = colType(tp.objnum); // Could it return an empty ColType?
         return tp;
     }
 

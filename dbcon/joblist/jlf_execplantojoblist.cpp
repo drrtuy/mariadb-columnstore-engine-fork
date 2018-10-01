@@ -2422,20 +2422,61 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = 
 
             //SimpleColumn* sc1 = dynamic_cast<SimpleColumn*>(lhs);
             //SimpleColumn* sc2 = dynamic_cast<SimpleColumn*>(rhs);
-            SimpleColumn* sc1;
-            SimpleColumn* sc2;
+            SimpleColumn* sc1; SimpleColumn* sc2; SimpleColumn* sc11; SimpleColumn* sc12;
+            CalpontSystemCatalog::OID tableOid1, tableOid2;
+            uint64_t tid1, tid2;
             
-            // MCOL-131 find an apropiate columns
+            // MCOL-131 find an apropriate columns
             if ( noFilters == true )
             {
-                UniqId uid1 = jobInfo.keyInfo.get()->tupleKeyVec[0];
-                UniqId uid2 = jobInfo.keyInfo.get()->tupleKeyVec[1];
-                CalpontSystemCatalog::TOPair tp1 = jobInfo.csc.get()->anyColumnInTable(make_table(uid1.fSchema, uid1.fTable));
-                CalpontSystemCatalog::TOPair tp2 = jobInfo.csc.get()->anyColumnInTable(make_table(uid2.fSchema, uid2.fTable));
+                tid1 = 0, tid2 = 1;
+                UniqId uid1 = jobInfo.keyInfo.get()->tupleKeyVec[tid1];
+                UniqId uid2 = jobInfo.keyInfo.get()->tupleKeyVec[tid2];
+                tableOid1 = uid1.fId, tableOid2 = uid2.fId;
+                CalpontSystemCatalog::TOCTuple toct1 = jobInfo.csc.get()->anyColumnInTable(make_table(uid1.fSchema, uid1.fTable));
+                // Table name could be an alias
+                if ( toct1.tcn.column.size() == 0 )
+                {
+                    string tableName1 = jobInfo.keyInfo.get()->keyName.find(tid1)->second;
+                    toct1 = jobInfo.csc.get()->anyColumnInTable(make_table(uid1.fSchema, tableName1));
+                    // Use table alias
+                    sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct, uid1.fTable);
+                }
+                else
+                {
+                    sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct);
+                }
+                CalpontSystemCatalog::TOCTuple toct2 = jobInfo.csc.get()->anyColumnInTable(make_table(uid2.fSchema, uid2.fTable));
+                // Table name could be an alias
+                if ( toct2.tcn.column.size() == 0 )
+                {
+                    string tableName2 = jobInfo.keyInfo.get()->keyName.find(tid2)->second;
+                    toct2 = jobInfo.csc.get()->anyColumnInTable(make_table(uid2.fSchema, tableName2));
+                    // Use table alias
+                    sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct, uid2.fTable);
+                }
+                else
+                {
+                    sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct);
+                }
+                
                 sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
                 sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
-                
+                //sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct);
+                //sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct);
             }
+            
+            if ( noFilters == false )
+            {
+                tableOid1 = tableOid(sc1, jobInfo.csc);
+                tid1 = getTableKey(jobInfo, tableOid1, sc1->tableAlias(),
+                    sc1->schemaName(), sc1->viewName());
+                tableOid2 = tableOid(sc2, jobInfo.csc);
+                tid2 = getTableKey(jobInfo, tableOid2, sc2->tableAlias(), 
+                    sc2->schemaName(), sc2->viewName());
+            }
+            
+            
             //sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
             //sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
                 
@@ -2446,12 +2487,12 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = 
             {
                 // @bug3037, workaround on join order, wish this can be corrected soon,
                 // cascade outer table attribute.
-                CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
-                uint64_t tid1 = getTableKey(
-                                    jobInfo, tableOid1, sc1->tableAlias(), sc1->schemaName(), sc1->viewName());
-                CalpontSystemCatalog::OID tableOid2 = tableOid(sc2, jobInfo.csc);
-                uint64_t tid2 = getTableKey(
-                                    jobInfo, tableOid2, sc2->tableAlias(), sc2->schemaName(), sc2->viewName());
+                //CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
+                //uint64_t tid1 = getTableKey(
+                //                    jobInfo, tableOid1, sc1->tableAlias(), sc1->schemaName(), sc1->viewName());
+                //CalpontSystemCatalog::OID tableOid2 = tableOid(sc2, jobInfo.csc);
+                //uint64_t tid2 = getTableKey(
+                //                    jobInfo, tableOid2, sc2->tableAlias(), sc2->schemaName(), sc2->viewName());
 
                 if (tablesInOuter.find(tid1) != tablesInOuter.end())
                     sc1->returnAll(true);
