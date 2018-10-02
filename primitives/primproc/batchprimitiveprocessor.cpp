@@ -106,10 +106,10 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor() :
     hasFilterStep(false),
     filtOnString(false),
     prefetchThreshold(0),
+    hasCartesianJoin(false),
     hasDictStep(false),
     sockIndex(0),
-    endOfJoinerRan(false),
-    hasCartesianJoin(false)
+    endOfJoinerRan(false)
 {
     pp.setLogicalBlockMode(true);
     pp.setBlockPtr((int*) blockData);
@@ -148,10 +148,10 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream& b, double prefetch,
     hasFilterStep(false),
     filtOnString(false),
     prefetchThreshold(prefetch),
+    hasCartesianJoin(false),
     hasDictStep(false),
     sockIndex(0),
-    endOfJoinerRan(false),
-    hasCartesianJoin(false)
+    endOfJoinerRan(false)
 {
     pp.setLogicalBlockMode(true);
     pp.setBlockPtr((int*) blockData);
@@ -1216,9 +1216,19 @@ void BatchPrimitiveProcessor::executeTupleCartJoin()
         for (j = 0; j < joinerCount; j++)
         {
             //getJoinResults(oldRow, j, tSmallSideMatches[j][newRowCount], true);
-            TJoiner::iterator it;
-            for (it = tJoiners[j]->begin(); it != tJoiners[j]->end(); ++it)
-                tSmallSideMatches[j][newRowCount].push_back(it->second);
+            if (!typelessJoin[j])
+            {
+                TJoiner::iterator it;
+                for (it = tJoiners[j]->begin(); it != tJoiners[j]->end(); ++it)
+                    tSmallSideMatches[j][newRowCount].push_back(it->second);
+            }
+            else
+            {
+                TLJoiner::iterator it;
+
+                for (it = tlJoiners[j]->begin(); it != tlJoiners[j]->end(); ++it)
+                    tSmallSideMatches[j][newRowCount].push_back(it->second);
+            }
         }
 
         values[newRowCount] = values[i];

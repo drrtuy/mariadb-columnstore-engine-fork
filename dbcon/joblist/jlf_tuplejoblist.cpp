@@ -2342,10 +2342,13 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
             cjs->view2(tableInfoMap[large].fView);
             cjs->schema1(smallSides[0]->fSchema);
             cjs->schema2(tableInfoMap[large].fSchema);
-            cjs->setLargeSideBPS(bps);
             cjs->joinId(lastJoinId);
 
-            if (dynamic_cast<TupleBPS*>(bps) != NULL)
+            TupleBPS* tBps = dynamic_cast<TupleBPS*>(bps);
+            tBps->cartesianJoin();
+            cjs->setLargeSideBPS(bps);
+
+            if ( tBps != NULL)
                 bps->incWaitToRunStepCnt();
 
             SJSTEP spjs(cjs);

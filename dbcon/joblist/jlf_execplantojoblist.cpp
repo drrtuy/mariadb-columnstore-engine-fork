@@ -2460,8 +2460,8 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = 
                     sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct);
                 }
                 
-                sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
-                sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
+                //sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
+                //sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
                 //sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct);
                 //sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct);
             }

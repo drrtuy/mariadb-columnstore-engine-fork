@@ -95,7 +95,7 @@ CartJoinStep::CartJoinStep(const JobInfo& jobInfo) :
     pmMemLimit = resourceManager->getHjPmMaxMemorySmallSide(fSessionId);
     uniqueLimit = resourceManager->getHjCPUniqueLimit();
 
-    fExtendedInfo = "CHJS: ";
+    fExtendedInfo = "CJS: ";
     joinType = INIT;
     joinThreadCount = resourceManager->getJlNumScanReceiveThreads();
     largeBPS = NULL;
@@ -1092,7 +1092,7 @@ void CartJoinStep::addJoinKeyIndex(const vector<JoinType>& jt,
 #ifdef JLF_DEBUG
 
     for (uint32_t i = 0; i < joinTypes.size(); i++)
-        cout << "jointype[" << i << "] = 0x" << hex << joinTypes[i] << dec << endl;
+        cerr << "jointype[" << i << "] = 0x" << hex << joinTypes[i] << dec << endl;
 
 #endif
 }

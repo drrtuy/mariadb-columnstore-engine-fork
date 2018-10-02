@@ -1335,6 +1335,7 @@ public:
     {
         return true;
     }
+    void cartesianJoin();
 
 protected:
     void sendError(uint16_t status);
@@ -1432,6 +1433,9 @@ private:
 
     uint32_t smallSideCount;
     int  smallOuterJoiner;
+
+    // MCOL-131 Cartesian JOIN
+    bool doCartesianJoin;
 
     bool fRunExecuted; // was the run method executed for this step
     rowgroup::RowGroup inputRowGroup;   // for parsing the data read from the datalist
