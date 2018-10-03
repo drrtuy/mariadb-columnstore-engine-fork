@@ -1201,9 +1201,9 @@ void BatchPrimitiveProcessor::executeTupleJoin()
 void BatchPrimitiveProcessor::executeTupleCartJoin()
 {
     uint32_t newRowCount = 0, i, j;
-    vector<uint32_t> matches;
+    //vector<uint32_t> matches;
     //uint64_t largeKey;
-    TypelessData tlLargeKey;
+    //TypelessData tlLargeKey;
 
     preJoinRidCount = ridCount;
     outputRG.getRow(0, &oldRow);

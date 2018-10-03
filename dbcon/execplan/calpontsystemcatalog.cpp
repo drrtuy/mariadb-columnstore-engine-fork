@@ -3481,7 +3481,7 @@ const CalpontSystemCatalog::TableName CalpontSystemCatalog::tableName(const OID&
 
 /*
  * Find and return TOCTuple for a first random column of a table.
- * tableName 
+ * tableName struct to filter the CSC data out
  * returns TOCTuple with columns information
  */
 const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(const TableName& tableName)
@@ -3504,12 +3504,6 @@ const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(cons
         checkSysCatVer();
     }
 
-    //boost::mutex::scoped_lock lk1(fTableInfoMapLock);
-    //TableInfoMap::const_iterator ti_iter = fTableInfoMap.find(aTableName);
-
-    // search fOIDmap for system catalog tables
-    // or if fTableInfoMap has entry for this table, column oids are cached.
-    // because columnRIDs(), colType() and tableInfo() are actually binded.
 #if BOOST_VERSION < 103800
     boost::mutex::scoped_lock lk2(fOIDmapLock, false);
 #else
@@ -3517,48 +3511,60 @@ const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(cons
 #endif
     boost::mutex::scoped_lock lk3(fColinfomapLock);
 
-    //if (aTableName.schema == CALPONT_SCHEMA) || ti_iter != fTableInfoMap.end())
+
     {
         if (aTableName.schema == CALPONT_SCHEMA)
-            lk3.unlock(); // There is no lock taken yet.
-        //else
-        //    rl.resize(ti_iter->second.numOfCols);
+            lk3.unlock(); // To unlock ColType
+
 
         if (aTableName.schema != CALPONT_SCHEMA)
             DEBUG << "for " << aTableName << ", searching " << fOIDmap.size() << " oids" << endl;
 
         lk2.lock();
         OIDmap::const_iterator iter = fOIDmap.begin();
+        OIDmap::const_iterator prevMatch = fOIDmap.end();
+        //ColType ct;
 
         while ( iter != fOIDmap.end() )
         {
-            TableColName tableColName = make_tcn((*iter).first.schema, 
-                (*iter).first.table, (*iter).first.column);
-
-            if ( tableColName.schema == aTableName.schema
-                    && tableColName.table == aTableName.table )
+            if ( (*iter).first.schema == aTableName.schema
+                    && (*iter).first.table == aTableName.table )
             {
+                cerr << "anyColumnInTable() from cache colname" <<  (*iter).first.column << "." << (*iter).first.column << endl;
+                // looking for a typed column
+                // Does this lock/unlock technic prevent any race conditions indeed?
+                lk3.unlock();
+                tp.ct = colType((*iter).second);
+                if ( tp.ct.colWidth > 8 )
+                {
+                    lk3.lock();
+                    continue;
+                    cerr << "anyColumnInTable() skip this in cache " << endl;
+                }
                 tp.objnum = (*iter).second;
-                tp.tcn = make_tcn(aTableName.schema, aTableName.table, tableColName.column);
+                tp.tcn = make_tcn(aTableName.schema, aTableName.table, (*iter).first.column);
+                break;
             }
             iter++;
         }
 
-        if (aTableName.schema != CALPONT_SCHEMA)
-            DEBUG << aTableName << "." << tp.tcn.column << " was picked from the cache." << endl;
-
-        return tp;
+        if ( iter != fOIDmap.end() )
+        {
+            if (aTableName.schema != CALPONT_SCHEMA)
+                DEBUG << aTableName << "." << tp.tcn.column << " was picked." << endl;
+            cerr << "anyColumnInTable() pick from cache this " << tp.tcn.table << "." << tp.tcn.column << endl;
+            return tp;            
+        }
     }
 
-    //lk1.unlock(); tableinfomap 
-    //lk3.unlock(); colInfoMap
+    lk3.unlock(); // colInfoMap
 
     if (aTableName.schema != CALPONT_SCHEMA)
         DEBUG << aTableName << " was not cached, fetching..." << endl;
 
     // get real data from system catalog for all user tables. don't check cache
     // because cache may not have complete columns for this table
-    // SQL statement: select objectid,columnname from syscolumn where schema=tableName.schema and
+    // SQL statement: select columnlength,objectid,columnname from syscolumn where schema=tableName.schema and
     // tablename=tableName.table;
     CalpontSelectExecutionPlan csep;
     CalpontSelectExecutionPlan::ReturnedColumnList returnedColumnList;
@@ -3676,191 +3682,42 @@ const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(cons
     getSysData (csep, sysDataList, SYSCOLUMN_TABLE);
 
     vector<ColumnResult*>::const_iterator it;
-    //ColType ct;
-    //ColType* ctList = NULL;
-    //TableInfo ti;
-    //ti.tablewithautoincr = NO_AUTOINCRCOL;
-
-    /*List = new ColType[ti.numOfCols];
-
-            for (int i = 0 ; i < (*it)->dataCount(); i++)
-            {
-                ROPair rp;
-//                 rp.rid = -1;
-                rp.objnum = (*it)->GetData(i);
-
-                if (fIdentity == EC)
-                    rp.rid = (*it)->GetRid(i);
-
-                DEBUG << rp.rid << " ";
-                rl.push_back(rp);
-                ColType ct;
-                ct.columnOID = rp.objnum;
-                ctList[i] = ct;
-            }
-
-            DEBUG << endl;
-        }
-        else if ((*it)->ColumnOID() == oid[15]) //autoincrement
+    int targetSysDataListId = -1;
+    //int32_t targetColWidth = 0;
+    // find a typed column to avoid typeless Joiner in Cartesian JOIN logic
+    for (it = sysDataList.begin(); it != sysDataList.end() && targetSysDataListId < 0; it++)
+    {
+        if ((*it)->ColumnOID() == oid[0]) // columnlength
         {
-
-            for (int i = 0 ; i < (*it)->dataCount(); i++)
-            {
-                ostringstream os;
-                os << (char) (*it)->GetData(i);
-
-                if (os.str().compare("y") == 0)
-                {
-                    ti.tablewithautoincr = AUTOINCRCOL;
-                    break;
-                }
-            }
+            int i = 0;
+            for (; i < (*it)->dataCount() && (*it)->GetData(i) > 8; i++);
+            if ( i < (*it)->dataCount() )
+                targetSysDataListId = i;
+            else
+                targetSysDataListId = 0; // pick the first column
         }
-
-        lk1.lock();
-        fTableInfoMap[aTableName] = ti;
-        lk1.unlock();
-    }*/
-
-    // loop 2nd time to make sure rl has been populated.
+    }
+    
+    // loop 2nd time to populate TOCTuple attributes.
     for (it = sysDataList.begin(); it != sysDataList.end(); it++)
     {
         if ((*it)->ColumnOID() == oid[1]) // objectid
-        {
-            // 0 means first column in the return result set
-            tp.objnum = (*it)->GetData(0);
-        }
+            tp.objnum = (*it)->GetData(targetSysDataListId);
         else if ((*it)->ColumnOID() == oid[12]) // columnname
         {
+            TableColName tcn = make_tcn(aTableName.schema, 
+                aTableName.table, (*it)->GetStringData(targetSysDataListId));
             lk2.lock();
-
-            for (int i = 0; i < (*it)->dataCount(); i++)
-            {
-                TableColName tcn = make_tcn(aTableName.schema, aTableName.table, (*it)->GetStringData(0));
-                fOIDmap[tcn] = tp.objnum;
-            }
-
+            fOIDmap[tcn] = tp.objnum;
             lk2.unlock();
-            break;
-        }
-        /*else if ((*it)->ColumnOID() == oid[0])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].colWidth = (*it)->GetData(i);
-        }
-        else if ((*it)->ColumnOID() == oid[2])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].colDataType = (ColDataType)((*it)->GetData(i));
-        }
-        else if ((*it)->ColumnOID() == oid[3])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].ddn.dictOID = ((*it)->GetData(i));
-        }
-        else if ((*it)->ColumnOID() == oid[4])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].ddn.listOID = ((*it)->GetData(i));
-        }
-        else if ((*it)->ColumnOID() == oid[5])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].ddn.treeOID = ((*it)->GetData(i));
-        }
-        else if ((*it)->ColumnOID() == oid[6])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].colPosition = ((*it)->GetData(i));
-        }
-        else if ((*it)->ColumnOID() == oid[7])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].scale = ((*it)->GetData(i));
-        }
-        else if ((*it)->ColumnOID() == oid[8])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].precision = ((*it)->GetData(i));
-        }
-        // TODO: check datatype to call GetData() or GetStringData()
-        else if ((*it)->ColumnOID() == DICTOID_SYSCOLUMN_DEFAULTVAL)
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-            {
-                ctList[i].defaultValue = ((*it)->GetStringData(i));
-
-                if ((!ctList[i].defaultValue.empty()) || (ctList[i].defaultValue.length() > 0))
-                {
-                    if (ctList[i].constraintType != NOTNULL_CONSTRAINT)
-                        ctList[i].constraintType = DEFAULT_CONSTRAINT;
-                }
-            }
-        }
-        else if ((*it)->ColumnOID() == oid[13])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                if ((*it)->GetData(i) == 0)
-                    ctList[i].constraintType = NOTNULL_CONSTRAINT;
-        }
-        else if ((*it)->ColumnOID() == oid[14])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].compressionType = ctList[i].ddn.compressionType = ((*it)->GetData(i));
-        }
-        else if ((*it)->ColumnOID() == oid[15])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-            {
-                ostringstream os;
-                os << (char) (*it)->GetData(i);
-
-                if (os.str().compare("y") == 0)
-                    ctList[i].autoincrement = true;
-                else
-                    ctList[i].autoincrement = false;
-            }
-        }
-        else if ((*it)->ColumnOID() == oid[16])
-        {
-            for (int i = 0; i < (*it)->dataCount(); i++)
-                ctList[i].nextvalue = ((*it)->GetData(i));
-        }*/
-    }
-
-    // MCOL-895 sort ctList, we can't specify an ORDER BY to do this yet
-    //std::sort(ctList, ctList + ti.numOfCols, ctListSort);
-
-    // populate colinfo cache
-    lk3.lock();
-
-    //for (int i = 0; i < ti.numOfCols; i++)
-    //fColinfomap[ctList[i].columnOID] = ctList[i];
-
-    lk3.unlock();
-
-    // Re-sort the output based on the sorted ctList
-    // Don't need to do this for the cached list as this will be already sorted
-    //RIDList rlOut;
-
-    /*
-    for (int i = 0; i < ti.numOfCols; i++)
-    {
-        OID objid = ctList[i].columnOID;
-
-        for (size_t j = 0; j < rl.size(); j++)
-        {
-            if (rl[j].objnum == objid)
-            {
-                rlOut.push_back(rl[j]);
-            }
         }
     }
-    */
+
 
     //delete [] ctList;
-    if (it != sysDataList.end())
+    if (tp.objnum >= 3000)
     {
+        cerr << "anyColumnInTable() pick this " << tp.tcn.table << "." << tp.tcn.column << endl;
         tp.ct = colType(tp.objnum); // Could it return an empty ColType?
         return tp;
     }
