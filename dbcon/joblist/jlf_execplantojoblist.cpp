@@ -1045,6 +1045,8 @@ const JobStepVector doFilterExpression(const SimpleColumn* sc1, const SimpleColu
 const JobStepVector doJoin(
     SimpleColumn* sc1, SimpleColumn* sc2, JobInfo& jobInfo, const SOP& sop, SimpleFilter* sf)
 {
+    cout << "doJoin() t1 " << sc1->schemaName() << "." << sc1->tableName() << " with t2 " 
+        << sc1->schemaName() << "." << sc1->tableName() << endl;
     if ((sc1->resultType().colDataType == CalpontSystemCatalog::VARBINARY ||
             sc1->resultType().colDataType == CalpontSystemCatalog::BLOB))
         throw runtime_error("VARBINARY/BLOB in join is not supported.");
@@ -2381,7 +2383,7 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = 
     set<ParseTree*> doneNodes;          // solved joins and simple filters
     map<ParseTree*, ParseTree*> cpMap;  // <child, parent> link for node removal
     JobStepVector join;                 // join step with its projection steps
-    bool keepFilters = false;           // keep filters for cross engine step
+    //bool keepFilters = false;           // keep filters for cross engine step
 
     // To compromise the front end difficulty on setting outer attributes.
     set<uint64_t> tablesInOuter;
@@ -2422,105 +2424,72 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = 
 
             //SimpleColumn* sc1 = dynamic_cast<SimpleColumn*>(lhs);
             //SimpleColumn* sc2 = dynamic_cast<SimpleColumn*>(rhs);
-            SimpleColumn* sc1; SimpleColumn* sc2; SimpleColumn* sc11; SimpleColumn* sc12;
+            SimpleColumn* sc1; SimpleColumn* sc2;// SimpleColumn* sc11; SimpleColumn* sc12;
             CalpontSystemCatalog::OID tableOid1, tableOid2;
             uint64_t tid1, tid2;
             
             // MCOL-131 find an apropriate columns
             if ( noFilters == true )
             {
-                tid1 = 0, tid2 = 1;
-                UniqId uid1 = jobInfo.keyInfo.get()->tupleKeyVec[tid1];
-                UniqId uid2 = jobInfo.keyInfo.get()->tupleKeyVec[tid2];
-                tableOid1 = uid1.fId, tableOid2 = uid2.fId;
-                CalpontSystemCatalog::TOCTuple toct1 = jobInfo.csc.get()->anyColumnInTable(make_table(uid1.fSchema, uid1.fTable));
-                // Table name could be an alias
-                if ( toct1.tcn.column.size() == 0 )
+                // Loop through the map to get and process all tids.
+                uint32_t tableNum = jobInfo.keyInfo.get()->tupleKeyToTableOid.size();
+                for(tid1 = 0, tid2 = 1; tid2 < tableNum; tid1++, tid2++)
                 {
+                    UniqId uid1 = jobInfo.keyInfo.get()->tupleKeyVec[tid1];
+                    UniqId uid2 = jobInfo.keyInfo.get()->tupleKeyVec[tid2];
+                    tableOid1 = uid1.fId, tableOid2 = uid2.fId;
                     string tableName1 = jobInfo.keyInfo.get()->keyName.find(tid1)->second;
-                    toct1 = jobInfo.csc.get()->anyColumnInTable(make_table(uid1.fSchema, tableName1));
-                    // Use table alias
-                    sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct, uid1.fTable);
-                }
-                else
-                {
-                    sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct);
-                }
-                CalpontSystemCatalog::TOCTuple toct2 = jobInfo.csc.get()->anyColumnInTable(make_table(uid2.fSchema, uid2.fTable));
-                // Table name could be an alias
-                if ( toct2.tcn.column.size() == 0 )
-                {
                     string tableName2 = jobInfo.keyInfo.get()->keyName.find(tid2)->second;
-                    toct2 = jobInfo.csc.get()->anyColumnInTable(make_table(uid2.fSchema, tableName2));
-                    // Use table alias
-                    sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct, uid2.fTable);
+                    CalpontSystemCatalog::TOCTuple toct1 = jobInfo.csc.get()->anyColumnInTable(make_table(uid1.fSchema, tableName1));
+                    // Set an alias for the column
+                    if ( uid1.fTable != tableName1 )
+                        sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct, uid1.fTable);
+                    else 
+                        sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct);
+                    
+                    CalpontSystemCatalog::TOCTuple toct2 = jobInfo.csc.get()->anyColumnInTable(make_table(uid2.fSchema, tableName2));
+                    if ( uid2.fTable != tableName2 )
+                        sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct, uid2.fTable);
+                    else 
+                        sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct);
+                    
+                    // @bug3037, workaround on join order, wish this can be corrected soon,
+                    // cascade outer table attribute.
+                    //CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
+                    //uint64_t tid1 = getTableKey(
+                    //                    jobInfo, tableOid1, sc1->tableAlias(), sc1->schemaName(), sc1->viewName());
+                    //CalpontSystemCatalog::OID tableOid2 = tableOid(sc2, jobInfo.csc);
+                    //uint64_t tid2 = getTableKey(
+                    //                    jobInfo, tableOid2, sc2->tableAlias(), sc2->schemaName(), sc2->viewName());
+
+                    if (tablesInOuter.find(tid1) != tablesInOuter.end())
+                        sc1->returnAll(true);
+                    else if (tablesInOuter.find(tid2) != tablesInOuter.end())
+                        sc2->returnAll(true);
+
+                    if (sc1->returnAll() && !sc2->returnAll())
+                        tablesInOuter.insert(tid1);
+                    else if (!sc1->returnAll() && sc2->returnAll())
+                        tablesInOuter.insert(tid2);
+
+                    tablesInJoin.insert(tid1);
+                    tablesInJoin.insert(tid2);
+
+                    SOP sop;
+                    join = doCartesianJoin(sc1, sc2, jobInfo, sop, NULL);
+                    // set cardinality for the hashjoin step.
+                    //uint32_t card = sf->cardinality();
+
+                    /*if (sf->cardinality() > sc1->cardinality() &&
+                            sf->cardinality() > sc2->cardinality())
+                        card = ((sc1->cardinality() > sc2->cardinality()) ?
+                                sc1->cardinality() : sc2->cardinality());
+                    */
+                    join[join.size() - 1].get()->cardinality(12);
+
+                    jsv.insert(jsv.end(), join.begin(), join.end());
+                    //doneNodes.insert(cn);
                 }
-                else
-                {
-                    sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct);
-                }
-                
-                //sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
-                //sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
-                //sc1 = new SimpleColumn(toct1.tcn.schema, toct1.tcn.table, toct1.tcn.column, toct1.objnum, toct1.ct);
-                //sc2 = new SimpleColumn(toct2.tcn.schema, toct2.tcn.table, toct2.tcn.column, toct2.objnum, toct2.ct);
-            }
-            
-            if ( noFilters == false )
-            {
-                tableOid1 = tableOid(sc1, jobInfo.csc);
-                tid1 = getTableKey(jobInfo, tableOid1, sc1->tableAlias(),
-                    sc1->schemaName(), sc1->viewName());
-                tableOid2 = tableOid(sc2, jobInfo.csc);
-                tid2 = getTableKey(jobInfo, tableOid2, sc2->tableAlias(), 
-                    sc2->schemaName(), sc2->viewName());
-            }
-            
-            
-            //sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
-            //sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
-                
-            //if ((sc1 != NULL && sc2 != NULL) && (sop->data() == "=") &&
-            //        (sc1->tableName() != sc2->tableName() ||
-            //         sc1->tableAlias() != sc2->tableAlias() ||
-            //         sc1->viewName() != sc2->viewName()))
-            {
-                // @bug3037, workaround on join order, wish this can be corrected soon,
-                // cascade outer table attribute.
-                //CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
-                //uint64_t tid1 = getTableKey(
-                //                    jobInfo, tableOid1, sc1->tableAlias(), sc1->schemaName(), sc1->viewName());
-                //CalpontSystemCatalog::OID tableOid2 = tableOid(sc2, jobInfo.csc);
-                //uint64_t tid2 = getTableKey(
-                //                    jobInfo, tableOid2, sc2->tableAlias(), sc2->schemaName(), sc2->viewName());
-
-                if (tablesInOuter.find(tid1) != tablesInOuter.end())
-                    sc1->returnAll(true);
-                else if (tablesInOuter.find(tid2) != tablesInOuter.end())
-                    sc2->returnAll(true);
-
-                if (sc1->returnAll() && !sc2->returnAll())
-                    tablesInOuter.insert(tid1);
-                else if (!sc1->returnAll() && sc2->returnAll())
-                    tablesInOuter.insert(tid2);
-
-                tablesInJoin.insert(tid1);
-                tablesInJoin.insert(tid2);
-
-                SOP sop;
-                join = doCartesianJoin(sc1, sc2, jobInfo, sop, NULL);
-                // set cardinality for the hashjoin step.
-                //uint32_t card = sf->cardinality();
-
-                /*if (sf->cardinality() > sc1->cardinality() &&
-                        sf->cardinality() > sc2->cardinality())
-                    card = ((sc1->cardinality() > sc2->cardinality()) ?
-                            sc1->cardinality() : sc2->cardinality());
-                */
-                join[join.size() - 1].get()->cardinality(12);
-
-                jsv.insert(jsv.end(), join.begin(), join.end());
-                //doneNodes.insert(cn);
             }
             /*else
             {
@@ -2536,6 +2505,82 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = 
                 if (es->functionJoinInfo())
                     fjCandidates.push_back(make_pair(cn, sjstep));
             }*/
+                
+            //}
+            
+            // Move the section out of the loop
+            if ( noFilters == false )
+            {
+                tableOid1 = tableOid(sc1, jobInfo.csc);
+                tid1 = getTableKey(jobInfo, tableOid1, sc1->tableAlias(),
+                    sc1->schemaName(), sc1->viewName());
+                tableOid2 = tableOid(sc2, jobInfo.csc);
+                tid2 = getTableKey(jobInfo, tableOid2, sc2->tableAlias(), 
+                    sc2->schemaName(), sc2->viewName());
+                    
+                //sc1 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[0].get());
+                //sc2 = dynamic_cast<SimpleColumn*>(jobInfo.deliveredCols[1].get());
+                    
+                //if ((sc1 != NULL && sc2 != NULL) && (sop->data() == "=") &&
+                //        (sc1->tableName() != sc2->tableName() ||
+                //         sc1->tableAlias() != sc2->tableAlias() ||
+                //         sc1->viewName() != sc2->viewName()))
+                {
+                    // @bug3037, workaround on join order, wish this can be corrected soon,
+                    // cascade outer table attribute.
+                    //CalpontSystemCatalog::OID tableOid1 = tableOid(sc1, jobInfo.csc);
+                    //uint64_t tid1 = getTableKey(
+                    //                    jobInfo, tableOid1, sc1->tableAlias(), sc1->schemaName(), sc1->viewName());
+                    //CalpontSystemCatalog::OID tableOid2 = tableOid(sc2, jobInfo.csc);
+                    //uint64_t tid2 = getTableKey(
+                    //                    jobInfo, tableOid2, sc2->tableAlias(), sc2->schemaName(), sc2->viewName());
+
+                    if (tablesInOuter.find(tid1) != tablesInOuter.end())
+                        sc1->returnAll(true);
+                    else if (tablesInOuter.find(tid2) != tablesInOuter.end())
+                        sc2->returnAll(true);
+
+                    if (sc1->returnAll() && !sc2->returnAll())
+                        tablesInOuter.insert(tid1);
+                    else if (!sc1->returnAll() && sc2->returnAll())
+                        tablesInOuter.insert(tid2);
+
+                    tablesInJoin.insert(tid1);
+                    tablesInJoin.insert(tid2);
+
+                    SOP sop;
+                    join = doCartesianJoin(sc1, sc2, jobInfo, sop, NULL);
+                    // set cardinality for the hashjoin step.
+                    //uint32_t card = sf->cardinality();
+
+                    /*if (sf->cardinality() > sc1->cardinality() &&
+                            sf->cardinality() > sc2->cardinality())
+                        card = ((sc1->cardinality() > sc2->cardinality()) ?
+                                sc1->cardinality() : sc2->cardinality());
+                    */
+                    join[join.size() - 1].get()->cardinality(12);
+
+                    jsv.insert(jsv.end(), join.begin(), join.end());
+                    //doneNodes.insert(cn);
+                }
+                /*else
+                {
+                    ExpressionStep* es = new ExpressionStep(jobInfo);
+
+                    if (es == NULL)
+                        throw runtime_error("Failed to create ExpressionStep 2");
+
+                    SJSTEP sjstep;
+                    es->expressionFilter(sf, jobInfo);
+                    sjstep.reset(es);
+
+                    if (es->functionJoinInfo())
+                        fjCandidates.push_back(make_pair(cn, sjstep));
+                }*/
+            }
+            
+            
+            
         }
 
         // Add right and left to the stack.
@@ -2696,7 +2741,7 @@ const JobStepVector doCartesianJoinFilter(JobInfo& jobInfo, SimpleFilter* cjf = 
         }*/
  
         // remove joins from the original filters
-        ParseTree* nullTree = NULL;
+        //ParseTree* nullTree = NULL;
 
         /*for (set<ParseTree*>::iterator i = doneNodes.begin(); i != doneNodes.end() && isOk; i++)
         {

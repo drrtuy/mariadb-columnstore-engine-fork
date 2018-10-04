@@ -1190,7 +1190,7 @@ bool CartJoinStep::deliverStringTableRowGroup() const
 void CartJoinStep::formatMiniStats(uint32_t index)
 {
     ostringstream oss;
-    oss << "HJS ";
+    oss << "CJS ";
 
     if (joiners[index]->inUM())
         oss << "UM ";

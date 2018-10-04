@@ -3557,6 +3557,7 @@ const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(cons
         }
     }
 
+    lk2.unlock(); // fOIDmapLock
     lk3.unlock(); // colInfoMap
 
     if (aTableName.schema != CALPONT_SCHEMA)
