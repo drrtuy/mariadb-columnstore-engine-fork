@@ -572,6 +572,84 @@ extern "C"
     	struct avgx_data* data = (struct avgx_data*)initid->ptr;
     	return data->sumx / data->cnt;
     }
+    
+    /**
+     * 5PIECE connector stub. 
+     */
+    struct five_piece_data
+    {
+      double	sumx;
+      int64_t   cnt;
+    };
+     
+    #ifdef _MSC_VER
+    __declspec(dllexport)
+    #endif
+    my_bool five_piece_init(UDF_INIT* initid, UDF_ARGS* args, char* message)
+    {
+    	struct five_piece_data* data;
+    	if (args->arg_count != 5)
+    	{
+    		strcpy(message,"five_piece() requires 5 arguments");
+    		return 1;
+    	}
+
+    	if (!(data = (struct five_piece_data*) malloc(sizeof(struct five_piece_data))))
+    	{
+    		strmov(message,"Couldn't allocate memory");
+    		return 1;
+    	}
+    	data->sumx	= 0;
+        data->cnt = 0;
+
+    	initid->ptr = (char*)data;
+    	return 0;
+    }
+
+    #ifdef _MSC_VER
+    __declspec(dllexport)
+    #endif
+    void five_piece_deinit(UDF_INIT* initid)
+    {
+    	free(initid->ptr);
+    }	
+
+    #ifdef _MSC_VER
+    __declspec(dllexport)
+    #endif
+    void
+    five_piece_clear(UDF_INIT* initid, char* is_null __attribute__((unused)),
+                  char* message __attribute__((unused)))
+    {
+    	//struct five_piece_data* data = (struct five_piece_data*)initid->ptr;
+    	//data->sumx = 0;
+        //data->cnt = 0;
+    }
+
+    #ifdef _MSC_VER
+    __declspec(dllexport)
+    #endif
+    void
+    five_piece_add(UDF_INIT* initid, UDF_ARGS* args,
+                char* is_null,
+                char* message __attribute__((unused)))
+    {
+        // TODO test for NULL in x and y
+    	//struct five_piece_data* data = (struct five_piece_data*)initid->ptr;
+    	//double xval = cvtArgToDouble(args->arg_type[1], args->args[0]);
+        //++data->cnt;
+    	//data->sumx += xval;
+    }
+
+    #ifdef _MSC_VER
+    __declspec(dllexport)
+    #endif
+    long long five_piece(UDF_INIT* initid, UDF_ARGS* args __attribute__((unused)),
+    				  char* is_null, char* error __attribute__((unused)))
+    {
+    	struct five_piece_data* data = (struct five_piece_data*)initid->ptr;
+    	return data->sumx / data->cnt;
+    }
 }
 // vim:ts=4 sw=4:
 
