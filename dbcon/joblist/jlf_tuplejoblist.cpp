@@ -2286,10 +2286,16 @@ SP_JoinInfo joinToLargeTable(uint32_t large, TableInfoMap& tableInfoMap,
 
         // MCOL-131. Is is a Cartesian JOIN? 
         // TODO How to find small table tid? tableInfoMap[large].fAdjacentList
+        /*uint32_t  smSizeTid = getTableKey(jobInfo,
+                                                smallSides[i]->fTableOid,
+                                                smallSides[i]->fAlias,
+                                                smallSides[i]->fSchema,
+                                                smallSides[i]->fView);
         pair<uint32_t, uint32_t> tablePair(large,1);
-        TableJoinMap::iterator tjmi = jobInfo.tableJoinMap.find(tablePair);
-        bool hasCartesian = ( tjmi != jobInfo.tableJoinMap.end() ) 
-            ? tjmi->second.fHasCartesian : false ;
+        TableJoinMap::iterator tjmi = jobInfo.tableJoinMap.find(tablePair);*/
+        bool hasCartesian = smallSides[0]->fJoinData.fHasCartesian;
+            //( tjmi != jobInfo.tableJoinMap.end() ) 
+            //? tjmi->second.fHasCartesian : false;
 
         if (!hasCartesian && ( bps || tsas ))
         {

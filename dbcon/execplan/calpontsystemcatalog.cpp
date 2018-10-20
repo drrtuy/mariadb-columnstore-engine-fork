@@ -3522,7 +3522,6 @@ const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(cons
 
         lk2.lock();
         OIDmap::const_iterator iter = fOIDmap.begin();
-        OIDmap::const_iterator prevMatch = fOIDmap.end();
         //ColType ct;
 
         while ( iter != fOIDmap.end() )
@@ -3538,8 +3537,9 @@ const CalpontSystemCatalog::TOCTuple CalpontSystemCatalog::anyColumnInTable(cons
                 if ( tp.ct.colWidth > 8 )
                 {
                     lk3.lock();
-                    continue;
+                    iter++;
                     cerr << "anyColumnInTable() skip this in cache " << endl;
+                    continue;
                 }
                 tp.objnum = (*iter).second;
                 tp.tcn = make_tcn(aTableName.schema, aTableName.table, (*iter).first.column);
