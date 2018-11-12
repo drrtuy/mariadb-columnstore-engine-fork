@@ -89,9 +89,9 @@ const uint32_t DEFAULT_EXTENTS_PER_SEG_FILE = 2;
 /** Debug macro */
 #define THROTTLE_DEBUG 0
 #if THROTTLE_DEBUG
-#define THROTTLEDEBUG std::cerr
+#define THROTTLEDEBUG std::cout
 #else
-#define THROTTLEDEBUG if (true) std::cerr
+#define THROTTLEDEBUG if (true) std::cout
 #endif
 namespace joblist
 {
@@ -110,7 +110,7 @@ struct TupleBPSPrimitive
         }
         catch (std::exception& re)
         {
-            cerr << "TupleBPS: send thread threw an exception: " << re.what() <<
+            cout << "TupleBPS: send thread threw an exception: " << re.what() <<
                  "\t" << this << endl;
             catchHandler(re.what(), ERR_TUPLE_BPS, fBatchPrimitiveStep->errorInfo());
         }
@@ -118,7 +118,7 @@ struct TupleBPSPrimitive
         {
             string msg("TupleBPS: send thread threw an unknown exception ");
             catchHandler(msg, ERR_TUPLE_BPS, fBatchPrimitiveStep->errorInfo());
-            cerr << msg << this << endl;
+            cout << msg << this << endl;
         }
     }
 };
@@ -139,13 +139,13 @@ struct TupleBPSAggregators
         }
         catch (std::exception& re)
         {
-            cerr << fBatchPrimitiveStepCols->toString() << ": receive thread threw an exception: " << re.what() << endl;
+            cout << fBatchPrimitiveStepCols->toString() << ": receive thread threw an exception: " << re.what() << endl;
             catchHandler(re.what(), ERR_TUPLE_BPS, fBatchPrimitiveStepCols->errorInfo());
         }
         catch (...)
         {
             string msg("TupleBPS: recv thread threw an unknown exception ");
-            cerr << fBatchPrimitiveStepCols->toString() << msg << endl;
+            cout << fBatchPrimitiveStepCols->toString() << msg << endl;
             catchHandler(msg, ERR_TUPLE_BPS, fBatchPrimitiveStepCols->errorInfo());
         }
     }
@@ -277,7 +277,7 @@ TupleBPS::TupleBPS(const pColStep& rhs, const JobInfo& jobInfo) :
 
     hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
                                     hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
-//	cerr << "TBPSCount = " << ++TBPSCount << endl;
+//	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
 TupleBPS::TupleBPS(const pColScanStep& rhs, const JobInfo& jobInfo) :
@@ -338,7 +338,7 @@ TupleBPS::TupleBPS(const pColScanStep& rhs, const JobInfo& jobInfo) :
     fTraceFlags = rhs.fTraceFlags;
     fBPP->setTraceFlags(fTraceFlags);
 //	if (fOid>=3000)
-//		cerr << "BPS:initalized from pColScanStep. fSessionId=" << fSessionId << endl;
+//		cout << "BPS:initalized from pColScanStep. fSessionId=" << fSessionId << endl;
     fBPP->setStepID(fStepId);
     fBPP->setOutputType(ROW_GROUP);
     fPhysicalIO = 0;
@@ -408,7 +408,7 @@ TupleBPS::TupleBPS(const PassThruStep& rhs, const JobInfo& jobInfo) :
     fBPP->setTraceFlags(fTraceFlags);
     fBPP->setOutputType(ROW_GROUP);
 //	if (fOid>=3000)
-//		cerr << "BPS:initalized from PassThruStep. fSessionId=" << fSessionId << endl;
+//		cout << "BPS:initalized from PassThruStep. fSessionId=" << fSessionId << endl;
 
     finishedSending = sendWaiting = false;
     fSwallowRows = false;
@@ -439,7 +439,7 @@ TupleBPS::TupleBPS(const PassThruStep& rhs, const JobInfo& jobInfo) :
     hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
                                     hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
 
-//	cerr << "TBPSCount = " << ++TBPSCount << endl;
+//	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
 TupleBPS::TupleBPS(const pDictionaryStep& rhs, const JobInfo& jobInfo) :
@@ -475,7 +475,7 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs, const JobInfo& jobInfo) :
     initializeConfigParms();
     fBPP->setSessionID(fSessionId);
 //	if (fOid>=3000)
-//		cerr << "BPS:initalized from DictionaryStep. fSessionId=" << fSessionId << endl;
+//		cout << "BPS:initalized from DictionaryStep. fSessionId=" << fSessionId << endl;
     fBPP->setStepID(fStepId);
     fBPP->setQueryContext(fVerId);
     fBPP->setTxnID(fTxnId);
@@ -509,7 +509,7 @@ TupleBPS::TupleBPS(const pDictionaryStep& rhs, const JobInfo& jobInfo) :
     hasPCFilter = hasPMFilter = hasRIDFilter = hasSegmentFilter = hasDBRootFilter = hasSegmentDirFilter =
                                     hasPartitionFilter = hasMaxFilter = hasMinFilter = hasLBIDFilter = hasExtentIDFilter = false;
 
-//	cerr << "TBPSCount = " << ++TBPSCount << endl;
+//	cout << "TBPSCount = " << ++TBPSCount << endl;
 }
 
 TupleBPS::~TupleBPS()
@@ -530,12 +530,12 @@ TupleBPS::~TupleBPS()
             catch (const std::exception& e)
             {
                 // log the exception
-                cerr << "~TupleBPS caught: " << e.what() << endl;
+                cout << "~TupleBPS caught: " << e.what() << endl;
                 catchHandler(e.what(), ERR_TUPLE_BPS, fErrorInfo, fSessionId);
             }
             catch (...)
             {
-                cerr << "~TupleBPS caught unknown exception" << endl;
+                cout << "~TupleBPS caught unknown exception" << endl;
                 catchHandler("~TupleBPS caught unknown exception",
                              ERR_TUPLE_BPS, fErrorInfo, fSessionId);
             }
@@ -544,7 +544,7 @@ TupleBPS::~TupleBPS()
         fDec->removeQueue(uniqueID);
     }
 
-//	cerr << "~TBPSCount = " << --TBPSCount << endl;
+//	cout << "~TBPSCount = " << --TBPSCount << endl;
 }
 
 void TupleBPS::setBPP(JobStep* jobStep)
@@ -561,7 +561,7 @@ void TupleBPS::setBPP(JobStep* jobStep)
 
         if (pseudo)
         {
-            //cerr << "adding a pseudo col filter" << endl;
+            //cout << "adding a pseudo col filter" << endl;
             fBPP->addFilterStep(*pseudo);
 
             if (pseudo->filterCount() > 0)
@@ -694,7 +694,7 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
             colWidth = (pcsp->colType()).colWidth;
             projectOids.push_back(jobStep1->oid());
 //			if (fOid>=3000)
-//				cerr << "Adding project step pColStep and pDictionaryStep to BPS" << endl;
+//				cout << "Adding project step pColStep and pDictionaryStep to BPS" << endl;
         }
         else
         {
@@ -712,7 +712,7 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
                 projectOids.push_back(jobStep1->oid());
                 colWidth = (psth->colType()).colWidth;
 //				if (fOid>=3000)
-//					cerr << "Adding project step PassThruStep and pDictionaryStep to BPS" << endl;
+//					cout << "Adding project step PassThruStep and pDictionaryStep to BPS" << endl;
             }
         }
     }
@@ -726,7 +726,7 @@ void TupleBPS::setProjectBPP(JobStep* jobStep1, JobStep* jobStep2)
 
             if (pseudo)
             {
-                //cerr << "adding a pseudo col projection" << endl;
+                //cout << "adding a pseudo col projection" << endl;
                 fBPP->addProjectStep(*pseudo);
             }
             else
@@ -838,7 +838,7 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
         }
     }
 
-    //cerr << "cp column number=" << cpColVec.size() << " 1st col extents size= " << scanFlags.size() << endl;
+    //cout << "cp column number=" << cpColVec.size() << " 1st col extents size= " << scanFlags.size() << endl;
 
     if (cpColVec.size() == 0)
         return;
@@ -922,14 +922,14 @@ void TupleBPS::serializeJoiner()
             more = fBPP->nextTupleJoinerMsg(bs);
         }
 #ifdef JLF_DEBUG
-        cerr << "serializing joiner into " << bs.length() << " bytes" << endl;
+        cout << "serializing joiner into " << bs.length() << " bytes" << endl;
 #endif
         fDec->write(uniqueID, bs);
         bs.restart();
     }
 
 //	stop =  boost::posix_time::microsec_clock::local_time();
-//	cerr << "serializing took " << stop-start << endl;
+//	cout << "serializing took " << stop-start << endl;
 }
 
 void TupleBPS::serializeJoiner(uint32_t conn)
@@ -961,7 +961,7 @@ void TupleBPS::prepCasualPartitioning()
         if (fOid >= 3000)
         {
             //if (scanFlags[i] && !runtimeCPFlags[i])
-            //	cerr << "runtime flags eliminated an extent!\n";
+            //	cout << "runtime flags eliminated an extent!\n";
             scanFlags[i] = scanFlags[i] && runtimeCPFlags[i];
 
             if (scanFlags[i] && lbidList->CasualPartitionDataType(fColType.colDataType,
@@ -1223,7 +1223,7 @@ void TupleBPS::run()
     /*
     	if (doJoin) {
     		for (uint32_t z = 0; z < smallSideCount; z++)
-    			cerr << "join #" << z << " " << "0x" << hex << tjoiners[z]->getJoinType()
+    			cout << "join #" << z << " " << "0x" << hex << tjoiners[z]->getJoinType()
     			  << std::dec << " typeless: " << (uint32_t) tjoiners[z]->isTypelessJoin() << endl;
     	}
     */
@@ -1248,13 +1248,13 @@ void TupleBPS::run()
     catch (const std::exception& e)
     {
         // log the exception
-        cerr << "tuple-bps::run() caught: " << e.what() << endl;
+        cout << "tuple-bps::run() caught: " << e.what() << endl;
         catchHandler(e.what(), ERR_TUPLE_BPS, fErrorInfo, fSessionId);
         fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
     }
     catch (...)
     {
-        cerr << "tuple-bps::run() caught unknown exception" << endl;
+        cout << "tuple-bps::run() caught unknown exception" << endl;
         catchHandler("tuple-bps::run() caught unknown exception",
                      ERR_TUPLE_BPS, fErrorInfo, fSessionId);
         fOutputJobStepAssociation.outAt(0)->rowGroupDL()->endOfInput();
@@ -1298,12 +1298,12 @@ void TupleBPS::join()
             catch (const std::exception& e)
             {
                 // log the exception
-                cerr << "tuple-bps::join() write(bs) caught: " << e.what() << endl;
+                cout << "tuple-bps::join() write(bs) caught: " << e.what() << endl;
                 catchHandler(e.what(), ERR_TUPLE_BPS, fErrorInfo, fSessionId);
             }
             catch (...)
             {
-                cerr << "tuple-bps::join() write(bs) caught unknown exception" << endl;
+                cout << "tuple-bps::join() write(bs) caught unknown exception" << endl;
                 catchHandler("tuple-bps::join() write(bs) caught unknown exception",
                              ERR_TUPLE_BPS, fErrorInfo, fSessionId);
             }
@@ -1431,9 +1431,9 @@ void TupleBPS::interleaveJobs(vector<Job>* jobs) const
 #endif
 
     jobs->swap(newJobs);
-	//cerr << "-------------\n";
+	//cout << "-------------\n";
 	//for (i = 0; i < jobs->size(); i++)
-	//	cerr << "job " << i+1 << ": dbroot " << (*jobs)[i].dbroot << ", PM "
+	//	cout << "job " << i+1 << ": dbroot " << (*jobs)[i].dbroot << ", PM "
 	//			<< (*jobs)[i].connectionNum + 1 << endl;
 }
 
@@ -1444,7 +1444,7 @@ void TupleBPS::sendJobs(const vector<Job>& jobs)
 
     for (i = 0; i < jobs.size() && !cancelled(); i++)
     {
-        cerr << "sending a job for dbroot " << jobs[i].dbroot << ", PM " << jobs[i].connectionNum << endl;
+        cout << "sending a job for dbroot " << jobs[i].dbroot << ", PM " << jobs[i].connectionNum << endl;
         fDec->write(uniqueID, *(jobs[i].msg));
         tplLock.lock();
         msgsSent += jobs[i].expectedResponses;
@@ -1788,20 +1788,20 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
 
         if (!inBounds)
         {
-            //cerr << "out of bounds" << endl;
+            //cout << "out of bounds" << endl;
             continue;
         }
 
         if (!doCartesianJoin && !scanFlags[i])
         {
-            //cerr << "CP elimination" << endl;
+            //cout << "CP elimination" << endl;
             fNumBlksSkipped += lbidsToScan;
             continue;
         }
 
         if (!processPseudoColFilters(i, dbRootPMMap))
         {
-            //cerr << "Skipping an extent due to pseudo-column filter elimination" << endl;
+            //cout << "Skipping an extent due to pseudo-column filter elimination" << endl;
             fNumBlksSkipped += lbidsToScan;
             continue;
         }
@@ -1843,7 +1843,7 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
             }
         }
 
-//		cerr << "   session " << fSessionId << " idx = " << i << " HWM = " << scannedExtents[i].HWM
+//		cout << "   session " << fSessionId << " idx = " << i << " HWM = " << scannedExtents[i].HWM
 //				<< " ... will scan " << lbidsToScan << " lbids\n";
 
         // the # of logical blocks in this extent
@@ -1860,7 +1860,7 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
 #else
         blocksPerJob = max(blocksToScan / fProcessorThreadsPerScan, 16U);
 #endif
-        //cerr << "blocks to scan = " << blocksToScan << " blocks per job = " << blocksPerJob <<
+        //cout << "blocks to scan = " << blocksToScan << " blocks per job = " << blocksPerJob <<
         //	" HWM == " << scannedExtents[i].HWM << endl;
 
         startingLBID = scannedExtents[i].range.start;
@@ -1868,14 +1868,14 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
         while (blocksToScan > 0)
         {
             uint32_t blocksThisJob = min(blocksToScan, blocksPerJob);
-            //cerr << "starting LBID = " << startingLBID << " count = " << blocksThisJob <<
+            //cout << "starting LBID = " << startingLBID << " count = " << blocksThisJob <<
             //	" dbroot = " << scannedExtents[i].dbRoot << endl;
 
             fBPP->setLBID(startingLBID, scannedExtents[i]);
             fBPP->setCount(blocksThisJob);
             bs.reset(new ByteStream());
             fBPP->runBPP(*bs, (*dbRootConnectionMap)[scannedExtents[i].dbRoot]);
-            //cerr << "making job for connection # " << (*dbRootConnectionMap)[scannedExtents[i].dbRoot] << endl;
+            //cout << "making job for connection # " << (*dbRootConnectionMap)[scannedExtents[i].dbRoot] << endl;
             jobs->push_back(Job(scannedExtents[i].dbRoot, (*dbRootConnectionMap)[scannedExtents[i].dbRoot],
                                 blocksThisJob, bs));
             blocksToScan -= blocksThisJob;
@@ -1884,7 +1884,7 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
         }
     }
 
-//	cerr << "session " << fSessionId << " sees " << extentCounter << " extents" << endl;
+//	cout << "session " << fSessionId << " sees " << extentCounter << " extents" << endl;
 }
 
 void TupleBPS::sendPrimitiveMessages()
@@ -1904,19 +1904,19 @@ void TupleBPS::sendPrimitiveMessages()
     }
     catch (const IDBExcept& e)
     {
-        //cerr << "Caught IDBExcept" << e.what() << e.errorCode() << endl;
+        //cout << "Caught IDBExcept" << e.what() << e.errorCode() << endl;
         sendError(e.errorCode());
         processError(e.what(), e.errorCode(), "TupleBPS::sendPrimitiveMessages()");
     }
     catch (const std::exception& ex)
     {
-        //cerr << "Caught exception" << endl;
+        //cout << "Caught exception" << endl;
         sendError(ERR_TUPLE_BPS);
         processError(ex.what(), ERR_TUPLE_BPS, "TupleBPS::sendPrimitiveMessages()");
     }
     catch (...)
     {
-        //cerr << "Caught ..." << endl;
+        //cout << "Caught ..." << endl;
         sendError(ERR_TUPLE_BPS);
         processError("unknown", ERR_TUPLE_BPS, "TupleBPS::sendPrimitiveMessages()");
     }
@@ -2072,36 +2072,36 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint32_t threadID)
                 uint8_t* tmp8;
                 tmp8 = local_primRG.getData();
                 local_primRG.setData(NULL);
-                cerr << "large-side RG: " << local_primRG.toString() << endl;
+                cout << "large-side RG: " << local_primRG.toString() << endl;
                 local_primRG.setData(tmp8);
 
                 for (i = 0; i < smallSideCount; i++)
                 {
                     tmp8 = joinerMatchesRGs[i].getData();
                     joinerMatchesRGs[i].setData(NULL);
-                    cerr << "small-side[" << i << "] RG: " << joinerMatchesRGs[i].toString() << endl;
+                    cout << "small-side[" << i << "] RG: " << joinerMatchesRGs[i].toString() << endl;
                 }
 
                 tmp8 = local_outputRG.getData();
                 local_outputRG.setData(NULL);
-                cerr << "output RG: " << local_outputRG.toString() << endl;
+                cout << "output RG: " << local_outputRG.toString() << endl;
                 local_outputRG.setData(tmp8);
 
-                cerr << "large mapping:\n";
+                cout << "large mapping:\n";
 
                 for (i = 0; i < local_primRG.getColumnCount(); i++)
-                    cerr << largeMapping[i] << " ";
+                    cout << largeMapping[i] << " ";
 
-                cerr << endl;
+                cout << endl;
 
                 for (uint32_t z = 0; z < smallSideCount; z++)
                 {
-                    cerr << "small mapping[" << z << "] :\n";
+                    cout << "small mapping[" << z << "] :\n";
 
                     for (i = 0; i < joinerMatchesRGs[z].getColumnCount(); i++)
-                        cerr << smallMappings[z][i] << " ";
+                        cout << smallMappings[z][i] << " ";
 
-                    cerr << endl;
+                    cout << endl;
                 }
             }
 
@@ -2192,7 +2192,7 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint32_t threadID)
 
             tplLock.unlock();
 
- 		cerr << "thread " << threadID << " has " << size << " Bytestreams\n";
+ 		cout << "thread " << threadID << " has " << size << " Bytestreams\n";
             for (i = 0; i < size && !cancelled(); i++)
             {
                 ByteStream* bs = bsv[i].get();
@@ -2247,26 +2247,26 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint32_t threadID)
                         local_outputRG.resetRowGroup(local_primRG.getBaseRid());
                         local_outputRG.setDBRoot(local_primRG.getDBRoot());
                         local_primRG.getRow(0, &largeSideRow);
-                        //cerr << "large-side raw data: " << local_primRG.toString() << endl;
+                        cout << "large-side raw data: " << local_primRG.toString() << endl;
 
-                        //cerr << "jointype = " << tjoiners[0]->getJoinType() << endl;
+                        cout << "jointype = " << tjoiners[0]->getJoinType() << endl;
                         for (k = 0; k < local_primRG.getRowCount() && !cancelled(); k++, largeSideRow.nextRow())
                         {
-                            //cerr << "TBPS: Large side row: " << largeSideRow.toString() << endl;
+                            cout << "TBPS: Large side row: " << largeSideRow.toString() << endl;
                             matchCount = 0;
 
                             for (j = 0; j < smallSideCount; j++)
                             {
                                 tjoiners[j]->match(largeSideRow, k, threadID, &joinerOutput[j]);
-                                /* Debugging code to print the matches
+                                // Debugging code to print the matches
                                 	Row r;
                                 	joinerMatchesRGs[j].initRow(&r);
-                                	cerr << joinerOutput[j].size() << " matches: \n";
+                                	cout << joinerOutput[j].size() << " matches: \n";
                                 	for (uint32_t z = 0; z < joinerOutput[j].size(); z++) {
                                 		r.setPointer(joinerOutput[j][z]);
-                                		cerr << "  " << r.toString() << endl;
+                                		cout << "  " << r.toString() << endl;
                                 	}
-                                */
+                                
                                 matchCount = joinerOutput[j].size();
 
                                 if (tjoiners[j]->inUM())
@@ -2274,7 +2274,7 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint32_t threadID)
                                     /* Count the # of rows that pass the join filter */
                                     if (tjoiners[j]->hasFEFilter() && matchCount > 0)
                                     {
-                                        //cerr << "doing FE filter" << endl;
+                                        //cout << "doing FE filter" << endl;
                                         vector<Row::Pointer> newJoinerOutput;
                                         applyMapping(fergMappings[smallSideCount], largeSideRow, &joinFERow);
 
@@ -2315,9 +2315,9 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint32_t threadID)
                                     {
                                         matchCount = (matchCount ? 0 : 1);
                                         //		if (matchCount)
-                                        //			cerr << "in the result\n";
+                                        //			cout << "in the result\n";
                                         //		else
-                                        //			cerr << "not in the result\n";
+                                        //			cout << "not in the result\n";
                                     }
 
                                     if (matchCount == 0)
@@ -2383,7 +2383,7 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint32_t threadID)
                     }
                     else
                     {
-// 					cerr << "TBPS: sending unjoined data\n";
+// 					cout << "TBPS: sending unjoined data\n";
                         rgDatav.push_back(rgData);
                     }
 
@@ -2478,7 +2478,7 @@ out:
                on sensible rids and/or sensible ordering */
             vector<Row::Pointer> unmatched;
 #ifdef JLF_DEBUG
-            cerr << "finishing small-outer join output\n";
+            cout << "finishing small-outer join output\n";
 #endif
             i = smallOuterJoiner;
             tjoiners[i]->getUnmarkedRows(&unmatched);
@@ -2491,7 +2491,7 @@ out:
             {
                 smallSideRows[i].setPointer(unmatched[j]);
 
-				cerr << "small side Row: " << smallSideRows[i].toString() << endl;
+				cout << "small side Row: " << smallSideRows[i].toString() << endl;
                 for (k = 0; k < smallSideCount; k++)
                 {
                     if (i == k)
@@ -2502,7 +2502,7 @@ out:
 
                 applyMapping(largeMapping, largeNull, &joinedBaseRow);
                 joinedBaseRow.setRid(0);
-				cerr << "outer row is " << joinedBaseRow.toString() << endl;
+				cout << "outer row is " << joinedBaseRow.toString() << endl;
 //				joinedBaseRow.setRid(largeSideRow.getRelRid());
                 joinedBaseRow.nextRow();
                 local_outputRG.incRowCount();
@@ -2577,11 +2577,11 @@ out:
         // catch and do nothing. Let it continue with the clean up and profiling
         catch (const std::exception& e)
         {
-            cerr << "tuple-bps caught: " << e.what() << endl;
+            cout << "tuple-bps caught: " << e.what() << endl;
         }
         catch (...)
         {
-            cerr << "tuple-bps caught unknown exception" << endl;
+            cout << "tuple-bps caught unknown exception" << endl;
         }
 
         Stats stats = fDec->getNetworkStats(uniqueID);
@@ -2718,7 +2718,7 @@ void TupleBPS::processError(const string& ex, uint16_t err, const string& src)
     oss << "st: " << fStepId << " " << src << " caught an exception: " << ex << endl;
     catchHandler(oss.str(), err, fErrorInfo, fSessionId);
     abort_nolock();
-    cerr << oss.str();
+    cout << oss.str();
 }
 
 const string TupleBPS::toString() const
@@ -2789,7 +2789,7 @@ inline bool TupleBPS::scanit(uint64_t rid)
     fbo = rid >> rpbShift;
     extentIndex = fbo >> divShift;
     //if (scanFlags[extentIndex] && !runtimeCPFlags[extentIndex])
-    //	cerr << "HJ feedback eliminated an extent!\n";
+    //	cout << "HJ feedback eliminated an extent!\n";
     return scanFlags[extentIndex] && runtimeCPFlags[extentIndex];
 }
 
@@ -2916,7 +2916,7 @@ void TupleBPS::generateJoinResultSet(const vector<vector<Row::Pointer> >& joiner
         {
             smallRow.setPointer(joinerOutput[depth][i]);
             applyMapping(mappings[depth], smallRow, &baseRow);
- 			cerr << "depth " << depth << ", size " << joinerOutput[depth].size() << ", row " << i << ": " << smallRow.toString() << endl;
+ 			//cout << "depth " << depth << ", size " << joinerOutput[depth].size() << ", row " << i << ": " << smallRow.toString() << endl;
             generateJoinResultSet(joinerOutput, baseRow, mappings, depth + 1,
                                   outputRG, rgData, outputData, smallRows, joinedRow);
         }
@@ -2934,7 +2934,7 @@ void TupleBPS::generateJoinResultSet(const vector<vector<Row::Pointer> >& joiner
             {
                 uint32_t dbRoot = outputRG.getDBRoot();
                 uint64_t baseRid = outputRG.getBaseRid();
- 				cerr << "GJRS adding data\n";
+ 				cout << "GJRS adding data\n";
                 outputData->push_back(rgData);
                 rgData = RGData(outputRG);
                 outputRG.setData(&rgData);
@@ -2943,11 +2943,11 @@ void TupleBPS::generateJoinResultSet(const vector<vector<Row::Pointer> >& joiner
                 outputRG.getRow(0, &joinedRow);
             }
 
- 			cerr << "depth " << depth << ", size " << joinerOutput[depth].size() << ", row " << i << ": " << smallRow.toString() << endl;
+ 			//cout << "depth " << depth << ", size " << joinerOutput[depth].size() << ", row " << i << ": " << smallRow.toString() << endl;
             applyMapping(mappings[depth], smallRow, &baseRow);
             copyRow(baseRow, &joinedRow);
             //memcpy(joinedRow.getData(), baseRow.getData(), joinedRow.getSize());
-            cerr << "(step " << fStepId << ") fully joined row is: " << joinedRow.toString() << endl;
+            //cout << "(step " << fStepId << ") fully joined row is: " << joinedRow.toString() << endl;
         }
     }
 }
@@ -2984,9 +2984,9 @@ uint64_t TupleBPS::getEstimatedRowCount()
 {
     // Call function that populates the scanFlags array based on the extents that qualify based on casual partitioning.
     storeCasualPartitionInfo(true);
-    // TODO:  Strip out the cerr below after a few days of testing.
+    // TODO:  Strip out the cout below after a few days of testing.
 #ifdef JLF_DEBUG
-    cerr << "OID-" << fOid << " EstimatedRowCount-" << fEstimatedRows << endl;
+    cout << "OID-" << fOid << " EstimatedRowCount-" << fEstimatedRows << endl;
 #endif
     return fEstimatedRows;
 }
@@ -3112,7 +3112,7 @@ void TupleBPS::processFE2_oneRG(RowGroup& input, RowGroup& output, Row& inRow,
         if (ret)
         {
             applyMapping(fe2Mapping, inRow, &outRow);
-            //cerr << "fe2 passed row: " << outRow.toString() << endl;
+            //cout << "fe2 passed row: " << outRow.toString() << endl;
             outRow.setRid(inRow.getRelRid());
             output.incRowCount();
             outRow.nextRow();
@@ -3161,7 +3161,7 @@ void TupleBPS::processFE2(RowGroup& input, RowGroup& output, Row& inRow, Row& ou
                         output.getBaseRid() != input.getBaseRid()
                    )
                 {
-//					cerr << "FE2 produced a full RG\n";
+//					cout << "FE2 produced a full RG\n";
                     results.push_back(result);
                     result = RGData(output);
                     output.setData(&result);
@@ -3175,11 +3175,11 @@ void TupleBPS::processFE2(RowGroup& input, RowGroup& output, Row& inRow, Row& ou
 
     if (output.getRowCount() > 0)
     {
-		cerr << "FE2 produced " << output.getRowCount() << " rows\n";
+		cout << "FE2 produced " << output.getRowCount() << " rows\n";
         results.push_back(result);
     }
 	else
-		cerr << "no rows from FE2\n";
+		cout << "no rows from FE2\n";
     rgData->swap(results);
 }
 
@@ -3241,7 +3241,8 @@ void TupleBPS::rgDataToDl(RGData& rgData, RowGroup& rg, RowGroupDL* dlp)
     /*
     	if (!(fSessionId & 0x80000000)) {
     		rg.setData(&rgData);
-    		cerr << "TBPS rowcount: " << rg.getRowCount() << endl;
+    		cout << "TBPS rowcount: " << rg.getRowCount() << endl;
+    		cout << "TBPS rowcount: " << rg.getRowCount() << endl;
     	}
     */
     dlp->insert(rgData);

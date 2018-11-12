@@ -782,6 +782,8 @@ uint64_t JoinPartition::writeByteStream(int which, ByteStream& bs)
 
     fs.seekp(offset);
 
+    useCompression = false;
+
     if (!useCompression)
     {
         ret = len + 4;

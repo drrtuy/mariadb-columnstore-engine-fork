@@ -2900,7 +2900,6 @@ oamModuleInfo_t Oam::getModuleInfo()
 
         serverTypeInstall = atoi(sysConfig->getConfig("Installation", "ServerTypeInstall").c_str());
 
-        sysConfig;
     }
     catch (...) {}
 
@@ -10351,11 +10350,9 @@ void Oam::sendStatusUpdate(ByteStream obs, ByteStream::byte returnRequestType)
             {
                 ibs >> returnRequestType;
 
-                if ( returnRequestType == returnRequestType )
-                {
-                    processor.shutdown();
-                    return;
-                }
+                processor.shutdown();
+                return;
+                
             }
             else
             {

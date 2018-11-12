@@ -1850,7 +1850,7 @@ void TupleHashJoinStep::segregateJoiners()
         return;
     }
 
-    /* Debugging code, this makes all eligible joins disk-based.
+    //Debugging code, this makes all eligible joins disk-based.
     else {
     	cout << "making all joins disk-based" << endl;
     	for (i = 0; i < smallSideCount; i++) {
@@ -1860,7 +1860,7 @@ void TupleHashJoinStep::segregateJoiners()
     	}
     	return;
     }
-    */
+    
 
     /* For now if there is no largeBPS all joins need to either be DJS or not, not mixed */
     if (!largeBPS)

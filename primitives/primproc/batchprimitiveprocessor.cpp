@@ -158,7 +158,7 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream& b, double prefetch,
     sendThread = bppst;
     pthread_mutex_init(&objLock, NULL);
     initBPP(b);
-// 	cerr << "made a BPP\n";
+// 	//cerr << "made a BPP\n";
 }
 
 #if 0
@@ -273,7 +273,7 @@ void BatchPrimitiveProcessor::initBPP(ByteStream& bs)
             {
                 doMatchNulls[i] = false;
                 bs >> tJoinerSizes[i];
-                cerr << "joiner size = " << tJoinerSizes[i] << endl;
+                //cerr << "joiner size = " << tJoinerSizes[i] << endl;
                 bs >> joinTypes[i];
                 bs >> tmp8;
                 typelessJoin[i] = (bool) tmp8;
@@ -296,7 +296,7 @@ void BatchPrimitiveProcessor::initBPP(ByteStream& bs)
                 {
                     bs >> joinNullValues[i];
                     bs >> largeSideKeyColumns[i];
-                    cerr << "large side key is " << largeSideKeyColumns[i] << endl;
+                    //cerr << "large side key is " << largeSideKeyColumns[i] << endl;
                     _pools[i].reset(new utils::SimplePool());
                     utils::SimpleAllocator<pair<uint64_t const, uint32_t> > alloc(_pools[i]);
                     tJoiners[i].reset(new TJoiner(10, TupleJoiner::hasher(), equal_to<uint64_t>(), alloc));
@@ -353,7 +353,7 @@ void BatchPrimitiveProcessor::initBPP(ByteStream& bs)
 
                 bs >> largeSideRG;
                 bs >> joinedRG;
- 				cerr << "got the joined Rowgroup: " << joinedRG.toString() << "\n";
+ 				//cerr << "got the joined Rowgroup: " << joinedRG.toString() << "\n";
             }
         }
         else
@@ -370,13 +370,13 @@ void BatchPrimitiveProcessor::initBPP(ByteStream& bs)
 
     bs >> filterCount;
     filterSteps.resize(filterCount);
-    cerr << "deserializing " << filterCount << " filters\n";
+    //cerr << "deserializing " << filterCount << " filters\n";
     hasScan = false;
     hasPassThru = false;
 
     for (i = 0; i < filterCount; ++i)
     {
-        cerr << "deserializing step " << i << endl;
+        //cerr << "deserializing step " << i << endl;
         filterSteps[i] = SCommand(Command::makeCommand(bs, &type, filterSteps));
 
         if (type == Command::COLUMN_COMMAND)
@@ -401,12 +401,12 @@ void BatchPrimitiveProcessor::initBPP(ByteStream& bs)
     }
 
     bs >> projectCount;
-    cerr << "deserializing " << projectCount << " projected columns\n\n";
+    //cerr << "deserializing " << projectCount << " projected columns\n\n";
     projectSteps.resize(projectCount);
 
     for (i = 0; i < projectCount; ++i)
     {
-        cerr << "deserializing step " << i << endl;
+        //cerr << "deserializing step " << i << endl;
         projectSteps[i] = SCommand(Command::makeCommand(bs, &type, projectSteps));
 
         if (type == Command::PASS_THRU)
@@ -521,6 +521,7 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream& bs, const SP_UM_MUTEX& w,
 
 void BatchPrimitiveProcessor::addToJoiner(ByteStream& bs)
 {
+    cout << "BatchPrimitiveProcessor::addToJoiner() " << endl;
     uint32_t count, i, joinerNum, tlIndex, startPos;
     joblist::ElementType* et;
     TypelessData tlLargeKey;
@@ -960,7 +961,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
     outputRG.getRow(0, &oldRow);
     outputRG.getRow(0, &newRow);
 
-    cerr << "executeTupleJoin() before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
+    cout << "executeTupleJoin() before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
     for (i = 0; i < ridCount && !sendThread->aborted(); i++, oldRow.nextRow())
     {
         /* Decide whether this large-side row belongs in the output.  The breaks
@@ -974,7 +975,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
          * 		  are NULL values to match against, but there is no filter, all rows can be eliminated.
          */
 
-        cerr << "large side row: " << oldRow.toString() << endl;
+        //cerr << "large side row: " << oldRow.toString() << endl;
         for (j = 0; j < joinerCount; j++)
         {
             bool found;
@@ -989,7 +990,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
 
             if (LIKELY(!typelessJoin[j]))
             {
-                cerr << "not typeless join\n";
+                //cerr << "not typeless join\n";
                 bool isNull;
                 uint32_t colIndex = largeSideKeyColumns[j];
 
@@ -1009,7 +1010,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
                 if (((!found || isNull) && !(joinTypes[j] & (LARGEOUTER | ANTI))) ||
                         ((joinTypes[j] & ANTI) && ((isNull && (joinTypes[j] & MATCHNULLS)) || (found && !isNull))))
                 {
-                    cerr << " - not in the result set\n";
+                    //cerr << " - not in the result set\n";
                     break;
                 }
 
@@ -1018,7 +1019,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
             }
             else
             {
-                cerr << " typeless join\n";
+                //cerr << " typeless join\n";
                 // the null values are not sent by UM in typeless case.  null -> !found
                 tlLargeKey = makeTypelessKey(oldRow, tlLargeSideKeyColumns[j], tlKeyLengths[j],
                                              &tmpKeyAllocators[j]);
@@ -1165,7 +1166,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
                     values[newRowCount] = values[i];
                     relRids[newRowCount] = relRids[i];
                     copyRow(oldRow, &newRow);
-                    cerr << "joined row: " << newRow.toString() << endl;
+                    //cerr << "joined row: " << newRow.toString() << endl;
                     //memcpy(newRow.getData(), oldRow.getData(), oldRow.getSize());
                 }
 
@@ -1209,10 +1210,19 @@ void BatchPrimitiveProcessor::executeTupleCartJoin()
     outputRG.getRow(0, &oldRow);
     outputRG.getRow(0, &newRow);
 
-    cerr << "executeTupleCartJoin() before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
+    cout << "BatchPrimitiveProcessor::executeTupleCartJoin() " << endl;
+
+    for (j = 0; j < joinerCount; j++)
+    {
+        //if (!typelessJoin[j])
+        tSmallSideMatches[j][newRowCount].reserve(ridCount);
+        cout << "executeTupleCartJoin " << tSmallSideMatches[j][newRowCount].size() << endl;
+    }
+
+    //cerr << "executeTupleCartJoin() before join, RG has " << outputRG.getRowCount() << " BPP ridcount= " << ridCount << endl;
     for (i = 0; i < ridCount && !sendThread->aborted(); i++, oldRow.nextRow())
     {
-        cerr << "large side row: " << oldRow.toString() << endl;
+        //cerr << "large side row: " << oldRow.toString() << endl;
         for (j = 0; j < joinerCount; j++)
         {
             //getJoinResults(oldRow, j, tSmallSideMatches[j][newRowCount], true);
@@ -1234,7 +1244,7 @@ void BatchPrimitiveProcessor::executeTupleCartJoin()
         values[newRowCount] = values[i];
         relRids[newRowCount] = relRids[i];
         copyRow(oldRow, &newRow);
-        cerr << "joined row: " << newRow.toString() << endl;
+        //cerr << "joined row: " << newRow.toString() << endl;
 
         newRowCount++;
         newRow.nextRow();
@@ -1614,7 +1624,7 @@ void BatchPrimitiveProcessor::execute()
                     }
                     else
                     {
-                        //cerr <<" * serialzing " << nextRG.toString() << endl;
+                        ////cerr <<" * serialzing " << nextRG.toString() << endl;
                         nextRG.serializeRGData(*serialized);
                     }
 
@@ -1645,13 +1655,13 @@ void BatchPrimitiveProcessor::execute()
                 fe2Output.getRow(0, &fe2Out);
                 fe2Input->getRow(0, &fe2In);
 
-                //cerr << "input row: " << fe2In.toString() << endl;
+                ////cerr << "input row: " << fe2In.toString() << endl;
                 for (j = 0; j < outputRG.getRowCount(); j++, fe2In.nextRow())
                 {
                     if (fe2->evaluate(&fe2In))
                     {
                         applyMapping(fe2Mapping, fe2In, &fe2Out);
-                        //cerr << "   passed. output row: " << fe2Out.toString() << endl;
+                        ////cerr << "   passed. output row: " << fe2Out.toString() << endl;
                         fe2Out.setRid (fe2In.getRelRid());
                         fe2Output.incRowCount();
                         fe2Out.nextRow();
@@ -1701,7 +1711,7 @@ void BatchPrimitiveProcessor::execute()
             {
                 *serialized << (uint8_t) 1;  // the "count this msg" var
                 outputRG.setDBRoot(dbRoot);
-                //cerr << "serializing " << outputRG.toString() << endl;
+                ////cerr << "serializing " << outputRG.toString() << endl;
                 outputRG.serializeRGData(*serialized);
 
                 //*serialized << outputRG.getDataSize();
@@ -2113,7 +2123,7 @@ int BatchPrimitiveProcessor::operator()()
         }
         catch (std::exception& e)
         {
-            cerr << "BPP::sendResponse(): " << e.what() << endl;
+            //cerr << "BPP::sendResponse(): " << e.what() << endl;
             break;  // If we make this throw, be sure to do the cleanup at the end
         }
 
@@ -2474,7 +2484,7 @@ bool BatchPrimitiveProcessor::generateJoinedRowGroup(rowgroup::Row& baseRow, con
             baseRow.setRid(largeRow.getRelRid());
         }
 
-        cerr << "rowNum = " << gjrgRowNumber << " at depth " << depth << " size is " << size << endl;
+        //cerr << "rowNum = " << gjrgRowNumber << " at depth " << depth << " size is " << size << endl;
         for (uint32_t& i = gjrgPlaceHolders[depth]; i < size && !gjrgFull; i++)
         {
             if (results[i] != (uint32_t) - 1)
@@ -2486,7 +2496,7 @@ bool BatchPrimitiveProcessor::generateJoinedRowGroup(rowgroup::Row& baseRow, con
             else
                 smallRow.setPointer(smallNullPointers[depth]);
 
-            cerr << "small row: " << smallRow.toString() << endl;
+            //cerr << "small row: " << smallRow.toString() << endl;
             applyMapping(gjrgMappings[depth], smallRow, &baseRow);
 
             if (!lowestLvl)
@@ -2495,7 +2505,7 @@ bool BatchPrimitiveProcessor::generateJoinedRowGroup(rowgroup::Row& baseRow, con
             {
                 copyRow(baseRow, &joinedRow);
                 //memcpy(joinedRow.getData(), baseRow.getData(), joinedRow.getSize());
-                //cerr << "joined row " << joinedRG.getRowCount() << ": " << joinedRow.toString() << endl;
+                ////cerr << "joined row " << joinedRG.getRowCount() << ": " << joinedRow.toString() << endl;
                 joinedRow.nextRow();
                 joinedRG.incRowCount();
 

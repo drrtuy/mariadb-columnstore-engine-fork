@@ -304,13 +304,13 @@ void BatchPrimitiveProcessorJL::addDeliveryStep(const DeliveryStep& ds)
             }
             else
             {
-                cerr << "BatchPrimitiveProcessorJL::addDeliveryStep(): didn't find OID " << oid <<
+                cout << "BatchPrimitiveProcessorJL::addDeliveryStep(): didn't find OID " << oid <<
                      " in tableband at pjstep idx " << i << endl;
             }
         }
         else
         {
-            cerr << "BatchPrimitiveProcessorJL::addDeliveryStep(): pjstep idx " << i <<
+            cout << "BatchPrimitiveProcessorJL::addDeliveryStep(): pjstep idx " << i <<
                  " doesn't have a valid OID" << endl;
         }
     }
@@ -346,7 +346,7 @@ void BatchPrimitiveProcessorJL::addElementType(const ElementType& et, uint32_t d
 
     if (sendValues)
     {
-// 		cerr << "adding value " << et.second << endl;
+// 		cout << "adding value " << et.second << endl;
         values[ridCount] = et.second;
     }
 
@@ -428,7 +428,7 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream& in,
     uint32_t jCount;
     ElementType* jet;
 
-// 	cerr << "get Element Types uniqueID=" << uniqueID << endl;
+// 	cout << "get Element Types uniqueID=" << uniqueID << endl;
     /* skip the header */
     idbassert(in.length() > sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
     in.advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
@@ -489,7 +489,7 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream& in,
     in >> *cachedIO;
     in >> *physIO;
     in >> *touchedBlocks;
-// 	cerr << "ET: got physIO=" << (int) *physIO << " cachedIO=" <<
+// 	cout << "ET: got physIO=" << (int) *physIO << " cachedIO=" <<
 // 		(int) *cachedIO << " touchedBlocks=" << (int) *touchedBlocks << endl;
     idbassert(in.length() == 0);
 }
@@ -520,7 +520,7 @@ void BatchPrimitiveProcessorJL::getStringElementTypes(ByteStream& in,
     uint64_t tmp64;
     uint8_t tmp8;
 
-// 	cerr << "get String ETs uniqueID\n";
+// 	cout << "get String ETs uniqueID\n";
     /* skip the header */
     in.advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 
@@ -542,7 +542,7 @@ void BatchPrimitiveProcessorJL::getStringElementTypes(ByteStream& in,
     }
 
     in >> l_count;
-// 	cerr << "parsing " << l_count << " strings\n";
+// 	cout << "parsing " << l_count << " strings\n";
     l_absRids = (uint64_t*) in.buf();
     out->resize(l_count);
     in.advance(l_count << 3);
@@ -556,7 +556,7 @@ void BatchPrimitiveProcessorJL::getStringElementTypes(ByteStream& in,
     in >> *cachedIO;
     in >> *physIO;
     in >> *touchedBlocks;
-// 	cerr << "SET: got physIO=" << (int) *physIO << " cachedIO=" <<
+// 	cout << "SET: got physIO=" << (int) *physIO << " cachedIO=" <<
 // 		(int) *cachedIO << " touchedBlocks=" << (int) *touchedBlocks << endl;
     idbassert(in.length() == 0);
 }
@@ -584,7 +584,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream& in,
     uint64_t tmp64;
     uint8_t tmp8;
 
-// 	cerr << "getTuples msg is " << in.length() << " bytes\n";
+// 	cout << "getTuples msg is " << in.length() << " bytes\n";
     /* skip the header */
     in.advance(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
 
@@ -607,7 +607,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream& in,
 
     in >> l_rowCount;
 
-// 	cerr << "read " << l_rowCount << " rows\n";
+// 	cout << "read " << l_rowCount << " rows\n";
 
     if (needRidsAtDelivery)
     {
@@ -629,7 +629,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream& in,
         colLengths[i] = *((uint32_t*) &buf[pos]);
         pos += 4;
         columnData[i] = &buf[pos];
-// 		cerr << "column " << i << " is " << colLengths[i] << " long at " << pos << endl;
+// 		cout << "column " << i << " is " << colLengths[i] << " long at " << pos << endl;
         pos += colLengths[i];
         idbassert(pos < in.length());
     }
@@ -688,7 +688,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream& in,
                         break;
 
                     default:
-                        cerr << "BPP::getTuples(): bad column width of " << colWidths[j]
+                        cout << "BPP::getTuples(): bad column width of " << colWidths[j]
                              << endl;
                         throw logic_error("BPP::getTuples(): bad column width");
                 }
@@ -791,7 +791,7 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream& in, vector<RGData>* 
         deserializeAggregateResult(&in, out);
         //for (uint32_t z = 0; z < out->size(); z++) {
         //	org.setData(&(*out)[z]);
-        //	cerr << "BPPJL: " << org.toString() << endl;
+        //	cout << "BPPJL: " << org.toString() << endl;
         //}
     }
     else
@@ -839,7 +839,7 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream& in, vector<RGData>* 
 
     if (*countThis)
     {
-// 		cerr << "grabbing io stats\n";
+// 		cout << "grabbing io stats\n";
         in >> *cachedIO;
         in >> *physIO;
         in >> *touchedBlocks;
@@ -888,7 +888,7 @@ void BatchPrimitiveProcessorJL::setLBID(uint64_t l, const BRM::EMEntry& scannedE
                                      (l - scannedExtent.range.start) / scannedExtent.range.size);  // the logical block #
 
     /*
-    cerr << "got baserid=" << baseRid << " from partnum=" << scannedExtent.partitionNum
+    cout << "got baserid=" << baseRid << " from partnum=" << scannedExtent.partitionNum
     		<< " segnum=" << scannedExtent.segmentNum << " extentnum=" <<
     		scannedExtent.blockOffset/(scannedExtent.range.size * 1024) <<
     		" blocknum=" << (l - scannedExtent.range.start)/scannedExtent.range.size << endl;
@@ -1009,7 +1009,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
     if (ot == ROW_GROUP)
     {
         bs << projectionRG;
-// 		cerr << "BPPJL: projectionRG is:\n" << projectionRG.toString() << endl;
+// 		cout << "BPPJL: projectionRG is:\n" << projectionRG.toString() << endl;
 
         /* F&E serialization */
         if (fe1)
@@ -1041,7 +1041,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
 
             bool atLeastOneFE = false;
 #ifdef JLF_DEBUG
-            cerr << "PMJoinerCount = " << PMJoinerCount << endl;
+            cout << "PMJoinerCount = " << PMJoinerCount << endl;
 #endif
 
             for (i = 0; i < PMJoinerCount; i++)
@@ -1057,7 +1057,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
                 {
                     atLeastOneFE = true;
 #ifdef JLF_DEBUG
-                    cerr << "serializing join FE object\n";
+                    cout << "serializing join FE object\n";
 #endif
                     bs << *tJoiners[i]->getFcnExpFilter();
                 }
@@ -1066,7 +1066,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
                 {
                     bs << (uint64_t) tJoiners[i]->smallNullValue();
                     bs << (messageqcpp::ByteStream::quadbyte)tJoiners[i]->getLargeKeyColumn();
-                    //cerr << "large key column is " << (uint32_t) tJoiners[i]->getLargeKeyColumn() << endl;
+                    //cout << "large key column is " << (uint32_t) tJoiners[i]->getLargeKeyColumn() << endl;
                 }
                 else
                 {
@@ -1081,12 +1081,12 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
             if (sendTupleJoinRowGroupData)
             {
 #ifdef JLF_DEBUG
-                cerr << "sending smallside data\n";
+                cout << "sending smallside data\n";
 #endif
                 serializeVector<RowGroup>(bs, smallSideRGs);
                 bs << largeSideRG;
                 bs << joinedRG;    // TODO: I think we can omit joinedRG if (!(fe2 || aggregatorPM))
-// 				cerr << "joined RG: " << joinedRG.toString() << endl;
+// 				cout << "joined RG: " << joinedRG.toString() << endl;
             }
         }
         else
@@ -1100,7 +1100,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
 
     for (i = 0; i < filterCount; ++i)
     {
-// 		cerr << "serializing step " << i << endl;
+// 		cout << "serializing step " << i << endl;
         filterSteps[i]->createCommand(bs);
     }
 
@@ -1265,7 +1265,7 @@ void BatchPrimitiveProcessorJL::destroyBPP(ByteStream& bs) const
     ISMPacketHeader ism;
 
 // 	if (!(sessionID & 0x80000000))
-// 		cerr << "step ID " << stepID << " added " << rowCounter << " rows, processed "
+// 		cout << "step ID " << stepID << " added " << rowCounter << " rows, processed "
 // 			<< rowsProcessed << " rows" << endl;
 
     memset((void*)&ism, 0, sizeof(ism));
@@ -1313,7 +1313,7 @@ void BatchPrimitiveProcessorJL::useJoiners(const vector<boost::shared_ptr<joiner
     {
         sendTupleJoinRowGroupData = true;
 #ifdef JLF_DEBUG
-        cerr << "will send small side row data\n";
+        cout << "will send small side row data\n";
 #endif
     }
 }
@@ -1339,7 +1339,7 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream& bs)
     if (joinerNum == PMJoinerCount - 1 && pos == size)
     {
         /* last message */
- 		cerr << "sending last joiner msg\n";
+// 		cout << "sending last joiner msg\n";
         ism.Command = BATCH_PRIMITIVE_END_JOINER;
         bs.load((uint8_t*) &ism, sizeof(ism));
         bs << (messageqcpp::ByteStream::quadbyte)sessionID;
@@ -1454,7 +1454,7 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream& bs)
 
             arr[j].key = (int64_t)smallkey;
             arr[j].value = i;
- 			cerr << "sending " << arr[j].key << ", " << arr[j].value << endl;
+// 			cout << "sending " << arr[j].key << ", " << arr[j].value << endl;
         }
 
         bs.advanceInputPtr(toSend * sizeof(JoinerElements));

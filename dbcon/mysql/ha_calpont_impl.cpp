@@ -2795,7 +2795,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
     //check whether the system is ready to process statement.
 #ifndef _MSC_VER
     static DBRM dbrm(true);
-    bool bSystemQueryReady = dbrm.getSystemQueryReady();
+    int bSystemQueryReady = dbrm.getSystemQueryReady();
 
     if (bSystemQueryReady == 0)
     {
