@@ -29,6 +29,7 @@
 #include <process.h>
 #include <ctime>
 #endif
+#include <unistd.h>
 
 #define TRACER_DLLEXPORT
 #include "tracer.h"
