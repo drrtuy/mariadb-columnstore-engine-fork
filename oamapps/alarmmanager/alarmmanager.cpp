@@ -484,7 +484,7 @@ void ALARMManager::sendAlarmReport (const char* componentID, int alarmID, int st
     else
         processName = repProcessName;
 
-    int returnStatus = API_SUCCESS;           //default
+    //int returnStatus = API_SUCCESS;           //default
     ByteStream msg1;
 
     // setup message

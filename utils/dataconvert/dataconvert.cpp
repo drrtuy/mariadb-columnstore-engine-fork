@@ -82,7 +82,7 @@ bool from_string(T& t, const std::string& s, std::ios_base & (*f)(std::ios_base&
     return !(iss >> f >> t).fail();
 }
 
-uint64_t pow10_(int32_t scale)
+/*uint64_t pow10_(int32_t scale)
 {
     if (scale <= 0) return 1;
 
@@ -93,7 +93,7 @@ uint64_t pow10_(int32_t scale)
         res *= 10;
 
     return res;
-}
+}*/
 
 bool number_value ( const string& data )
 {
@@ -871,7 +871,6 @@ bool mysql_str_to_datetime( const string& input, DateTime& output, bool& isDate 
 
 bool mysql_str_to_time( const string& input, Time& output, long decimals )
 {
-    int32_t datesepct = 0;
     uint32_t dtend = 0;
     bool isNeg = false;
 
@@ -1757,7 +1756,8 @@ int32_t DataConvert::convertColumnDate(
 bool DataConvert::isColumnDateValid( int32_t date )
 {
     Date d;
-    memcpy(&d, &date, sizeof(int32_t));
+    void* dp = static_cast<void*>(&d);
+    memcpy(dp, &date, sizeof(int32_t));
     return (isDateValid(d.day, d.month, d.year));
 }
 
@@ -2059,7 +2059,8 @@ int64_t DataConvert::convertColumnTime(
 bool DataConvert::isColumnDateTimeValid( int64_t dateTime )
 {
     DateTime dt;
-    memcpy(&dt, &dateTime, sizeof(uint64_t));
+    void* dtp = static_cast<void*>(&dt);
+    memcpy(dtp, &dateTime, sizeof(uint64_t));
 
     if (isDateValid(dt.day, dt.month, dt.year))
         return isDateTimeValid(dt.hour, dt.minute, dt.second, dt.msecond);
@@ -2070,7 +2071,8 @@ bool DataConvert::isColumnDateTimeValid( int64_t dateTime )
 bool DataConvert::isColumnTimeValid( int64_t time )
 {
     Time dt;
-    memcpy(&dt, &time, sizeof(uint64_t));
+    void* dtp = static_cast<void*>(&dt);
+    memcpy(dtp, &time, sizeof(uint64_t));
 
     return isTimeValid(dt.hour, dt.minute, dt.second, dt.msecond);
 }

@@ -270,9 +270,9 @@ int main(int argc, char* argv[])
 
     //check if root-user
     int user;
-    int usergroup;
+    //int usergroup;
     user = getuid();
-    usergroup = getgid();
+    //usergroup = getgid();
 
 	string SUDO = "";
     if (user != 0) 
@@ -1355,7 +1355,7 @@ int main(int argc, char* argv[])
 	{
 		string amazonLog = tmpDir + "/amazon.log";
 		string cmd = "aws --version > " + amazonLog + " 2>&1";
-		int rtnCode = system(cmd.c_str());
+		system(cmd.c_str());
 
 		ifstream in(amazonLog.c_str());
 
@@ -1852,7 +1852,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    unsigned int maxPMNicCount = 1;
+    int maxPMNicCount = 1;
 
     //configure module type
     bool parentOAMmoduleConfig = false;
@@ -1989,7 +1989,7 @@ int main(int argc, char* argv[])
         //clear any Equipped Module IP addresses that aren't in current ID range
         for ( int j = 0 ; j < listSize ; j++ )
         {
-			for ( unsigned int k = 1 ; k < MaxNicID+1 ; k++)
+			for ( int k = 1 ; k < MaxNicID+1 ; k++)
             {
                 string ModuleIPAddr = "ModuleIPAddr" + oam.itoa(j + 1) + "-" + oam.itoa(k) + "-" + oam.itoa(i + 1);
 
@@ -2064,7 +2064,7 @@ int main(int argc, char* argv[])
 					}
 				}
 				
-				unsigned int nicID=1;
+				int nicID=1;
 				for(  ; nicID < MaxNicID +1 ; nicID++ )
 				{
 					if ( !found )
@@ -3409,7 +3409,7 @@ int main(int argc, char* argv[])
 
         for ( int pmsID = 1; pmsID < pmPorts + 1 ; )
         {
-            for (unsigned int j = 1 ; j < maxPMNicCount + 1 ; j++)
+            for (int j = 1 ; j < maxPMNicCount + 1 ; j++)
             {
                 PerformanceModuleList::iterator list1 = performancemodulelist.begin();
 
@@ -3870,9 +3870,11 @@ int main(int argc, char* argv[])
                     break;
                 }
 
-                if ( pass1 == "exit")
+                if ( strncmp(pass1, "exit", 4) )
+                {
                     exit(0);
-
+                }
+                
                 string p1 = pass1;
                 pass2 = getpass("Confirm password > ");
                 string p2 = pass2;
@@ -6280,7 +6282,6 @@ bool glusterSetup(string password)
     Oam oam;
     int dataRedundancyCopies = 0;
     int dataRedundancyNetwork = 0;
-    int dataRedundancyStorage = 0;
     int numberDBRootsPerPM = DBRootCount / pmNumber;
     int numberBricksPM = 0;
     std::vector<int> dbrootPms[DBRootCount];

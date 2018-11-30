@@ -5890,7 +5890,6 @@ int processCommand(string* arguments)
 
             int moduleID = 1;
             inputNames::const_iterator listPT1 = inputnames.begin();
-            umStorageNames::const_iterator listPT2 = umstoragenames.begin();
 
             for ( int i = 0 ; i < moduleCount ; i++ )
             {

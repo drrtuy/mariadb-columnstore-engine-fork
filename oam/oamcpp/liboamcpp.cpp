@@ -159,7 +159,9 @@ Oam::Oam()
     userDir = USER;
 
     if ( USER != "root")
-	userDir = "home/" + USER;
+    {
+	    userDir = "home/" + USER;
+    }
 
 	tmpdir = startup::StartUp::tmpDir();
 
@@ -2899,8 +2901,6 @@ oamModuleInfo_t Oam::getModuleInfo()
         // Get Server Type Install ID
 
         serverTypeInstall = atoi(sysConfig->getConfig("Installation", "ServerTypeInstall").c_str());
-
-        sysConfig;
     }
     catch (...) {}
 
@@ -8564,9 +8564,6 @@ std::string Oam::createEC2Volume(std::string size, std::string name)
     if ( volumeName == "unknown" )
         return "failed";
 
-    if ( volumeName == "unknown" )
-        return "failed";
-
     if (volumeName.find("vol-") == string::npos)
         return "failed";
 
@@ -10351,11 +10348,8 @@ void Oam::sendStatusUpdate(ByteStream obs, ByteStream::byte returnRequestType)
             {
                 ibs >> returnRequestType;
 
-                if ( returnRequestType == returnRequestType )
-                {
-                    processor.shutdown();
-                    return;
-                }
+                processor.shutdown();
+                return;
             }
             else
             {
