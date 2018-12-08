@@ -525,6 +525,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     bool bNoStartExtentOnThisPM = false;
     bool bEmptyPM               = false;
 
+    startTimer();
     for ( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ )
     {
         const JobColumn& curJobCol = job.jobTableList[tableNo].colList[i];
@@ -561,8 +562,12 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         oids[i] = curJobCol.mapOid;
     } // end of 1st for-loop through the list of columns (get starting HWM)
 
+    stopTimer();
+    cerr << getTotalRunTime() << "1st loop seconds" << endl;
+    
     std::cerr << oids.size() << " " << dbRootHWMInfoColVec.size() << endl;
 
+    startTimer();
     // check HWM for column file
     rc = BRMWrapper::getInstance()->bulkGetDbRootHWMInfo( oids,
         dbRootHWMInfoColVec);
@@ -575,8 +580,10 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         ec.errorString(rc); fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
         return rc;
     }
+    stopTimer();
+    cerr << getTotalRunTime() << " bulk seconds" << endl;
 
-
+    startTimer();
     //--------------------------------------------------------------------------
     // Second loop thru the columns for the "tableNo" table in jobTableList[].
     // Create DBRootExtentTracker, and select starting DBRoot.
@@ -634,7 +641,10 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         // Save column segment file info for use in subsequent loop
         segFileInfo.push_back( dbRootExtent );
     }
+    stopTimer();
+    cerr << getTotalRunTime() << " 2nd loop seconds" << endl;
 
+    startTimer();
     //--------------------------------------------------------------------------
     // Validate that the starting HWMs for all the columns are in sync
     //--------------------------------------------------------------------------
@@ -645,7 +655,8 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     {
         return rc;
     }
-
+    stopTimer();
+    cerr << getTotalRunTime() << " validateColumnHWMs seconds" << endl;
     //--------------------------------------------------------------------------
     // Create bulk rollback meta data file
     //--------------------------------------------------------------------------
@@ -653,7 +664,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     oss11 << "Initializing import: " <<
           "Table-" << job.jobTableList[tableNo].tblName << "...";
     fLog.logMsg( oss11.str(), MSGLVL_INFO2 );
-
+    startTimer();
     rc = saveBulkRollbackMetaData( job, tableInfo, segFileInfo,
                                    dbRootHWMInfoColVec );
 
@@ -661,7 +672,8 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     {
         return rc;
     }
-
+    stopTimer();
+    cerr << getTotalRunTime() << " saveBulkRollbackMetaData seconds" << endl;
     //--------------------------------------------------------------------------
     // Third loop thru the columns for the "tableNo" table in jobTableList[].
     // In this pass through the columns we create the ColumnInfo object,
@@ -669,7 +681,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     // the block where we will begin adding data.
     //--------------------------------------------------------------------------
     unsigned int fixedBinaryRecLen = 0;
-
+    startTimer();
     for ( size_t i = 0; i < job.jobTableList[tableNo].colList.size(); i++ )
     {
         uint16_t dbRoot    = segFileInfo[i].fDbRoot;
@@ -784,6 +796,8 @@ int BulkLoad::preProcess( Job& job, int tableNo,
         tableInfo->addColumn(info);
 
     } // end of 2nd for-loop through the list of columns
+    stopTimer();
+    cerr << getTotalRunTime() << " 3d loop seconds" << endl;
 
     if ((fImportDataMode == IMPORT_DATA_BIN_ACCEPT_NULL) ||
             (fImportDataMode == IMPORT_DATA_BIN_SAT_NULL))
@@ -1011,7 +1025,7 @@ int BulkLoad::processJob( )
     // Init total cumulative run time with time it took to load xml file
     double totalRunTime = getTotalRunTime();
     fLog.logMsg( "PreProcessing check starts", MSGLVL_INFO1 );
-    startTimer();
+    //startTimer();
 
     //--------------------------------------------------------------------------
     // Validate that only 1 table is specified for import if using STDIN
@@ -1142,7 +1156,7 @@ int BulkLoad::processJob( )
         }
     }
 
-    stopTimer();
+    //stopTimer();
     fLog.logMsg( "PreProcessing check completed", MSGLVL_INFO1 );
 
     std::ostringstream ossPrepTime;
