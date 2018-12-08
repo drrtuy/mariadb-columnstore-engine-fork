@@ -667,6 +667,9 @@ public:
     EXPORT void getDbRootHWMInfo(int OID, uint16_t pmNumber,
                                  EmDbRootHWMInfo_v& emDbRootHwmInfos);
 
+    EXPORT void bulkGetDbRootHWMInfo(std::vector<int> oids, uint16_t pmNumber,
+        std::vector<BRM::EmDbRootHWMInfo_v>& emDbRootHwmInfosVec);
+
     /** @brief Get the status (AVAILABLE, OUTOFSERVICE, etc) for the
      * segment file represented by the specified OID, part# and seg#.
      *

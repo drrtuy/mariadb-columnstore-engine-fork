@@ -59,7 +59,6 @@ namespace bi = boost::interprocess;
 #include "IDBDataFile.h"
 #include "IDBPolicy.h"
 #ifdef BRM_INFO
-//#error BRM_INFO is broken right now
 #include "tracer.h"
 #include "configcpp.h"
 #endif
@@ -1142,8 +1141,7 @@ void ExtentMap::loadVersion4(ifstream& in)
     in.read((char*) &flNumElements, sizeof(int));
     idbassert(emNumElements > 0);
 
-    void *fExtentMapPtr = static_cast<void*>(fExtentMap);
-    memset(fExtentMapPtr, 0, fEMShminfo->allocdSize);
+    memset(fExtentMap, 0, fEMShminfo->allocdSize);
     fEMShminfo->currentSize = 0;
 
     // init the free list
@@ -1966,7 +1964,17 @@ int ExtentMap::lookupLocal(LBID_t lbid, int& OID, uint16_t& dbRoot, uint32_t& pa
         log(oss.str(), logging::LOG_TYPE_CRITICAL);
         throw invalid_argument(oss.str());
     }
+/*
+    vector<int> bulkTestVec;
+    bulkTestVec.resize(3);
+    std::vector<EmDbRootHWMInfo_v> emDbRootHwmInfosVec;
+    emDbRootHwmInfosVec.resize(3);
+    bulkTestVec[0] = 3637;
+    bulkTestVec[1] = 3636;
+    bulkTestVec[2] = 3634;
 
+    bulkGetDbRootHWMInfo(bulkTestVec, 1, emDbRootHwmInfosVec);
+*/
     grabEMEntryTable(READ);
 
     entries = fEMShminfo->allocdSize / sizeof(struct EMEntry);
@@ -4372,6 +4380,180 @@ void ExtentMap::getDbRootHWMInfo(int OID, uint16_t pmNumber,
     }
 }
 
+void ExtentMap::bulkGetDbRootHWMInfo(std::vector<int> oids, uint16_t pmNumber,
+        std::vector<EmDbRootHWMInfo_v>& emDbRootHwmInfosVec)
+{
+#ifdef BRM_INFO
+
+    if (fDebug)
+    {
+        TRACER_WRITELATER("bulkGetDbRootHWMInfo");
+        for(uint32_t i = 0; i < oids.size(); i++)
+        {
+            TRACER_ADDINPUT(oids[i]);
+        }
+        TRACER_ADDSHORTINPUT(pmNumber);
+        TRACER_WRITE;
+    }
+
+#endif
+
+    // Determine List of DBRoots for specified PM, and construct map of
+    // EmDbRootHWMInfo objects.
+    //tr1::unordered_map<uint16_t, EmDbRootHWMInfo> emDbRootMap;
+    std::vector<tr1::unordered_map<uint16_t, EmDbRootHWMInfo>> emDbRootMapVec;
+    vector<vector<int>> dbRootListVec;
+    emDbRootMapVec.resize(oids.size());
+    dbRootListVec.resize(oids.size());
+    int oidsFound = 0;
+    for(uint32_t i = 0; i < oids.size(); i++)
+    {
+        if (oids[i] < 0)
+        {
+            ostringstream oss;
+            oss << "ExtentMap::bulkGetDbRootHWMInfo(): invalid OID requested: " << oids[i];
+            log(oss.str(), logging::LOG_TYPE_CRITICAL);
+            throw invalid_argument(oss.str());
+        }
+        else
+        {
+            getPmDbRoots( pmNumber, dbRootListVec[i] );
+
+            if ( dbRootListVec[i].size() > 0 )
+                {
+                    for (unsigned int iroot = 0; iroot < dbRootListVec[i].size(); iroot++)
+                    {
+                        uint16_t rootID = dbRootListVec[i][iroot];
+                        EmDbRootHWMInfo emDbRootInfo(rootID);
+                        emDbRootMapVec[i][rootID] = emDbRootInfo;
+                    }
+                }
+                else
+                {
+                    ostringstream oss;
+                    oss << "ExtentMap::bulkGetDbRootHWMInfo(): " <<
+                        "There are no DBRoots for OID " << oids[i] <<
+                        " and PM " << pmNumber << endl;
+                    log(oss.str(), logging::LOG_TYPE_CRITICAL);
+                    throw invalid_argument(oss.str());
+                }
+
+            
+        }
+    }
+
+    grabEMEntryTable(READ);
+    tr1::unordered_map<uint16_t, EmDbRootHWMInfo>::iterator emIter;
+
+    // Searching the array in reverse order should be faster since the last
+    // extent is usually at the bottom.  We still have to search the entire
+    // array (just in case), but the number of operations per loop iteration
+    // will be less.
+    int emEntries = fEMShminfo->allocdSize / sizeof(struct EMEntry);
+
+    for (int i = emEntries - 1; i >= 0; i--)
+    {
+        vector<int>::iterator fileIDIter;
+        int oidsId;
+        if (fExtentMap[i].range.size != 0)
+        {
+            fileIDIter = find(oids.begin(), oids.end(), fExtentMap[i].fileID);
+            if (fileIDIter == oids.end() )
+            {
+                continue;
+            }
+            oidsId = fileIDIter - oids.begin();
+            // Include this extent in the search, only if the extent's
+            // DBRoot falls in the list of DBRoots for this PM.
+            emIter = emDbRootMapVec[oidsId].find( fExtentMap[i].dbRoot );
+
+            if (emIter == emDbRootMapVec[oidsId].end())
+            {
+                continue;
+            }
+            
+            EmDbRootHWMInfo& emDbRoot = emIter->second;
+
+            if ((fExtentMap[i].status != EXTENTOUTOFSERVICE) &&
+                    (fExtentMap[i].HWM != 0))
+                emDbRoot.totalBlocks += (fExtentMap[i].HWM + 1);
+
+            if ( (fExtentMap[i].partitionNum >  emDbRoot.partitionNum) ||
+                    ((fExtentMap[i].partitionNum == emDbRoot.partitionNum) &&
+                     (fExtentMap[i].blockOffset   >  emDbRoot.fbo))         ||
+                    ((fExtentMap[i].partitionNum == emDbRoot.partitionNum) &&
+                     (fExtentMap[i].blockOffset   == emDbRoot.fbo) &&
+                     (fExtentMap[i].segmentNum    >= emDbRoot.segmentNum)) )
+            {
+                emDbRoot.fbo              = fExtentMap[i].blockOffset;
+                emDbRoot.partitionNum     = fExtentMap[i].partitionNum;
+                emDbRoot.segmentNum       = fExtentMap[i].segmentNum;
+                emDbRoot.localHWM         = fExtentMap[i].HWM;
+                emDbRoot.startLbid        = fExtentMap[i].range.start;
+                emDbRoot.status           = fExtentMap[i].status;
+                emDbRoot.hwmExtentIndex   = i;
+                oidsFound++;
+            }
+        }
+    }
+
+    releaseEMEntryTable(READ);
+    
+    for(uint32_t i = 0; i < oids.size(); i++)
+    {
+        for (tr1::unordered_map<uint16_t, EmDbRootHWMInfo>::iterator iter =
+            emDbRootMapVec[i].begin(); iter != emDbRootMapVec[i].end(); ++iter)
+        {
+            EmDbRootHWMInfo& emDbRoot = iter->second;
+
+            if (emDbRoot.hwmExtentIndex != -1)
+            {
+                // @bug 5349: make sure HWM extent for each DBRoot is AVAILABLE
+                if (emDbRoot.status == EXTENTUNAVAILABLE)
+                {
+                    ostringstream oss;
+                    oss << "ExtentMap::bulkGetDbRootHWMInfo(): " <<
+                        "OID " << oids[i] <<
+                        " has HWM extent that is UNAVAILABLE for " <<
+                        "DBRoot"      << emDbRoot.dbRoot       <<
+                        "; part#: "   << emDbRoot.partitionNum <<
+                        ", seg#: "    << emDbRoot.segmentNum   <<
+                        ", fbo: "     << emDbRoot.fbo          <<
+                        ", localHWM: " << emDbRoot.localHWM     <<
+                        ", lbid: "    << emDbRoot.startLbid    << endl;
+                    log(oss.str(), logging::LOG_TYPE_CRITICAL);
+                    throw runtime_error(oss.str());
+                }
+
+                // In the loop above we ignored "all" the extents with HWM of 0,
+                // which is okay most of the time, because each segment file's HWM
+                // is carried in the last extent only.  BUT if we have a segment
+                // file with HWM=0, having a single extent and a single block at
+                // the "end" of the data, we still need to account for this last
+                // block.  So we increment the block count for this isolated case.
+                if ((emDbRoot.localHWM == 0) &&
+                        (emDbRoot.status == EXTENTAVAILABLE))
+                {
+                    emDbRoot.totalBlocks++;
+                }
+            }
+        }
+
+        // Copy internal map to the output vector argument
+        // Error this control flow out if CS fails to find enough oids 
+        // for some reason.            
+        for (tr1::unordered_map<uint16_t, EmDbRootHWMInfo>::iterator iter =
+                emDbRootMapVec[i].begin(); iter != emDbRootMapVec[i].end(); ++iter)
+        {
+            // Change push_back to operator::[]
+            emDbRootHwmInfosVec[i].push_back( iter->second );
+        }
+    }
+
+
+
+}
+
 //------------------------------------------------------------------------------
 // Return the existence (bFound) and state (status) for the segment file
 // containing the extents for the specified OID, partition, and segment.
@@ -5367,7 +5549,7 @@ bool ExtentMap::isDBRootEmpty(uint16_t dbroot)
     if (fDebug)
     {
         TRACER_WRITELATER("isDBRootEmpty");
-        //STRACER_ADDINPUT(OID);
+        TRACER_ADDINPUT(dbroot);
         TRACER_WRITE;
     }
 

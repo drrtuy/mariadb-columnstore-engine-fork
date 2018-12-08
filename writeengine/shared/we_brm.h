@@ -35,6 +35,7 @@
 #include "brmtypes.h"
 #include "IDBDataFile.h"
 #include "IDBPolicy.h"
+#include "we_config.h"
 
 #if defined(_MSC_VER) && defined(WRITEENGINE_DLLEXPORT)
 #define EXPORT __declspec(dllexport)
@@ -324,6 +325,12 @@ public:
      */
     int bulkSetHWMAndCP( const std::vector<BRM::BulkSetHWMArg>& hwmArgs,
                          const std::vector<BRM::CPInfoMerge>& mergeCPDataArgs);
+
+    /**
+     * @brief Get a vector of HWM infos for a vector of OIDs and PM
+     */
+    int bulkGetDbRootHWMInfo(std::vector<int> oids,
+        std::vector<BRM::EmDbRootHWMInfo_v>& emDbRootHwmInfosVec);
 
     /**
      * @brief Acquire a table lock for the specified table OID.
@@ -645,6 +652,20 @@ inline int BRMWrapper::bulkSetHWMAndCP(
                  hwmArgs, setCPDataArgs, mergeCPDataArgs, transID );
 
     return getRC( rc, ERR_BRM_BULK_UPDATE );
+}
+
+/**
+ * @brief Get HWM info for a specific OID and PM
+ */
+inline int BRMWrapper::bulkGetDbRootHWMInfo(std::vector<int> oids,
+    std::vector<BRM::EmDbRootHWMInfo_v>& emDbRootHwmInfosVec)
+{
+    int rc = NO_ERROR;
+    uint16_t localModuleID = Config::getLocalModuleID();
+    rc = blockRsltnMgrPtr->bulkGetDbRootHWMInfo(
+        oids, localModuleID, emDbRootHwmInfosVec);
+
+    return getRC( rc, ERR_BRM_DBROOT_HWMS );
 }
 
 inline int BRMWrapper::setExtentsMaxMin(const BRM::CPInfoList_t& cpinfoList)

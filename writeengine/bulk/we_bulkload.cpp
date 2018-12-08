@@ -514,11 +514,13 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     // First loop thru the columns for the "tableNo" table in jobTableList[].
     // Get the HWM information for each column.
     //------------------------------------------------------------------------
-    std::vector<int>                    colWidths;
+    uint32_t colNumber = job.jobTableList[tableNo].colList.size();
+    std::vector<int>                    colWidths(colNumber);
     std::vector<DBRootExtentInfo>       segFileInfo;
     std::vector<DBRootExtentTracker*>   dbRootExtTrackerVec;
-    std::vector<BRM::EmDbRootHWMInfo_v> dbRootHWMInfoColVec(
-        job.jobTableList[tableNo].colList.size() );
+    std::vector<BRM::EmDbRootHWMInfo_v> dbRootHWMInfoColVec(colNumber);
+    std::vector<int> oids(colNumber);
+    
     DBRootExtentTracker* pRefDBRootExtentTracker = 0;
     bool bNoStartExtentOnThisPM = false;
     bool bEmptyPM               = false;
@@ -552,22 +554,28 @@ int BulkLoad::preProcess( Job& job, int tableNo,
                     job.jobTableList[tableNo].colList[i].dataType,
                     job.jobTableList[tableNo].colList[i].width );
 
-        // check HWM for column file
-        rc = BRMWrapper::getInstance()->getDbRootHWMInfo( curJobCol.mapOid,
-                dbRootHWMInfoColVec[i]);
+        colWidths[i] = job.jobTableList[tableNo].colList[i].width;
+        //rc = BRMWrapper::getInstance()->getDbRootHWMInfo( curJobCol.mapOid,
+        //dbRootHWMInfoColVec[i]);
 
-        if (rc != NO_ERROR)
-        {
-            WErrorCodes ec;
-            ostringstream oss;
-            oss << "Error getting last DBRoot/HWMs for column file " <<
-                curJobCol.mapOid << "; " << ec.errorString(rc);
-            fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
-            return rc;
-        }
-
-        colWidths.push_back( job.jobTableList[tableNo].colList[i].width );
+        oids[i] = curJobCol.mapOid;
     } // end of 1st for-loop through the list of columns (get starting HWM)
+
+    std::cerr << oids.size() << " " << dbRootHWMInfoColVec.size() << endl;
+
+    // check HWM for column file
+    rc = BRMWrapper::getInstance()->bulkGetDbRootHWMInfo( oids,
+        dbRootHWMInfoColVec);
+
+    if (rc != NO_ERROR)
+    {
+        WErrorCodes ec;
+        ostringstream oss;
+        oss << "Error getting last DBRoot/HWMs for column file " <<
+        ec.errorString(rc); fLog.logMsg( oss.str(), rc, MSGLVL_ERROR );
+        return rc;
+    }
+
 
     //--------------------------------------------------------------------------
     // Second loop thru the columns for the "tableNo" table in jobTableList[].

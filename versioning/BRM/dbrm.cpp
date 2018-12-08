@@ -1661,6 +1661,37 @@ int DBRM::bulkUpdateDBRoot(const vector<BulkUpdateDBRootArg>& args)
 }
 
 
+int DBRM::bulkGetDbRootHWMInfo(std::vector<int> oids, uint16_t pmNumber,
+        std::vector<EmDbRootHWMInfo_v>& emDbRootHwmInfosVec)
+{
+#ifdef BRM_INFO
+
+    if (fDebug)
+    {
+        TRACER_WRITELATER("bulkGetDbRootHWMInfo");
+        for(uint32_t i = 0; i < oids.size(); i++)
+        {
+            TRACER_ADDINPUT(oids[i]);
+        }
+        TRACER_ADDSHORTINPUT(pmNumber);
+        TRACER_WRITE;
+    }
+
+#endif
+
+    try
+    {
+        em->bulkGetDbRootHWMInfo(oids, pmNumber, emDbRootHwmInfosVec);
+    }
+    catch (exception& e)
+    {
+        cerr << e.what() << endl;
+        return ERR_FAILURE;
+    }
+
+    return ERR_OK;
+}
+
 //------------------------------------------------------------------------------
 // For the specified OID and PM number, this function will return a vector
 // of objects carrying HWM info (for the last segment file) and block count

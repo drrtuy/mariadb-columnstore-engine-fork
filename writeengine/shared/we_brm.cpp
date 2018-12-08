@@ -42,7 +42,6 @@ using namespace boost;
 #include "we_colopcompress.h"
 #include "we_dctnrycompress.h"
 #include "we_simplesyslog.h"
-#include "we_config.h"
 #include "IDBDataFile.h"
 #include "IDBPolicy.h"
 using namespace idbdatafile;

@@ -448,6 +448,19 @@ public:
 
     EXPORT int bulkUpdateDBRoot(const std::vector<BulkUpdateDBRootArg>&);
 
+    /** @brief Template
+     *  assigned to a specific PM.
+     *
+     * Vector will contain an entry for each DBRoot.  If no "available" extents
+     * are found for a DBRoot, then totalBlocks will be 0 (and hwmExtentIndex
+     * will be -1) for that DBRoot.
+     * @param oid The oid of interest.
+     * @param pmNumber The PM number of interest.
+     * @param emDbRootHwmInfos The vector of DbRoot/HWM related objects.
+     */
+    EXPORT int bulkGetDbRootHWMInfo(std::vector<int> oids, uint16_t pmNumber,
+        std::vector<BRM::EmDbRootHWMInfo_v>& emDbRootHwmInfosVec);
+
     /** @brief Get HWM information about last segment file for each DBRoot
      *  assigned to a specific PM.
      *
