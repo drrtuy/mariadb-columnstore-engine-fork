@@ -664,7 +664,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     oss11 << "Initializing import: " <<
           "Table-" << job.jobTableList[tableNo].tblName << "...";
     fLog.logMsg( oss11.str(), MSGLVL_INFO2 );
-    startTimer();
+    //startTimer();
     rc = saveBulkRollbackMetaData( job, tableInfo, segFileInfo,
                                    dbRootHWMInfoColVec );
 
@@ -672,8 +672,8 @@ int BulkLoad::preProcess( Job& job, int tableNo,
     {
         return rc;
     }
-    stopTimer();
-    cerr << getTotalRunTime() << " saveBulkRollbackMetaData seconds" << endl;
+    //stopTimer();
+    //cerr << getTotalRunTime() << " saveBulkRollbackMetaData seconds" << endl;
     //--------------------------------------------------------------------------
     // Third loop thru the columns for the "tableNo" table in jobTableList[].
     // In this pass through the columns we create the ColumnInfo object,

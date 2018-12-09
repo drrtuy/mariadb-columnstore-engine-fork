@@ -181,7 +181,7 @@ void RBMetaWriter::saveBulkRollbackMetaData(
             std::string metaFileName = openMetaFile( dbRoots[m] );
             bOpenedFile    = true;
             fCreatedSubDir = false;
-
+            startTimer();
             // Loop through the columns in the specified table
             for ( size_t i = 0; i < columns.size(); i++ )
             {
@@ -349,7 +349,8 @@ void RBMetaWriter::saveBulkRollbackMetaData(
                 }
 
             }         // End of loop through columns
-
+            stopTimer();
+            std::cerr << getTotalRunTime() << " saveBulkRollbackMetaData loop seconds" << std::endl;
             // time to dump the string stream to file
             std::string data(fMetaDataStream.str());
 
@@ -360,6 +361,7 @@ void RBMetaWriter::saveBulkRollbackMetaData(
             size_t      w = 0;            // total bytes written so far
             ssize_t     n = 0;            // bytes written in one write
 
+            startTimer();
             for (int i = 0; i < 10 && w < s; i++)
             {
                 n = fMetaDataFile->write(p + w, s - w);
@@ -383,10 +385,13 @@ void RBMetaWriter::saveBulkRollbackMetaData(
             fMetaDataStream.str("");
             closeMetaFile( );
             bOpenedFile = false;
-
-        }   // End of loop through DBRoot HWMs for this PM
-
+            stopTimer();
+            std::cerr << getTotalRunTime() << " saveBulkRollbackMetaData write seconds" << std::endl;
+        }   // End of3d loop through DBRoot HWMs for this PM
+        startTimer();
         renameMetaFile( ); // rename meta files from temporary filenames
+        stopTimer();
+        std::cerr << getTotalRunTime() << " saveBulkRollbackMetaData rename seconds" << std::endl;
     }
     catch (WeException& ex) // catch exception to close file, then rethrow
     {

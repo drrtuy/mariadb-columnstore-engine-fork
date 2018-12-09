@@ -140,6 +140,27 @@ class RBMetaWriter
 {
 public:
 
+    timeval     fStartTime;                // job start time
+    timeval     fEndTime;                  // job end time
+    double      fTotalTime;                // elapsed time for current phase
+    
+inline void startTimer( )
+{
+    gettimeofday( &fStartTime, 0 );
+}
+
+inline void stopTimer()
+{
+    gettimeofday( &fEndTime, 0 );
+    fTotalTime = (fEndTime.tv_sec   + (fEndTime.tv_usec   / 1000000.0)) -
+                 (fStartTime.tv_sec + (fStartTime.tv_usec / 1000000.0));
+}
+
+inline double  getTotalRunTime() const
+{
+    return fTotalTime;
+}
+
     /** @brief RBMetaWriter constructor
      * @param appDesc Description of application that is using RBMetaWriter
      * @param logger Logger to be used for logging messages.
