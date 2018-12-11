@@ -730,12 +730,13 @@ int BulkLoad::preProcess( Job& job, int tableNo,
                 fixedBinaryRecLen += info->column.definedWidth;
             }
         }
-
+        
+        int widthFactor = info->column.width / minWidth;
         // Skip minimum blocks before starting import; minwidth columns skip to
         // next block.  Wider columns skip based on multiple of width. If this
         // skipping of blocks requires a new extent, then we extend the column.
-        HWM hwm = (minHWM + 1) * ( info->column.width / minWidth );
-        info->relativeColWidthFactor( info->column.width / minWidth );
+        HWM hwm = (minHWM + 1) * ( widthFactor );
+        info->relativeColWidthFactor( widthFactor );
 
         if ((bEmptyPM) || (bNoStartExtentOnThisPM))
         {
@@ -764,7 +765,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
             // Pass blocks to be skipped at start of file "if" we decide to
             // employ block skipping for the first extent.
-            hwm = info->column.width / minWidth;
+            hwm = widthFactor;
 
             // We don't have a starting DB file on this PM, or the starting HWM
             // extent is disabled.  In either case, we will wait and create a
@@ -795,7 +796,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
 
         tableInfo->addColumn(info);
 
-    } // end of 2nd for-loop through the list of columns
+    } // end of 3dd for-loop through the list of columns
     stopTimer();
     cerr << getTotalRunTime() << " 3d loop seconds" << endl;
 

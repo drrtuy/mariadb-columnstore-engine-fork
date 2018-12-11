@@ -1141,7 +1141,7 @@ int main(int argc, char** argv)
         if (!BRMWrapper::getInstance()->isSystemReady())
         {
             startupError( std::string(
-                              "System is not ready.  Verify that InfiniDB is up and ready "
+                              "System is not ready.  Verify that MCS is up and ready "
                               "before running cpimport."), false );
         }
 
