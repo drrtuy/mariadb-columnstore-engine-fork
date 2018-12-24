@@ -527,7 +527,7 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 
     int colDataType = (pRowGroup->getColTypes())[col];
 
-    switch (colDataType)
+    /*switch (colDataType)
     {
         case execplan::CalpontSystemCatalog::TINYINT:
         {
@@ -624,13 +624,13 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
             ret = ((uint32_t)row.getUintField(col) == joblist::DATENULL);
             break;
         }
-
-        case execplan::CalpontSystemCatalog::BIGINT:
+        */
+        //case execplan::CalpontSystemCatalog::BIGINT:
         {
             ret = ((uint64_t)row.getIntField(col) == joblist::BIGINTNULL);
-            break;
+            //break;
         }
-
+/*
         case execplan::CalpontSystemCatalog::UBIGINT:
         {
             ret = ((uint64_t)row.getIntField(col) == joblist::UBIGINTNULL);
@@ -676,7 +676,7 @@ inline bool RowAggregation::isNull(const RowGroup* pRowGroup, const Row& row, in
 
         default:
             break;
-    }
+    }*/
 
     return ret;
 }

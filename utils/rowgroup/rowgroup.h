@@ -699,8 +699,8 @@ inline int64_t Row::getIntField(uint32_t colIndex) const
 
 inline int64_t Row::getIntField(uint32_t colIndex) const
 {
-    /* I think the compiler will optimize away the switch stmt */
-    switch (getColumnWidth(colIndex))
+    // I think the compiler will optimize away the switch stmt 
+/*    switch (getColumnWidth(colIndex))
     {
         case 1:
             return (int8_t) data[offsets[colIndex]];
@@ -710,14 +710,14 @@ inline int64_t Row::getIntField(uint32_t colIndex) const
 
         case 4:
             return *((int32_t*) &data[offsets[colIndex]]);
-
-        case 8:
+*/
+      //  case 8:
             return *((int64_t*) &data[offsets[colIndex]]);
 
-        default:
+        /*default:
             idbassert(0);
-            throw std::logic_error("Row::getIntField(): bad length.");
-    }
+            throw std::logic_error("Row::getIntField(): bad length.");*/
+    //}
 }
 
 inline const uint8_t* Row::getStringPointer(uint32_t colIndex) const
@@ -988,7 +988,7 @@ inline void Row::setIntField(int64_t val, uint32_t colIndex)
 
 inline void Row::setIntField(int64_t val, uint32_t colIndex)
 {
-    switch (getColumnWidth(colIndex))
+    /*switch (getColumnWidth(colIndex))
     {
         case 1:
             *((int8_t*) &data[offsets[colIndex]]) = val;
@@ -1001,15 +1001,15 @@ inline void Row::setIntField(int64_t val, uint32_t colIndex)
         case 4:
             *((int32_t*) &data[offsets[colIndex]]) = val;
             break;
-
-        case 8:
+    */
+        //case 8:
             *((int64_t*) &data[offsets[colIndex]]) = val;
-            break;
-
+      //      break;
+/*
         default:
             idbassert(0);
             throw std::logic_error("Row::setIntField: bad length");
-    }
+    }*/
 }
 
 inline void Row::setDoubleField(double val, uint32_t colIndex)
