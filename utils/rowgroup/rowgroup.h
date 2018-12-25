@@ -1183,8 +1183,8 @@ inline bool Row::equals(const Row& r2, const std::vector<uint32_t>& keyCols) con
 
 inline bool Row::equals(const Row& r2, uint32_t lastCol) const
 {
-    if (lastCol >= columnCount)
-        return true;
+    //if (lastCol >= columnCount)
+    //    return true;
 
     if (!useStringTable && !r2.useStringTable)
         return !(memcmp(&data[offsets[0]], &r2.data[offsets[0]], offsets[lastCol + 1] - offsets[0]));

@@ -101,6 +101,8 @@ uint64_t LimitedOrderBy::getKeyLength() const
 
 void LimitedOrderBy::processRow(const rowgroup::Row& row)
 {
+
+    //ordering::IdbOrderBy::DistinctMap_t::iterator it = fDistinctMap->find(row.getPointer());
     // check if this is a distinct row
     if (fDistinct && fDistinctMap->find(row.getPointer()) != fDistinctMap->end())
         return;
@@ -108,6 +110,8 @@ void LimitedOrderBy::processRow(const rowgroup::Row& row)
     // @bug5312, limit count is 0, do nothing.
     if (fCount == 0)
         return;
+
+    //cerr << "LimitedOrderBy::processRow " << row.toString() << endl;
 
     // if the row count is less than the limit
     if (fOrderByQueue.size() < fStart + fCount)
@@ -150,23 +154,31 @@ void LimitedOrderBy::processRow(const rowgroup::Row& row)
     {
         OrderByRow swapRow = fOrderByQueue.top();
         row1.setData(swapRow.fData);
-        fOrderByQueue.pop();
+        //fOrderByQueue.pop();
 
-        if (!fDistinct)
+        copyRow(row, &row1);
+
+        /*if (!fDistinct)
         {
             copyRow(row, &row1);
             //memcpy(swapRow.fData, row.getData(), row.getSize());
-        }
+        }*
         else
+        */
+        if (fDistinct)
         {
-            fDistinctMap->erase(row.getPointer());
-            copyRow(row, &row1);
+            //fDistinctMap->erase(row.getPointer());
+            //copyRow(row, &row1);
+            fDistinctMap->erase(fOrderByQueue.top().fData);
             fDistinctMap->insert(row1.getPointer());
             //fDistinctMap->erase(fDistinctMap->find(row.getData() + 2));
             //memcpy(swapRow.fData, row.getData(), row.getSize());
             //fDistinctMap->insert(make_pair((swapRow.fData+2), swapRow.fData));
+            //cerr << "LimitedOrderBy::processRow row in else if " << row.toString() << endl;
+            //cerr << "LimitedOrderBy::processRow row1 in else if " << row1.toString() << endl;
         }
 
+        fOrderByQueue.pop();
         fOrderByQueue.push(swapRow);
     }
 }
@@ -228,6 +240,7 @@ void LimitedOrderBy::finalize()
             const OrderByRow& topRow = fOrderByQueue.top();
             row1.setData(topRow.fData);
             copyRow(row1, &fRow0);
+            //cerr << "LimitedOrderBy::finalize fRow0 " << fRow0.toString() << endl;
             fRowGroup.incRowCount();
             offset--;
             fRow0.prevRow(rSize);

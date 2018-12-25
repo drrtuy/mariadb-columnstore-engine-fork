@@ -461,7 +461,8 @@ uint64_t IdbOrderBy::Hasher::operator()(const Row::Pointer& p) const
 {
     Row& row = ts->row1;
     row.setPointer(p);
-    uint64_t ret = row.hash(colCount);
+    //MCOL-1829 Row::h uses colcount as an array idx down a callstack.
+    uint64_t ret = row.hash();//(colCount - 1);
     //cout << "hash(): returning " << ret << " for row: " << row.toString() << endl;
     return ret;
 }
