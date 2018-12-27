@@ -48,6 +48,7 @@ using namespace std;
 #include <boost/tokenizer.hpp>
 using namespace boost;
 
+#include "mcs_sysvars.h"
 #include "idb_mysql.h"
 
 #include "ha_calpont_impl_if.h"
@@ -2117,7 +2118,7 @@ int ha_calpont_impl_create_(const char* name, TABLE* table_arg, HA_CREATE_INFO* 
         return 1;
     }
 
-    int compressiontype = thd->variables.infinidb_compression_type;
+    int compressiontype = get_compression_type(thd);
 
     if (compressiontype == 1) compressiontype = 2;
 
@@ -2129,7 +2130,7 @@ int ha_calpont_impl_create_(const char* name, TABLE* table_arg, HA_CREATE_INFO* 
     }
 
     if ( compressiontype == MAX_INT )
-        compressiontype = thd->variables.infinidb_compression_type;
+        compressiontype = get_compression_type(thd);
     else if ( compressiontype < 0 )
     {
         string emsg = IDBErrorInfo::instance()->errorMsg(ERR_INVALID_COMPRESSION_TYPE);
@@ -2504,12 +2505,12 @@ extern "C"
         if ( thd->db.length )
             db = thd->db.str;
 
-        int compressiontype = thd->variables.infinidb_compression_type;
+        int compressiontype = get_compression_type(thd);
 
         if (compressiontype == 1) compressiontype = 2;
 
         if ( compressiontype == MAX_INT )
-            compressiontype = thd->variables.infinidb_compression_type;
+            compressiontype = get_compression_type(thd);
 
         //hdfs
         if ((compressiontype == 0) && (useHdfs))
