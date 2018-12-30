@@ -931,10 +931,10 @@ void makeUpdateSemiJoin(const ParseTree* n, void* obj)
 
 uint32_t doUpdateDelete(THD* thd)
 {
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     //@bug 5660. Error out DDL/DML on slave node, or on local query node
     if (ci->isSlaveNode && !thd->slave_thread)
@@ -1984,10 +1984,10 @@ extern "C"
     {
         THD* thd = current_thd;
 
-        if (!thd->infinidb_vtable.cal_conn_info)
-            thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+        if (get_fe_conn_info_ptr() == NULL)
+            set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
         unsigned long l = ci->queryStats.size();
 
@@ -2036,10 +2036,10 @@ extern "C"
     {
         THD* thd = current_thd;
 
-        if (!thd->infinidb_vtable.cal_conn_info)
-            thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+        if (get_fe_conn_info_ptr() == NULL)
+            set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
         long long oldTrace = ci->traceFlags;
         ci->traceFlags = (uint32_t)(*((long long*)args->args[0]));
@@ -2394,10 +2394,10 @@ extern "C"
     {
         THD* thd = current_thd;
 
-        if (!thd->infinidb_vtable.cal_conn_info)
-            thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+        if (get_fe_conn_info_ptr() == NULL)
+            set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
         CalpontSystemCatalog::TableName tableName;
 
         if ( args->arg_count == 2 )
@@ -2467,11 +2467,11 @@ extern "C"
     {
         THD* thd = current_thd;
 
-        if (!thd->infinidb_vtable.cal_conn_info)
-            thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+        if (get_fe_conn_info_ptr() == NULL)
+            set_fe_conn_info_ptr((void*)new cal_connection_info());
 
         cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(
-                                      thd->infinidb_vtable.cal_conn_info);
+                                      get_fe_conn_info_ptr());
         long long lockID = *reinterpret_cast<long long*>(args->args[0]);
 
         if ( !ci->dmlProc )
@@ -2646,10 +2646,10 @@ extern "C"
             }
         }
 
-        if (!thd->infinidb_vtable.cal_conn_info)
-            thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+        if (get_fe_conn_info_ptr() == NULL)
+            set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
         if (flags > 0)
             //msgp = &connMap[sessionID].extendedStats;
@@ -2742,10 +2742,10 @@ extern "C"
     {
         THD* thd = current_thd;
 
-        if (!thd->infinidb_vtable.cal_conn_info)
-            thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+        if (get_fe_conn_info_ptr() == NULL)
+            set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+        cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
         idbassert(ci != 0);
 
         MessageQueueClient* mqc = 0;
@@ -2833,14 +2833,8 @@ int ha_calpont_impl_discover_existence(const char* schema, const char* name)
     return 0;
 }
 
-int ha_calpont_impl_rnd_init(TABLE* table, mcs_handler_info hndtl_ptr)
+int ha_calpont_impl_rnd_init(TABLE* table)
 {
-    ha_calpont* handler;
-    if ( hndtl_ptr.hndl_type == LEGACY )
-    {
-        handler = reinterpret_cast<ha_calpont*>(hndtl_ptr.hndl_ptr);
-    }
-    
 #ifdef DEBUG_SETENV
     string home(getenv("HOME"));
 
@@ -2939,10 +2933,10 @@ int ha_calpont_impl_rnd_init(TABLE* table, mcs_handler_info hndtl_ptr)
     boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
     csc->identity(CalpontSystemCatalog::FE);
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     idbassert(ci != 0);
 
@@ -3478,10 +3472,10 @@ int ha_calpont_impl_rnd_next(uchar* buf, TABLE* table)
         return ER_INTERNAL_ERROR;
     }
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     // @bug 3078
     if (thd->killed == KILL_QUERY || thd->killed == KILL_QUERY_HARD)
@@ -3579,8 +3573,8 @@ int ha_calpont_impl_rnd_end(TABLE* table)
 
     thd->infinidb_vtable.isNewQuery = true;
 
-    if (thd->infinidb_vtable.cal_conn_info)
-        ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    if (get_fe_conn_info_ptr() != NULL)
+        ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ORDER_BY )
     {
@@ -3628,8 +3622,8 @@ int ha_calpont_impl_rnd_end(TABLE* table)
 
     if (!ci)
     {
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
-        ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
+        ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
     }
 
     // @bug 3078. Also session limit variable works the same as ctrl+c
@@ -3749,10 +3743,10 @@ int ha_calpont_impl_create(const char* name, TABLE* table_arg, HA_CREATE_INFO* c
 {
     THD* thd = current_thd;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     // @bug1940 Do nothing for select query. Support of set default engine to IDB.
     if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE ||
@@ -3798,10 +3792,10 @@ int ha_calpont_impl_delete_table(const char* name)
     if (string(name).find("@0024vtable") != string::npos)
         return 0;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if (!thd) return 0;
 
@@ -3874,10 +3868,10 @@ int ha_calpont_impl_write_row(uchar* buf, TABLE* table)
         }
     }
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if (thd->slave_thread) return 0;
 
@@ -3920,10 +3914,10 @@ int ha_calpont_impl_update_row()
     //@Bug 2540. Return the correct error code.
     THD* thd = current_thd;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
     int rc = ci->rc;
 
     if ( rc != 0 )
@@ -3937,10 +3931,10 @@ int ha_calpont_impl_delete_row()
     //@Bug 2540. Return the correct error code.
     THD* thd = current_thd;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
     int rc = ci->rc;
 
     if ( rc != 0 )
@@ -3953,10 +3947,10 @@ void ha_calpont_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 {
     THD* thd = current_thd;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     // clear rows variable
     ci->rowsHaveInserted = 0;
@@ -4521,10 +4515,10 @@ int ha_calpont_impl_end_bulk_insert(bool abort, TABLE* table)
 
     std::string aTmpDir(startup::StartUp::tmpDir());
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if (thd->slave_thread) return 0;
 
@@ -4779,10 +4773,10 @@ int ha_calpont_impl_commit (handlerton* hton, THD* thd, bool all)
             thd->infinidb_vtable.vtable_state == THD::INFINIDB_REDO_PHASE1)
         return 0;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if (ci->isAlter)
         return 0;
@@ -4820,10 +4814,10 @@ int ha_calpont_impl_rollback (handlerton* hton, THD* thd, bool all)
     //	return 0;
     //}
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if ( !ci->dmlProc )
     {
@@ -4850,10 +4844,10 @@ int ha_calpont_impl_close_connection (handlerton* hton, THD* thd)
 
     execplan::CalpontSystemCatalog::removeCalpontSystemCatalog(tid2sid(thd->thread_id));
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if (!ci) return 0;
 
@@ -4880,10 +4874,10 @@ int ha_calpont_impl_rename_table(const char* from, const char* to)
     IDEBUG( cout << "ha_calpont_impl_rename_table: " << from << " => " << to << endl );
     THD* thd = current_thd;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     //@Bug 1948. Alter table call rename table twice
     if ( ci->alterTableState == cal_connection_info::ALTER_FIRST_RENAME )
@@ -4931,10 +4925,10 @@ COND* ha_calpont_impl_cond_push(COND* cond, TABLE* table)
     alias.assign(table->alias.ptr(), table->alias.length());
     IDEBUG( cout << "ha_calpont_impl_cond_push: " << alias << endl );
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     cal_table_info ti = ci->tableMap[table];
 
@@ -5012,10 +5006,10 @@ int ha_calpont_impl_external_lock(THD* thd, TABLE* table, int lock_type)
     if ( thd->infinidb_vtable.vtable_state == THD::INFINIDB_INIT  )
         return 0;
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     if (thd->killed == KILL_QUERY || thd->killed == KILL_QUERY_HARD)
     {
@@ -5177,10 +5171,10 @@ int ha_calpont_impl_group_by_init(ha_calpont_group_by_handler* group_hand, TABLE
     boost::shared_ptr<CalpontSystemCatalog> csc = CalpontSystemCatalog::makeCalpontSystemCatalog(sessionID);
     csc->identity(CalpontSystemCatalog::FE);
 
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     idbassert(ci != 0);
 
@@ -5679,10 +5673,10 @@ int ha_calpont_impl_group_by_next(ha_calpont_group_by_handler* group_hand, TABLE
         return ER_INTERNAL_ERROR;
     }
     */
-    if (!thd->infinidb_vtable.cal_conn_info)
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
+    if (get_fe_conn_info_ptr() == NULL)
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
 
-    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    cal_connection_info* ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     // @bug 3078
     if (thd->killed == KILL_QUERY || thd->killed == KILL_QUERY_HARD)
@@ -5783,8 +5777,8 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
     thd->infinidb_vtable.isNewQuery = true;
     thd->infinidb_vtable.isUnion = false;
 
-    if (thd->infinidb_vtable.cal_conn_info)
-        ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+    if (get_fe_conn_info_ptr() != NULL)
+        ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
     // MCOL-1052
     //if (thd->infinidb_vtable.vtable_state == THD::INFINIDB_ORDER_BY )
@@ -5821,8 +5815,8 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
 
     if (!ci)
     {
-        thd->infinidb_vtable.cal_conn_info = (void*)(new cal_connection_info());
-        ci = reinterpret_cast<cal_connection_info*>(thd->infinidb_vtable.cal_conn_info);
+        set_fe_conn_info_ptr((void*)new cal_connection_info());
+        ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
     }
 
     // @bug 3078. Also session limit variable works the same as ctrl+c
