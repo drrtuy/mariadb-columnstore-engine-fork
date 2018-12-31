@@ -350,8 +350,12 @@ void Convertor::convertColType(CalpontSystemCatalog::ColDataType dataType,
             internalType = WriteEngine::WR_SHORT;
             break;
 
-        // Map MEDINT, INT, and DATE to WR_INT
+        // Map MEDINT to WR_MEDINT
         case CalpontSystemCatalog::MEDINT :
+            internalType = WriteEngine::WR_MEDINT;
+            break;
+
+        // Map INT, and DATE to WR_INT
         case CalpontSystemCatalog::INT :
         case CalpontSystemCatalog::DATE :
             internalType = WriteEngine::WR_INT;
@@ -415,8 +419,12 @@ void Convertor::convertColType(CalpontSystemCatalog::ColDataType dataType,
             internalType = WriteEngine::WR_USHORT;
             break;
 
-        // Map UMEDINT and UINT to WR_UINT
+        // Map UMEDINT to WR_UMEDINT
         case CalpontSystemCatalog::UMEDINT:
+            internalType = WriteEngine::WR_UMEDINT;
+            break;
+
+        // Map UINT to WR_UINT
         case CalpontSystemCatalog::UINT:
             internalType = WriteEngine::WR_UINT;
             break;
@@ -458,7 +466,12 @@ void Convertor::convertWEColType(ColType internalType,
             dataType = CalpontSystemCatalog::SMALLINT;
             break;
 
-        // Map MEDINT, INT, and DATE to WR_INT
+        // Map MEDINT to WR_MEDINT
+        case WriteEngine::WR_MEDINT :
+            dataType = CalpontSystemCatalog::MEDINT;
+            break;
+
+        // Map INT, and DATE to WR_INT
         case WriteEngine::WR_INT :
             dataType = CalpontSystemCatalog::INT;
             break;
@@ -508,7 +521,12 @@ void Convertor::convertWEColType(ColType internalType,
             dataType = CalpontSystemCatalog::USMALLINT;
             break;
 
-        // Map UMEDINT and UINT to WR_UINT
+        // Map UMEDINT to WR_UMEDINT
+        case WriteEngine::WR_UMEDINT:
+            dataType = CalpontSystemCatalog::UMEDINT;
+            break;
+
+        // Map UINT to WR_UINT
         case WriteEngine::WR_UINT:
             dataType = CalpontSystemCatalog::UINT;
             break;
@@ -560,8 +578,12 @@ void Convertor::convertColType(ColStruct* curStruct)
             *internalType = WriteEngine::WR_SHORT;
             break;
 
-        // Map MEDINT, INT, and DATE to WR_INT
+        // Map MEDINT to WR_MEDINT
         case CalpontSystemCatalog::MEDINT :
+            *internalType = WriteEngine::WR_MEDINT;
+            break;
+
+        // Map INT, and DATE to WR_INT
         case CalpontSystemCatalog::INT :
         case CalpontSystemCatalog::DATE :
             *internalType = WriteEngine::WR_INT;
@@ -644,8 +666,12 @@ void Convertor::convertColType(ColStruct* curStruct)
             *internalType = WriteEngine::WR_USHORT;
             break;
 
-        // Map UMEDINT and UINT to WR_UINT
+        // Map UMEDINT to WR_UMEDINT
         case CalpontSystemCatalog::UMEDINT:
+            *internalType = WriteEngine::WR_UMEDINT;
+            break;
+
+        // Map UINT to WR_UINT
         case CalpontSystemCatalog::UINT:
             *internalType = WriteEngine::WR_UINT;
             break;

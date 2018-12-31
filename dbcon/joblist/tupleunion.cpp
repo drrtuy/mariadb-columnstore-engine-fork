@@ -1186,6 +1186,7 @@ void TupleUnion::writeNull(Row* out, uint32_t col)
             out->setUintField<4>(joblist::INTNULL, col);
             break;
 
+        case CalpontSystemCatalog::UMEDINT:
         case CalpontSystemCatalog::UINT:
             out->setUintField<4>(joblist::UINTNULL, col);
             break;
