@@ -89,6 +89,41 @@ namespace rowgroup
 #pragma warning (disable : 4200)
 #endif
 
+void setIntField1(const Row *r, int64_t val, uint32_t colIndex);
+void setIntField2(const Row *r, int64_t val, uint32_t colIndex);
+void setIntField4(const Row *r, int64_t val, uint32_t colIndex);
+void setIntField8(const Row *r, int64_t val, uint32_t colIndex);
+int64_t getIntField1(const Row *r, uint32_t colIndex);
+int64_t getIntField2(const Row *r, uint32_t colIndex);
+int64_t getIntField4(const Row *r, uint32_t colIndex);
+int64_t getIntField8(const Row *r, uint32_t colIndex);
+
+static int64_t (*getFuncPtrs[])(const Row*, uint32_t) = {
+    NULL,
+    &getIntField1,
+    &getIntField2,
+    NULL,
+    &getIntField4,
+    NULL,
+    NULL,
+    NULL,
+    &getIntField8,
+    NULL
+};
+
+static void (*setFuncPtrs[])(const Row*, int64_t, uint32_t) = {
+    NULL,
+    &setIntField1,
+    &setIntField2,
+    NULL,
+    &setIntField4,
+    NULL,
+    NULL,
+    NULL,
+    &setIntField8,
+    NULL
+};
+
 class StringStore
 {
 public:
@@ -313,6 +348,7 @@ public:
     // if a string table is being used, getRealSize() takes into account variable-length strings
     inline uint32_t getRealSize() const;
     inline uint32_t getOffset(uint32_t colIndex) const;
+    inline uint32_t* getOffsets() const;
     inline uint32_t getScale(uint32_t colIndex) const;
     inline uint32_t getPrecision(uint32_t colIndex) const;
     inline execplan::CalpontSystemCatalog::ColDataType getColType(uint32_t colIndex) const;
@@ -483,6 +519,11 @@ inline uint8_t* Row::getData() const
 {
     return data;
 }
+inline uint32_t* Row::getOffsets() const
+{
+    return offsets;
+}
+
 
 inline void Row::setPointer(const Pointer& p)
 {
@@ -700,7 +741,7 @@ inline int64_t Row::getIntField(uint32_t colIndex) const
 inline int64_t Row::getIntField(uint32_t colIndex) const
 {
     /* I think the compiler will optimize away the switch stmt */
-    switch (getColumnWidth(colIndex))
+    /*switch (getColumnWidth(colIndex))
     {
         case 1:
             return (int8_t) data[offsets[colIndex]];
@@ -717,7 +758,8 @@ inline int64_t Row::getIntField(uint32_t colIndex) const
         default:
             idbassert(0);
             throw std::logic_error("Row::getIntField(): bad length.");
-    }
+    }*/
+    return getFuncPtrs[getColumnWidth(colIndex)](this, colIndex);
 }
 
 inline const uint8_t* Row::getStringPointer(uint32_t colIndex) const
@@ -988,7 +1030,7 @@ inline void Row::setIntField(int64_t val, uint32_t colIndex)
 
 inline void Row::setIntField(int64_t val, uint32_t colIndex)
 {
-    switch (getColumnWidth(colIndex))
+    /*switch (getColumnWidth(colIndex))
     {
         case 1:
             *((int8_t*) &data[offsets[colIndex]]) = val;
@@ -1009,7 +1051,8 @@ inline void Row::setIntField(int64_t val, uint32_t colIndex)
         default:
             idbassert(0);
             throw std::logic_error("Row::setIntField: bad length");
-    }
+    }*/
+    setFuncPtrs[getColumnWidth(colIndex)](this, val, colIndex);
 }
 
 inline void Row::setDoubleField(double val, uint32_t colIndex)

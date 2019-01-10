@@ -50,6 +50,52 @@ using namespace execplan;
 namespace rowgroup
 {
 
+// Int setters
+void setIntField1(const Row *r, int64_t val, uint32_t colIndex)
+{
+    *((int8_t*) &(r->getData()[r->getOffsets()[colIndex]])) = val;
+}
+
+
+void setIntField2(const Row *r, int64_t val, uint32_t colIndex)
+{
+    *((int16_t*) &(r->getData()[r->getOffsets()[colIndex]])) = val;
+}
+
+
+void setIntField4(const Row *r, int64_t val, uint32_t colIndex)
+{
+    *((int32_t*) &(r->getData()[r->getOffsets()[colIndex]])) = val;
+}
+
+
+void setIntField8(const Row *r, int64_t val, uint32_t colIndex)
+{
+    *((int64_t*) &(r->getData()[r->getOffsets()[colIndex]])) = val;
+}
+
+// getters
+
+int64_t getIntField1(const Row *r, uint32_t colIndex)
+{
+    return ((int8_t) (r->getData()[r->getOffsets()[colIndex]]));
+}
+
+int64_t getIntField2(const Row *r, uint32_t colIndex)
+{
+    return *((int16_t*) &(r->getData()[r->getOffsets()[colIndex]]));
+}
+
+int64_t getIntField4(const Row *r, uint32_t colIndex)
+{
+    return *((int32_t*) &(r->getData()[r->getOffsets()[colIndex]]));
+}
+
+int64_t getIntField8(const Row *r, uint32_t colIndex)
+{
+    return *((int64_t*) &(r->getData()[r->getOffsets()[colIndex]]));
+}
+
 StringStore::StringStore() : empty(true), fUseStoreStringMutex(false) { }
 
 StringStore::StringStore(const StringStore&)
