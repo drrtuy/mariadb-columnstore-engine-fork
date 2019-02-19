@@ -1303,8 +1303,8 @@ uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
             {
                 if (gwi.thd->derived_tables_processing)
                 {
-                    gwi.thd->infinidb_vtable.isUnion = false;
-                    gwi.thd->infinidb_vtable.isUpdateWithDerive = true;
+                    gwi.MIGR::infinidb_vtable.isUnion = false;
+                    gwi.MIGR::infinidb_vtable.isUpdateWithDerive = true;
                     return -1;
                 }
             }
@@ -2606,8 +2606,8 @@ void setError(THD* thd, uint32_t errcode, string errmsg)
     }
 
     thd->raise_error_printf(errcode, errmsg.c_str());
-    thd->infinidb_vtable.isNewQuery = true;
-    thd->infinidb_vtable.override_largeside_estimate = false;
+    MIGR::infinidb_vtable.isNewQuery = true;
+    MIGR::infinidb_vtable.override_largeside_estimate = false;
 
     // reset expressionID
     if (get_fe_conn_info_ptr() == NULL)
@@ -5483,7 +5483,7 @@ void gp_walk(const Item* item, void* arg)
                 gwip->hasSubSelect = true;
                 gwip->subQuery = existsSub;
                 gwip->ptWorkStack.push(existsSub->transform());
-                current_thd->infinidb_vtable.isUnion = true; // only temp. bypass the 2nd phase.
+                current_MIGR::infinidb_vtable.isUnion = true; // only temp. bypass the 2nd phase.
                 // recover original
                 gwip->subQuery = orig;
                 gwip->lastSub = existsSub;
@@ -5840,7 +5840,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
             ((gwi.thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) ||
             ((gwi.thd->lex)->sql_command == SQLCOM_DELETE_MULTI ) ) && gwi.thd->derived_tables_processing)
     {
-        gwi.thd->infinidb_vtable.isUnion = false;
+        gwi.MIGR::infinidb_vtable.isUnion = false;
         return -1;
     }
 
@@ -5887,7 +5887,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
 
     // @bug 2123. Override large table estimate if infinidb_ordered hint was used.
     // @bug 2404. Always override if the infinidb_ordered_only variable is turned on.
-    if (gwi.thd->infinidb_vtable.override_largeside_estimate || get_ordered_only(gwi.thd))
+    if (gwi.MIGR::infinidb_vtable.override_largeside_estimate || get_ordered_only(gwi.thd))
         csep->overrideLargeSideEstimate(true);
 
     // @bug 5741. Set a flag when in Local PM only query mode
@@ -5973,7 +5973,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
                 gwi.tbList.push_back(tn);
                 CalpontSystemCatalog::TableAliasName tan = make_aliastable("", alias, alias);
                 gwi.tableMap[tan] = make_pair(0, table_ptr);
-                gwi.thd->infinidb_vtable.isUnion = true; //by-pass the 2nd pass of rnd_init
+                gwi.MIGR::infinidb_vtable.isUnion = true; //by-pass the 2nd pass of rnd_init
             }
             else if (table_ptr->view)
             {
@@ -6044,7 +6044,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     // is_unit_op() give a segv for derived_handler's SELECT_LEX
     if (!isUnion && select_lex.master_unit()->is_unit_op())
     {
-        gwi.thd->infinidb_vtable.isUnion = true;
+        gwi.MIGR::infinidb_vtable.isUnion = true;
         CalpontSelectExecutionPlan::SelectList unionVec;
         SELECT_LEX* select_cursor = select_lex.master_unit()->first_select();
         unionSel = true;
@@ -6103,7 +6103,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
         csep->distinctUnionNum(distUnionNum);
 
         if (unionVec.empty())
-            gwi.thd->infinidb_vtable.impossibleWhereOnUnion = true;
+            gwi.MIGR::infinidb_vtable.impossibleWhereOnUnion = true;
     }
 
     gwi.clauseType = WHERE;
@@ -6136,8 +6136,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
             // processing.
             if (gwi.thd->derived_tables_processing)
             {
-                gwi.thd->infinidb_vtable.isUnion = false;
-                gwi.thd->infinidb_vtable.isUpdateWithDerive = true;
+                gwi.MIGR::infinidb_vtable.isUnion = false;
+                gwi.MIGR::infinidb_vtable.isUpdateWithDerive = true;
                 return -1;
             }
 
@@ -6989,7 +6989,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     SRCP minSc;             // min width projected column. for count(*) use
 
     // Group by list. not valid for union main query
-    if (gwi.thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE && !unionSel)
+    if (gwi.MIGR::infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE && !unionSel)
     {
         gwi.clauseType = GROUP_BY;
         Item* nonSupportItem = NULL;
@@ -7266,14 +7266,14 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
         }
     }
 
-    if (gwi.thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE)
+    if (gwi.MIGR::infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE)
     {
         SQL_I_List<ORDER> order_list = select_lex.order_list;
         ORDER* ordercol = reinterpret_cast<ORDER*>(order_list.first);
-        string create_query(gwi.thd->infinidb_vtable.create_vtable_query.c_ptr());
-        string select_query(gwi.thd->infinidb_vtable.select_vtable_query.c_ptr());
-        string lower_create_query(gwi.thd->infinidb_vtable.create_vtable_query.c_ptr());
-        string lower_select_query(gwi.thd->infinidb_vtable.select_vtable_query.c_ptr());
+        string create_query(gwi.MIGR::infinidb_vtable.create_vtable_query.c_ptr());
+        string select_query(gwi.MIGR::infinidb_vtable.select_vtable_query.c_ptr());
+        string lower_create_query(gwi.MIGR::infinidb_vtable.create_vtable_query.c_ptr());
+        string lower_select_query(gwi.MIGR::infinidb_vtable.select_vtable_query.c_ptr());
         boost::algorithm::to_lower(lower_create_query);
         boost::algorithm::to_lower(lower_select_query);
 
@@ -7844,9 +7844,9 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
                 }
 
 
-                gwi.thd->infinidb_vtable.create_vtable_query.free();
-                gwi.thd->infinidb_vtable.create_vtable_query.append(create_query.c_str(), create_query.length());
-                gwi.thd->infinidb_vtable.vtable_state = THD::INFINIDB_REDO_PHASE1; // redo phase 1
+                gwi.MIGR::infinidb_vtable.create_vtable_query.free();
+                gwi.MIGR::infinidb_vtable.create_vtable_query.append(create_query.c_str(), create_query.length());
+                gwi.MIGR::infinidb_vtable.vtable_state = THD::INFINIDB_REDO_PHASE1; // redo phase 1
 
                 // turn off select distinct from post process unless there're post process functions
                 // on the select list.
@@ -8011,7 +8011,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
 
             if (ord_cols.length() > 0)	// has order by
             {
-                gwi.thd->infinidb_vtable.has_order_by = true;
+                gwi.MIGR::infinidb_vtable.has_order_by = true;
                 csep->hasOrderBy(true);
                 // To activate LimitedOrderBy
                 if(isPushdownHand)
@@ -8117,7 +8117,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
             // do not set in csep. @bug5096. ignore session limit setting for dml
             if ((gwi.thd->variables.select_limit == (uint64_t) - 1 ||
                     (gwi.thd->variables.select_limit != (uint64_t) - 1 &&
-                     gwi.thd->infinidb_vtable.vtable_state != THD::INFINIDB_CREATE_VTABLE)) &&
+                     gwi.MIGR::infinidb_vtable.vtable_state != THD::INFINIDB_CREATE_VTABLE)) &&
                     !csep->hasOrderBy())
             {
                 csep->limitStart(limitOffset);
@@ -8143,8 +8143,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
             csep->limitNum((uint64_t) - 2);
         }
 
-        gwi.thd->infinidb_vtable.select_vtable_query.free();
-        gwi.thd->infinidb_vtable.select_vtable_query.append(select_query.c_str(), select_query.length());
+        gwi.MIGR::infinidb_vtable.select_vtable_query.free();
+        gwi.MIGR::infinidb_vtable.select_vtable_query.append(select_query.c_str(), select_query.length());
 
         // We don't currently support limit with correlated subquery
         if (csep->limitNum() != (uint64_t) - 1 &&
@@ -8239,7 +8239,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     csep->derivedTableList(gwi.derivedTbList);
     csep->selectSubList(selectSubList);
     csep->subSelectList(gwi.subselectList);
-    gwi.thd->infinidb_vtable.duplicate_field_name = false;
+    gwi.MIGR::infinidb_vtable.duplicate_field_name = false;
     clearStacks(gwi);
     return 0;
 }
@@ -8522,7 +8522,7 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
 
     // @bug 2123. Override large table estimate if infinidb_ordered hint was used.
     // @bug 2404. Always override if the infinidb_ordered_only variable is turned on.
-    if (gwi.thd->infinidb_vtable.override_largeside_estimate || get_ordered_only(gwi.thd))
+    if (gwi.MIGR::infinidb_vtable.override_largeside_estimate || get_ordered_only(gwi.thd))
         csep->overrideLargeSideEstimate(true);
 
     // @bug 5741. Set a flag when in Local PM only query mode
@@ -8608,7 +8608,7 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
                 gwi.tbList.push_back(tn);
                 CalpontSystemCatalog::TableAliasName tan = make_aliastable("", alias, alias);
                 gwi.tableMap[tan] = make_pair(0, table_ptr);
-//                gwi.thd->infinidb_vtable.isUnion = true; //by-pass the 2nd pass of rnd_init
+//                gwi.MIGR::infinidb_vtable.isUnion = true; //by-pass the 2nd pass of rnd_init
             }
             else if (table_ptr->view)
             {
@@ -8705,8 +8705,8 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
             // processing.
             if (gwi.thd->derived_tables_processing)
             {
-                gwi.thd->infinidb_vtable.isUnion = false;
-                gwi.thd->infinidb_vtable.isUpdateWithDerive = true;
+                gwi.MIGR::infinidb_vtable.isUnion = false;
+                gwi.MIGR::infinidb_vtable.isUpdateWithDerive = true;
                 return -1;
             }
 
@@ -9520,7 +9520,7 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
     SRCP minSc;             // min width projected column. for count(*) use
 
     // Group by list. not valid for union main query
-    if (gwi.thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE && !unionSel)
+    if (gwi.MIGR::infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE && !unionSel)
     {
         gwi.clauseType = GROUP_BY;
         Item* nonSupportItem = NULL;
@@ -9799,13 +9799,13 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
 
 
     // ORDER BY processing starts here
-    if (gwi.thd->infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE)
+    if (gwi.MIGR::infinidb_vtable.vtable_state == THD::INFINIDB_CREATE_VTABLE)
     {
         ORDER* ordercol = reinterpret_cast<ORDER*>(gi.groupByOrder);
-        string create_query(gwi.thd->infinidb_vtable.create_vtable_query.c_ptr());
-        string select_query(gwi.thd->infinidb_vtable.select_vtable_query.c_ptr());
-        string lower_create_query(gwi.thd->infinidb_vtable.create_vtable_query.c_ptr());
-        string lower_select_query(gwi.thd->infinidb_vtable.select_vtable_query.c_ptr());
+        string create_query(gwi.MIGR::infinidb_vtable.create_vtable_query.c_ptr());
+        string select_query(gwi.MIGR::infinidb_vtable.select_vtable_query.c_ptr());
+        string lower_create_query(gwi.MIGR::infinidb_vtable.create_vtable_query.c_ptr());
+        string lower_select_query(gwi.MIGR::infinidb_vtable.select_vtable_query.c_ptr());
         boost::algorithm::to_lower(lower_create_query);
         boost::algorithm::to_lower(lower_select_query);
 
@@ -10133,9 +10133,9 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
                 }
 
 
-                gwi.thd->infinidb_vtable.create_vtable_query.free();
-                gwi.thd->infinidb_vtable.create_vtable_query.append(create_query.c_str(), create_query.length());
-                gwi.thd->infinidb_vtable.vtable_state = THD::INFINIDB_REDO_PHASE1; // redo phase 1
+                gwi.MIGR::infinidb_vtable.create_vtable_query.free();
+                gwi.MIGR::infinidb_vtable.create_vtable_query.append(create_query.c_str(), create_query.length());
+                gwi.MIGR::infinidb_vtable.vtable_state = THD::INFINIDB_REDO_PHASE1; // redo phase 1
 
                 // turn off select distinct from post process unless there're post process functions
                 // on the select list.
@@ -10305,7 +10305,7 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
 
             if ( gwi.orderByCols.size() )	// has order by
             {
-                gwi.thd->infinidb_vtable.has_order_by = true;
+                gwi.MIGR::infinidb_vtable.has_order_by = true;
                 csep->hasOrderBy(true);
                 csep->specHandlerProcessed(true);
             }
@@ -10332,8 +10332,9 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
             csep->limitStart(((Item_int*)gi.groupByTables->select_lex->offset_limit)->val_int());
         }
 
-        //gwi.thd->infinidb_vtable.select_vtable_query.free();
-        //gwi.thd->infinidb_vtable.select_vtable_query.append(select_query.c_str(), select_query.length());
+        // WIP MCOL-2178
+        //gwi.MIGR::infinidb_vtable.select_vtable_query.free();
+        //gwi.MIGR::infinidb_vtable.select_vtable_query.append(select_query.c_str(), select_query.length());
 
         // We don't currently support limit with correlated subquery
         if (csep->limitNum() != (uint64_t) - 1 &&
@@ -10429,7 +10430,7 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
     csep->derivedTableList(gwi.derivedTbList);
     csep->selectSubList(selectSubList);
     csep->subSelectList(gwi.subselectList);
-    gwi.thd->infinidb_vtable.duplicate_field_name = false;
+    gwi.MIGR::infinidb_vtable.duplicate_field_name = false;
     clearStacks(gwi);
     return 0;
 }
