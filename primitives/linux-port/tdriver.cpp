@@ -38,11 +38,17 @@
 #include <values.h>
 #include <cppunit/extensions/HelperMacros.h>
 
+#include "calpontsystemcatalog.h"
+#include "primitivemsg.h"
 #include "primitiveprocessor.h"
 
 using namespace std;
+using namespace primitives;
 
 int done;
+typedef uint64_t Int64;
+typedef int16_t Int16;
+
 
 void alarm_handler(int sig)
 {
@@ -53,7 +59,7 @@ class PrimTest : public CppUnit::TestFixture
 {
 
     CPPUNIT_TEST_SUITE(PrimTest);
-
+/*
     CPPUNIT_TEST(p_IdxWalk_1_eq_1);
     CPPUNIT_TEST(p_IdxWalk_1_eq_2);
     CPPUNIT_TEST(p_IdxWalk_1_lt_1);
@@ -67,7 +73,6 @@ class PrimTest : public CppUnit::TestFixture
     CPPUNIT_TEST(p_IdxWalk_2_range_3);
     CPPUNIT_TEST(p_IdxWalk_40_eq_or_1);
     CPPUNIT_TEST(p_IdxWalk_40_neq_and_1);
-
     CPPUNIT_TEST(p_AggregateSignature_1);
     CPPUNIT_TEST(p_AggregateSignature_2);
 
@@ -87,7 +92,7 @@ class PrimTest : public CppUnit::TestFixture
 
     CPPUNIT_TEST(p_IdxList_1);
     CPPUNIT_TEST(p_IdxList_2);
-
+*/
 // whole block tests
     CPPUNIT_TEST(p_Col_1);
     CPPUNIT_TEST(p_Col_2);
@@ -196,7 +201,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_EQ;
         params->NVALS = 1;
@@ -261,7 +266,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_LT;
         params->NVALS = 1;
@@ -338,7 +343,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_LE;
         params->NVALS = 1;
@@ -415,7 +420,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_GT;
         params->NVALS = 1;
@@ -492,7 +497,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_GE;
         params->NVALS = 1;
@@ -569,7 +574,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_NE;
         params->NVALS = 1;
@@ -644,7 +649,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_EQ;
         params->NVALS = 1;
@@ -707,7 +712,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey[0];
         params->SearchString[1] = searchKey[1];
         params->COP1 = COMPARE_EQ;
@@ -793,7 +798,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey[0];
         params->SearchString[1] = searchKey[1];
         params->COP1 = COMPARE_LT;
@@ -879,7 +884,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey[0];
         params->SearchString[1] = searchKey[1];
         params->COP1 = COMPARE_LE;
@@ -963,7 +968,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey[0];
         params->SearchString[1] = searchKey[1];
         params->COP1 = COMPARE_GE;
@@ -1045,7 +1050,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_EQ;
         params->BOP = BOP_OR;
@@ -1134,7 +1139,7 @@ public:
 
         params = new IndexWalkHeader();
 
-        memset(params, 0, sizeof(IndexWalkHeader));
+        //memset(params, 0, sizeof(IndexWalkHeader));
         params->SearchString[0] = searchKey;
         params->COP1 = COMPARE_NE;
         params->BOP = BOP_AND;
@@ -1207,6 +1212,8 @@ public:
         char minmax[BLOCK_SIZE];
         int fd;
         uint32_t err;
+        uint32_t written;
+        bool utf8 = false;
 
         fd = open(filename.c_str(), O_RDONLY);
 
@@ -1238,7 +1245,7 @@ public:
         cmd->NVALS = 0;
 
         pp.setBlockPtr((int*) block);
-        pp.p_AggregateSignature(cmd, results, BLOCK_SIZE, &err);
+        pp.p_AggregateSignature(cmd, results, BLOCK_SIZE, &written, utf8);
         dvPtr = reinterpret_cast<DataValue*>(&output[sizeof(AggregateSignatureResultHeader)]);
         memcpy(minmax, dvPtr->data, dvPtr->len);
         minmax[dvPtr->len] = '\0';
@@ -1267,6 +1274,8 @@ public:
         char minmax[BLOCK_SIZE];
         int fd;
         uint32_t err;
+        uint32_t written;
+        bool utf8 = false;
 
         fd = open(filename.c_str(), O_RDONLY);
 
@@ -1314,7 +1323,7 @@ public:
         cmd->tokens[3].len = 13;
 
         pp.setBlockPtr((int*) block);
-        pp.p_AggregateSignature(cmd, results, BLOCK_SIZE, &err);
+        pp.p_AggregateSignature(cmd, results, BLOCK_SIZE, &written, utf8);
 
         dvPtr = reinterpret_cast<DataValue*>(&output[sizeof(AggregateSignatureResultHeader)]);
         memcpy(minmax, dvPtr->data, dvPtr->len);
@@ -1377,8 +1386,12 @@ public:
         args->len = 5;
         strncpy(args->data, "XHINA", 5);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
         args = reinterpret_cast<DataValue*>(&results[1]);
         args->data[args->len] = '\0';		// not reusable in tests with multiple matches.
@@ -1440,8 +1453,12 @@ public:
         args->len = 5;
         strncpy(args->data, "XHINA", 5);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
         args = reinterpret_cast<DataValue*>(&results[1]);
         memcpy(tmp, args->data, args->len);
@@ -1502,8 +1519,12 @@ public:
         cmd->COP1 = COMPARE_EQ;
         cmd->OutputType = OT_DATAVALUE;
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
         argsOffset = sizeof(TokenByScanResultHeader);
 // 	cout << "NVALS = " << results->NVALS << endl;
@@ -1566,8 +1587,12 @@ public:
         args->len = 7;
         strncpy(args->data, "GERMANY", 7);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 // 	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 41);
@@ -1631,8 +1656,12 @@ public:
         args->len = 7;
         strncpy(args->data, "GERMANY", 7);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 // 	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 42);
@@ -1696,8 +1725,12 @@ public:
         args->len = 7;
         strncpy(args->data, "GERMANY", 7);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 // 	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 8);
@@ -1761,8 +1794,12 @@ public:
         args->len = 7;
         strncpy(args->data, "GERMANY", 7);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 // 	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 9);
@@ -1826,8 +1863,12 @@ public:
         args->len = 7;
         strncpy(args->data, "GERMANY", 7);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 // 	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 49);
@@ -1900,8 +1941,12 @@ public:
         args->len = 6;
         strncpy(args->data, "BRAZIL", 6);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 // 	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 12);
@@ -1993,8 +2038,12 @@ public:
         args->len = 13;
         strncpy(args->data, "UNITED STATES", 13);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 // 	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 5);
@@ -2086,8 +2135,12 @@ public:
         args->len = 13;
         strncpy(args->data, "UNITED STATES", 13);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 //  	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 45);
@@ -2154,8 +2207,12 @@ public:
         args->len = 4;
         strncpy(args->data, "%NYA", 4);
 
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
 //   	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 2);
@@ -2219,10 +2276,14 @@ public:
         cmd->OutputType = OT_TOKEN;
         cmd->LBID = 13;  		// arbitrary #
         args->len = 5;
-        strncpy(args->data, "XHINA", 5);
+        strncpy(args->data, "XHINA", 6);
+
+        bool utf8 = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
 
         pp.setBlockPtr((int*) block);
-        pp.p_TokenByScan(cmd, results, BLOCK_SIZE);
+        pp.p_TokenByScan(cmd, results, BLOCK_SIZE, utf8, eqFilter);
 
         result = reinterpret_cast<PrimToken*>(&results[1]);
         CPPUNIT_ASSERT(results->NVALS == 1);
@@ -2265,7 +2326,7 @@ public:
         resultHdr = reinterpret_cast<IndexListHeader*>(output);
         results = reinterpret_cast<IndexListEntry*>(&output[sizeof(IndexListHeader)]);
 
-        memset(hdr, 0, sizeof(IndexListHeader));
+        //memset(hdr, 0, sizeof(IndexListHeader));
         hdr->NVALS = 1;
 
         params->fbo = 11;
@@ -2380,7 +2441,7 @@ public:
         resultHdr = reinterpret_cast<IndexListHeader*>(output);
         results = reinterpret_cast<IndexListEntry*>(&output[sizeof(IndexListHeader)]);
 
-        memset(hdr, 0, sizeof(IndexListHeader));
+        //memset(hdr, 0, sizeof(IndexListHeader));
         hdr->NVALS = 1;
 
         params->fbo = 11;
@@ -2506,11 +2567,10 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 1;
-        in->DataType = CalpontSystemCatalog::CHAR;
+        in->DataType = execplan::CalpontSystemCatalog::CHAR;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 0;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         pp.setBlockPtr((int*) block);
         pp.p_Col(in, out, 4 * BLOCK_SIZE, &written);
@@ -2570,11 +2630,10 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 2;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 0;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         pp.setBlockPtr((int*) block);
         pp.p_Col(in, out, 4 * BLOCK_SIZE, &written);
@@ -2634,11 +2693,10 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 4;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 0;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         pp.setBlockPtr((int*) block);
         pp.p_Col(in, out, 4 * BLOCK_SIZE, &written);
@@ -2698,11 +2756,10 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 0;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         pp.setBlockPtr((int*) block);
         pp.p_Col(in, out, 4 * BLOCK_SIZE, &written);
@@ -2764,11 +2821,10 @@ public:
         rids = reinterpret_cast<uint16_t*>(&in[1]);
 
         in->DataSize = 1;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 0;
         in->NVALS = 2;
-        in->InputFlags = 0;
         rids[0] = 20;
         rids[1] = 17;
 
@@ -2832,12 +2888,11 @@ public:
         args = reinterpret_cast<ColArgs*>(&in[1]);
 
         in->DataSize = 4;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 2;
         in->BOP = BOP_AND;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = 20;
         args->COP = COMPARE_LT;
@@ -2909,12 +2964,11 @@ public:
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 2;
         in->BOP = BOP_OR;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = 10;
         args->COP = COMPARE_LT;
@@ -2986,12 +3040,11 @@ public:
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 2;
         in->BOP = BOP_OR;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = 10;
         args->COP = COMPARE_EQ;
@@ -3064,12 +3117,11 @@ public:
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_DATAVALUE;
         in->NOPS = 2;
         in->BOP = BOP_OR;
         in->NVALS = 2;
-        in->InputFlags = 0;
 
         tmp = 10;
         args->COP = COMPARE_EQ;
@@ -3109,7 +3161,8 @@ public:
         NewColResultHeader* out;
         ColArgs* args;
         int16_t* results;
-        uint32_t written, i;
+        int32_t i;
+        uint32_t written;
         int fd;
         int64_t tmp;
         string filename("col8block.cdf");
@@ -3146,12 +3199,11 @@ public:
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_RID;
         in->NOPS = 2;
         in->BOP = BOP_OR;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = 10;
         args->COP = COMPARE_LT;
@@ -3187,7 +3239,8 @@ public:
         ColArgs* args;
         int16_t* resultRid;
         int64_t* resultVal;
-        uint32_t written, i;
+        int32_t i;
+        uint32_t written;  
         int fd;
         int64_t tmp;
         string filename("col8block.cdf");
@@ -3224,12 +3277,11 @@ public:
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_BOTH;
         in->NOPS = 2;
         in->BOP = BOP_OR;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = 10;
         args->COP = COMPARE_LT;
@@ -3303,12 +3355,11 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 1;
-        in->DataType = CalpontSystemCatalog::CHAR;
+        in->DataType = execplan::CalpontSystemCatalog::CHAR;
         in->OutputType = OT_DATAVALUE;
         in->BOP = BOP_AND;
         in->NOPS = 2;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
         args->COP = COMPARE_GT;
@@ -3384,12 +3435,11 @@ public:
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
 
         in->DataSize = 4;
-        in->DataType = CalpontSystemCatalog::INT;
+        in->DataType = execplan::CalpontSystemCatalog::INT;
         in->OutputType = OT_RID;
         in->NOPS = 3;
         in->BOP = BOP_OR;
         in->NVALS = 3;
-        in->InputFlags = 1;
 
         // first argument "is RID 8 < 10?"  Answer is yes
         tmp = 10;	// value to check
@@ -3474,12 +3524,11 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::DOUBLE;
+        in->DataType = execplan::CalpontSystemCatalog::DOUBLE;
         in->OutputType = OT_DATAVALUE;
         in->BOP = BOP_AND;
         in->NOPS = 2;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = 10.5;
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
@@ -3551,12 +3600,11 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 4;
-        in->DataType = CalpontSystemCatalog::FLOAT;
+        in->DataType = execplan::CalpontSystemCatalog::FLOAT;
         in->OutputType = OT_BOTH;
         in->BOP = BOP_AND;
         in->NOPS = 2;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = 10.5;
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
@@ -3632,13 +3680,12 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 4;
-        in->DataType = CalpontSystemCatalog::FLOAT;
+        in->DataType = execplan::CalpontSystemCatalog::FLOAT;
         in->OutputType = OT_BOTH;
         in->BOP = BOP_AND;
         in->NOPS = 2;
 // 	in->NOPS = 0;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = -5.0;
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
@@ -3713,12 +3760,11 @@ public:
         out = reinterpret_cast<NewColResultHeader*>(output);
 
         in->DataSize = 8;
-        in->DataType = CalpontSystemCatalog::DOUBLE;
+        in->DataType = execplan::CalpontSystemCatalog::DOUBLE;
         in->OutputType = OT_DATAVALUE;
         in->BOP = BOP_AND;
         in->NOPS = 2;
         in->NVALS = 0;
-        in->InputFlags = 0;
 
         tmp = -5.0;
         args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader)]);
@@ -3793,11 +3839,21 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_EQ;
         args->len = 5;
-        strncpy((char*)args->data, "XHINA", 5);
+        strncpy((char*)args->data, "XHINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
-
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
         outValue = reinterpret_cast<DataValue*>(&results[1]);
         outValue->data[args->len] = '\0';		// not reusable in tests with multiple matches.
         CPPUNIT_ASSERT(results->NVALS == 1);
@@ -3853,17 +3909,27 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_EQ;
         args->len = 13;
-        strncpy((char*)args->data, "UNITED STATES", 13);
+        strncpy((char*)args->data, "UNITED STATES", 14);
 
         args = reinterpret_cast<DictFilterElement*>(&input[sizeof(DictInput) + args->len +
                                   sizeof(DictFilterElement)]);
         args->COP = COMPARE_EQ;
         args->len = 5;
-        strncpy((char*)args->data, "XHINA", 5);
+        strncpy((char*)args->data, "XHINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
-
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
         outValue = reinterpret_cast<DataValue*>(&results[1]);
         CPPUNIT_ASSERT(results->NVALS == 2);
         CPPUNIT_ASSERT(outValue->len == 5);
@@ -3881,7 +3947,7 @@ public:
         string filename("dictblock.cdf");
         DictInput* cmd;
         DictOutput* results;
-        DictFilterElement* args;
+        //DictFilterElement* args;
         DataValue* outValue;
         int fd, argsOffset;
         uint32_t err, i;
@@ -3914,7 +3980,7 @@ public:
 
         cmd = reinterpret_cast<DictInput*>(input);
         results = reinterpret_cast<DictOutput*>(output);
-        args = reinterpret_cast<DictFilterElement*>(&cmd[1]);
+        //args = reinterpret_cast<DictFilterElement*>(&cmd[1]);
 
         cmd->NOPS = 0;
         cmd->OutputType = OT_DATAVALUE;
@@ -3922,9 +3988,19 @@ public:
         cmd->NVALS = 0;
         cmd->InputFlags = 0;
 
-        pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
+        pp.setBlockPtr((int*) block);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
 //   	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 50);
 
@@ -3989,10 +4065,22 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_GT;
         args->len = 7;
-        strncpy((char*)args->data, "GERMANY", 7);
+        strncpy((char*)args->data, "GERMANY", 8);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
 //  	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 41);
@@ -4058,16 +4146,28 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_EQ;
         args->len = 13;
-        strncpy((char*)args->data, "UNITED STATES", 13);
+        strncpy((char*)args->data, "UNITED STATES", 14);
 
         args = reinterpret_cast<DictFilterElement*>(&input[sizeof(DictInput) + args->len +
                                   sizeof(DictFilterElement)]);
         args->COP = COMPARE_EQ;
         args->len = 5;
-        strncpy((char*)args->data, "XHINA", 5);
+        strncpy((char*)args->data, "XHINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
         CPPUNIT_ASSERT(results->NVALS == 2);
 
@@ -4129,16 +4229,28 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_EQ;
         args->len = 13;
-        strncpy((char*)args->data, "UNITED STATES", 13);
+            strncpy((char*)args->data, "UNITED STATES", 14);
 
         args = reinterpret_cast<DictFilterElement*>(&input[sizeof(DictInput) + args->len +
                                   sizeof(DictFilterElement)]);
         args->COP = COMPARE_EQ;
         args->len = 5;
-        strncpy((char*)args->data, "XHINA", 5);
+        strncpy((char*)args->data, "XHINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
         CPPUNIT_ASSERT(results->NVALS == 2);
 
@@ -4203,16 +4315,28 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_EQ;
         args->len = 13;
-        strncpy((char*)args->data, "UNITED STATES", 13);
+        strncpy((char*)args->data, "UNITED STATES", 14);
 
         args = reinterpret_cast<DictFilterElement*>(&input[sizeof(DictInput) + args->len +
                                   sizeof(DictFilterElement)]);
         args->COP = COMPARE_EQ;
         args->len = 5;
-        strncpy((char*)args->data, "XHINA", 5);
+        strncpy((char*)args->data, "XHINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
         CPPUNIT_ASSERT(results->NVALS == 2);
 
@@ -4299,16 +4423,28 @@ public:
 
         args->COP = COMPARE_EQ;
         args->len = 13;
-        strncpy((char*)args->data, "UNITED STATES", 13);
+        strncpy((char*)args->data, "UNITED STATES", 14);
 
         args = reinterpret_cast<DictFilterElement*>(&input[sizeof(DictInput) + 3 * sizeof(PrimToken) +
                                   args->len + sizeof(DictFilterElement)]);
         args->COP = COMPARE_EQ;
         args->len = 5;
-        strncpy((char*)args->data, "XHINA", 5);
+        strncpy((char*)args->data, "XHINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
         CPPUNIT_ASSERT(results->NVALS == 2);
 
@@ -4399,8 +4535,20 @@ public:
         args[1].rid = 0x1121110987654321LL;
         args[1].offsetIndex = 38;		// JAPAN
 
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
+
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
 // 	cout << " nvals = " << results->NVALS << endl;
 
@@ -4477,10 +4625,22 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 5;
-        strncpy((char*)args->data, "%HINA", 5);
+        strncpy((char*)args->data, "%HINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 2);
@@ -4552,10 +4712,22 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 5;
-        strncpy((char*)args->data, "%HIN%", 5);
+        strncpy((char*)args->data, "%HIN%", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 2);
@@ -4627,10 +4799,22 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 4;
-        strncpy((char*)args->data, "CHI%", 4);
+        strncpy((char*)args->data, "CHI%", 5);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 1);
@@ -4696,10 +4880,22 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 5;
-        strncpy((char*)args->data, "CHINA", 5);
+        strncpy((char*)args->data, "CHINA", 6);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 1);
@@ -4765,10 +4961,22 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 7;
-        strncpy((char*)args->data, "_NDO%A%", 7);
+        strncpy((char*)args->data, "_NDO%A%", 8);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 2);
@@ -4840,10 +5048,21 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 11;
-        strncpy((char*)args->data, "%NIT%ING%D%", 11);
+        strncpy((char*)args->data, "%NIT%ING%D%", 12);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 2);
@@ -4915,10 +5134,21 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 7;
-        strncpy((char*)args->data, "UNI%TES", 7);
+        strncpy((char*)args->data, "UNI%TES", 8);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 1);
@@ -4985,10 +5215,23 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 7;
-        strncpy((char*)args->data, "%TH_OP%", 7);
+        strncpy((char*)args->data, "%TH_OP%", 8);
+
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
 
         pp.setBlockPtr((int*) block);
-        pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+        pp.p_Dictionary(cmd, &out,
+            utf8,
+            skipNulls,
+            eqFilter,
+            eqOp);
+
+
 
 //    	cout << "NVALS = " << results->NVALS << endl;
         CPPUNIT_ASSERT(results->NVALS == 2);
@@ -5014,10 +5257,11 @@ public:
     void p_Dictionary_like_prefixbench_1()
     {
         PrimitiveProcessor pp;
-        uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+        uint8_t block[BLOCK_SIZE], input[BLOCK_SIZE];
+        //uint8_t output[BLOCK_SIZE];
         string filename("dictblock.cdf");
         DictInput* cmd;
-        DictOutput* results;
+        //DictOutput* results;
         DictFilterElement* args;
         int fd;
         uint32_t err;
@@ -5049,7 +5293,7 @@ public:
         close(fd);
 
         cmd = reinterpret_cast<DictInput*>(input);
-        results = reinterpret_cast<DictOutput*>(output);
+        //results = reinterpret_cast<DictOutput*>(output);
         args = reinterpret_cast<DictFilterElement*>(&cmd[1]);
 
         cmd->NOPS = 1;
@@ -5059,7 +5303,7 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 4;
-        strncpy((char*)args->data, "CHI%", 4);
+        strncpy((char*)args->data, "CHI%", 5);
 
         pp.setBlockPtr((int*) block);
 
@@ -5068,9 +5312,20 @@ public:
         signal(SIGALRM, alarm_handler);
         alarm(30);
 
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
+
         while (!done)
         {
-            pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+            pp.p_Dictionary(cmd, &out,
+                utf8,
+                skipNulls,
+                eqFilter,
+                eqOp);
             count++;
         }
 
@@ -5080,10 +5335,11 @@ public:
     void p_Dictionary_like_substrbench_1()
     {
         PrimitiveProcessor pp;
-        uint8_t block[BLOCK_SIZE], output[BLOCK_SIZE], input[BLOCK_SIZE];
+        uint8_t block[BLOCK_SIZE],input[BLOCK_SIZE];
+        //uint8_t output[BLOCK_SIZE]; 
         string filename("dictblock.cdf");
         DictInput* cmd;
-        DictOutput* results;
+        //DictOutput* results;
         DictFilterElement* args;
         int fd;
         uint32_t err;
@@ -5115,7 +5371,7 @@ public:
         close(fd);
 
         cmd = reinterpret_cast<DictInput*>(input);
-        results = reinterpret_cast<DictOutput*>(output);
+        //results = reinterpret_cast<DictOutput*>(output);
         args = reinterpret_cast<DictFilterElement*>(&cmd[1]);
 
         cmd->NOPS = 1;
@@ -5125,7 +5381,7 @@ public:
         cmd->InputFlags = 0;
         args->COP = COMPARE_LIKE;
         args->len = 4;
-        strncpy((char*)args->data, "%HI%", 4);
+        strncpy((char*)args->data, "%HI%", 5);
 
         pp.setBlockPtr((int*) block);
 
@@ -5134,9 +5390,20 @@ public:
         signal(SIGALRM, alarm_handler);
         alarm(30);
 
+        std::vector<uint8_t> out; 
+        bool utf8 = false;
+        bool skipNulls = false;
+        boost::shared_ptr<DictEqualityFilter> eqFilter;
+        eqFilter.reset(new primitives::DictEqualityFilter());
+        uint8_t eqOp = COMPARE_EQ;
+
         while (!done)
         {
-            pp.p_Dictionary(cmd, results, BLOCK_SIZE);
+            pp.p_Dictionary(cmd, &out,
+                utf8,
+                skipNulls,
+                eqFilter,
+                eqOp);
             count++;
         }
 
