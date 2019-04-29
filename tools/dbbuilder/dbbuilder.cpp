@@ -72,12 +72,6 @@ int checkNotThere(WriteEngine::FID fid)
     return (fileOp.existsOIDDir(fid) ? -1 : 0);
 }
 
-void tearDown()
-{
-	string file = tmpDir + "/oidbitmap";
-    unlink(file.c_str());
-}
-
 void usage()
 {
     cerr << "Usage: dbbuilder [-h|f] function" << endl
