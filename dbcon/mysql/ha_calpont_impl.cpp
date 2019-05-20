@@ -1,4 +1,4 @@
- /* Copyright (C) 2014 InfiniDB, Inc.
+/* Copyright (C) 2014 InfiniDB, Inc.
    Copyright (C) 2019 MariaDB Corporaton
 
    This program is free software; you can redistribute it and/or
@@ -1138,14 +1138,14 @@ uint32_t doUpdateDelete(THD* thd)
             {
                 if (value->cmp_type() == STRING_RESULT)
                 {
-                    //@Bug 2587 use val_str to replace value->name to get rid of 255 limit
-                    String val, *str;
-                    str = value->val_str(&val);
-                    columnAssignmentPtr->fScalarExpression.assign(str->ptr(), str->length());
-                    columnAssignmentPtr->fFromCol = false;
-                }
+                //@Bug 2587 use val_str to replace value->name to get rid of 255 limit
+                String val, *str;
+                str = value->val_str(&val);
+                columnAssignmentPtr->fScalarExpression.assign(str->ptr(), str->length());
+                columnAssignmentPtr->fFromCol = false;
+            }
                 else if (value->cmp_type() ==  INT_RESULT)
-                {
+            {
                     std::ostringstream oss;
 
                     if (value->unsigned_flag)
@@ -2223,7 +2223,7 @@ int ha_calpont_impl_rnd_init(TABLE* table)
         if (ci->tableMap.size() == 1)
         {
             ti.csep->data(idb_mysql_query_str(thd));
-        }
+    }
         else
         {
             ti.csep->data("<part of the query executed in table mode>");
@@ -4134,9 +4134,9 @@ int ha_calpont_impl_external_lock(THD* thd, TABLE* table, int lock_type)
         ci->tableMap.erase(table);
     }
     else
-    {
-        if (lock_type == 0) 
         {
+        if (lock_type == 0) 
+            {
             ci->physTablesList.insert(table);
         }
         else if (lock_type == 2)
@@ -4161,12 +4161,12 @@ int ha_calpont_impl_external_lock(THD* thd, TABLE* table, int lock_type)
                 ci->queryState = 0;
                 MIGR::infinidb_vtable.override_largeside_estimate = false;
                 // MCOL-3247 Use THD::ha_data as a per-plugin per-session
-                // storage for cal_conn_hndl to use it later in close_connection
+                // storage for cal_conn_hndl to use it later in close_connection 
                 thd_set_ha_data(thd, mcs_hton, get_fe_conn_info_ptr());
                 ci->tableMap.clear();
             }
 
-        }
+    }
     }
 
     return 0;
@@ -4810,7 +4810,7 @@ int ha_calpont_impl_group_by_end(ha_calpont_group_by_handler* group_hand, TABLE*
     if (get_fe_conn_info_ptr() != NULL)
         ci = reinterpret_cast<cal_connection_info*>(get_fe_conn_info_ptr());
 
-    if (((thd->lex)->sql_command == SQLCOM_INSERT) ||
+   if (((thd->lex)->sql_command == SQLCOM_INSERT) ||
             ((thd->lex)->sql_command == SQLCOM_INSERT_SELECT) )
     {
         force_close_fep_conn(thd, ci, true); // with checking prev command rc
