@@ -1,4 +1,5 @@
 /* Copyright (C) 2014 InfiniDB, Inc.
+   Copyright (C) 2019 MariaDB Corporation
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -508,6 +509,109 @@ void TupleAnnexStep::executeWithOrderBy()
     RGData rgDataOut;
     bool more = false;
 
+    std::cout << "TASwOrd: fInputDL size " << fInputDL->totalSize() << std::endl;
+    try
+    {
+        more = fInputDL->next(fInputIterator, &rgDataIn);
+
+        if (traceOn()) dlTimes.setFirstReadTime();
+
+        StepTeleStats sts;
+        sts.query_uuid = fQueryUuid;
+        sts.step_uuid = fStepUuid;
+        sts.msg_type = StepTeleStats::ST_START;
+        sts.total_units_of_work = 1;
+        postStepStartTele(sts);
+
+        uint16_t rgCounter = 0;
+        while (more && !cancelled())
+        {
+            rgCounter += 1;
+            fRowGroupIn.setData(&rgDataIn);
+            fRowGroupIn.getRow(0, &fRowIn);
+
+            std::cout << "TASwOrd: rgIn rows " << fRowGroupIn.getRowCount() << std::endl;
+            std::cout << "TASwOrd: rgIn  " << fRowGroupIn.toString() << std::endl;
+
+            for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled(); ++i)
+            {
+                fOrderBy->processRow(fRowIn);
+                fRowIn.nextRow();
+            }
+
+            more = fInputDL->next(fInputIterator, &rgDataIn);
+        }
+
+        std::cout << "TASwOrd: number of row groups " << rgCounter << std::endl;
+
+        fOrderBy->finalize();
+
+        if (!cancelled())
+        {
+            while (fOrderBy->getData(rgDataIn))
+            {
+                if (fConstant == NULL &&
+                        fRowGroupOut.getColumnCount() == fRowGroupIn.getColumnCount())
+                {
+                    rgDataOut = rgDataIn;
+                    fRowGroupOut.setData(&rgDataOut);
+                }
+                else
+                {
+                    fRowGroupIn.setData(&rgDataIn);
+                    fRowGroupIn.getRow(0, &fRowIn);
+
+                    rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
+                    fRowGroupOut.setData(&rgDataOut);
+                    fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
+                    fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
+                    fRowGroupOut.getRow(0, &fRowOut);
+
+                    for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
+                    {
+                        if (fConstant)
+                            fConstant->fillInConstants(fRowIn, fRowOut);
+                        else
+                            copyRow(fRowIn, &fRowOut);
+
+                        fRowGroupOut.incRowCount();
+                        fRowOut.nextRow();
+                        fRowIn.nextRow();
+                    }
+                }
+
+                if (fRowGroupOut.getRowCount() > 0)
+                {
+                    fRowsReturned += fRowGroupOut.getRowCount();
+                    fOutputDL->insert(rgDataOut);
+                }
+            }
+        }
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(), ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep execute caught an unknown exception",
+                     ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+
+    while (more)
+        more = fInputDL->next(fInputIterator, &rgDataIn);
+
+    // Bug 3136, let mini stats to be formatted if traceOn.
+    fOutputDL->endOfInput();
+}
+
+void TupleAnnexStep::executeParallelOrderBy()
+{
+    utils::setThreadName("TASwParOrd");
+    RGData rgDataIn;
+    RGData rgDataOut;
+    bool more = false;
+
     try
     {
         more = fInputDL->next(fInputIterator, &rgDataIn);
@@ -595,7 +699,6 @@ void TupleAnnexStep::executeWithOrderBy()
     // Bug 3136, let mini stats to be formatted if traceOn.
     fOutputDL->endOfInput();
 }
-
 
 const RowGroup& TupleAnnexStep::getOutputRowGroup() const
 {

@@ -102,6 +102,7 @@ protected:
     void execute();
     void executeNoOrderBy();
     void executeWithOrderBy();
+    void executeParallelOrderBy();
     void executeNoOrderByWithDistinct();
     void formatMiniStats();
     void printCalTrace();
