@@ -66,6 +66,9 @@ using namespace querytele;
 
 #include "tupleannexstep.h"
 
+// WIP MCOL-894
+#include <unistd.h>
+
 namespace
 {
 struct TAHasher
@@ -118,6 +121,7 @@ TupleAnnexStep::TupleAnnexStep(const JobInfo& jobInfo) :
     fLimitHit(false),
     fEndOfResult(false),
     fDistinct(false),
+    fParallelOp(false),
     fOrderBy(NULL),
     fConstant(NULL),
     fFeInstance(funcexp::FuncExp::instance()),
@@ -130,6 +134,24 @@ TupleAnnexStep::TupleAnnexStep(const JobInfo& jobInfo) :
 
 TupleAnnexStep::~TupleAnnexStep()
 {
+    if(fParallelOp)
+    {
+        if(fOrderByList.size() > 0)
+        {
+            for(uint64_t id = 1; id <= fMaxThreads; id++)
+            {
+                delete fOrderByList[id];
+            }
+
+            fOrderByList.clear();
+        }
+
+        fRowGroupInList.clear();
+        fRowInList.clear();
+        fInputIteratorsList.clear();
+        fRunnersList.clear();
+    }
+
     if (fOrderBy)
         delete fOrderBy;
 
@@ -150,25 +172,53 @@ void TupleAnnexStep::setOutputRowGroup(const rowgroup::RowGroup& rg)
 
 void TupleAnnexStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 {
-    fRowGroupIn = rgIn;
-    fRowGroupIn.initRow(&fRowIn);
-
-    if (fOrderBy)
+    // Initialize structures used by separate workers
+    uint64_t id = 1;
+    if(fParallelOp)
     {
-        fOrderBy->distinct(fDistinct);
-        fOrderBy->initialize(rgIn, jobInfo);
+        fRowGroupInList.resize(fMaxThreads+1);
+        fRowInList.resize(fMaxThreads+1);
+        for(id = 1; id <= fMaxThreads; id++)
+        {
+            fRowInList[id] = fRowIn;
+            fRowGroupInList[id] = rgIn;
+            fRowGroupInList[id].initRow(&fRowInList[id]);
+        }
+        // WIP MCOL-894 Put this block into AdjustLastStep
+        if (fOrderBy)
+        {
+            fOrderByList.resize(fMaxThreads+1);
+            for(id = 1; id <= fMaxThreads; id++)
+            {
+                // WIP use SP here?
+                fOrderByList[id] = new LimitedOrderBy();
+                fOrderByList[id]->distinct(fDistinct);
+                fOrderByList[id]->initialize(rgIn, jobInfo);
+            }
+        }
+    }
+    else
+    {
+        fRowGroupIn = rgIn;
+        fRowGroupIn.initRow(&fRowIn);
+        if (fOrderBy)
+        {
+            fOrderBy->distinct(fDistinct);
+            fOrderBy->initialize(rgIn, jobInfo);
+        }
     }
 
     if (fConstant == NULL)
     {
-        vector<uint32_t> oids, oidsIn = fRowGroupIn.getOIDs();
-        vector<uint32_t> keys, keysIn = fRowGroupIn.getKeys();
-        vector<uint32_t> scale, scaleIn = fRowGroupIn.getScale();
-        vector<uint32_t> precision, precisionIn = fRowGroupIn.getPrecision();
-        vector<CalpontSystemCatalog::ColDataType> types, typesIn = fRowGroupIn.getColTypes();
-        vector<uint32_t> pos, posIn = fRowGroupIn.getOffsets();
-
+        vector<uint32_t> oids, oidsIn = rgIn.getOIDs();
+        vector<uint32_t> keys, keysIn = rgIn.getKeys();
+        vector<uint32_t> scale, scaleIn = rgIn.getScale();
+        vector<uint32_t> precision, precisionIn = rgIn.getPrecision();
+        vector<CalpontSystemCatalog::ColDataType> types, typesIn = rgIn.getColTypes();
+        vector<uint32_t> pos, posIn = rgIn.getOffsets();
         size_t n = jobInfo.nonConstDelCols.size();
+
+        // Add all columns into output RG as keys. Can we put only keys?
         oids.insert(oids.end(), oidsIn.begin(), oidsIn.begin() + n);
         keys.insert(keys.end(), keysIn.begin(), keysIn.begin() + n);
         scale.insert(scale.end(), scaleIn.begin(), scaleIn.begin() + n);
@@ -199,8 +249,6 @@ void TupleAnnexStep::run()
     if (fInputDL == NULL)
         throw logic_error("Input is not a RowGroup data list.");
 
-    fInputIterator = fInputDL->getIterator();
-
     if (fOutputJobStepAssociation.outSize() == 0)
         throw logic_error("No output data list for annex step.");
 
@@ -214,14 +262,46 @@ void TupleAnnexStep::run()
         fOutputIterator = fOutputDL->getIterator();
     }
 
-    fRunner = jobstepThreadPool.invoke(Runner(this));
-}
+    if(fParallelOp)
+    {
+        // This one differs in index numbering to use
+        // special join().
+        fRunnersList.resize(fMaxThreads);
+        fInputIteratorsList.resize(fMaxThreads+1);
 
+        for(uint32_t id = 1; id <= fMaxThreads; id++)
+        {
+            fInputIteratorsList[id] = fInputDL->getIterator();
+            fRunnersList[id-1] = jobstepThreadPool.invoke(Runner(this, id));
+        }
+    }
+    else
+    {
+        fInputDL = fInputJobStepAssociation.outAt(0)->rowGroupDL();
+
+        if (fInputDL == NULL)
+            throw logic_error("Input is not a RowGroup data list.");
+
+        fInputIterator = fInputDL->getIterator();
+        fRunner = jobstepThreadPool.invoke(Runner(this));
+    }
+    
+}
 
 void TupleAnnexStep::join()
 {
-    if (fRunner)
-        jobstepThreadPool.join(fRunner);
+    if(fParallelOp)
+    {
+        jobstepThreadPool.join(fRunnersList);
+    }
+    else
+    {
+        if (fRunner)
+        {
+            jobstepThreadPool.join(fRunner);
+        }
+    }
+    
 }
 
 
@@ -313,6 +393,13 @@ void TupleAnnexStep::execute()
     }
 }
 
+void TupleAnnexStep::execute(uint32_t id)
+{
+    if(fOrderByList[id])
+        executeParallelOrderBy(id);
+
+    finalizeParallelOrderBy();
+}
 
 void TupleAnnexStep::executeNoOrderBy()
 {
@@ -531,7 +618,8 @@ void TupleAnnexStep::executeWithOrderBy()
             fRowGroupIn.getRow(0, &fRowIn);
 
             std::cout << "TASwOrd: rgIn rows " << fRowGroupIn.getRowCount() << std::endl;
-            std::cout << "TASwOrd: rgIn  " << fRowGroupIn.toString() << std::endl;
+            //std::cout << "TASwOrd: rgIn  " << fRowGroupIn.toString() << std::endl;
+            std::cout << fOrderBy->toString() << std::endl;
 
             for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled(); ++i)
             {
@@ -605,42 +693,52 @@ void TupleAnnexStep::executeWithOrderBy()
     fOutputDL->endOfInput();
 }
 
-void TupleAnnexStep::executeParallelOrderBy()
+void TupleAnnexStep::finalizeParallelOrderBy()
 {
-    utils::setThreadName("TASwParOrd");
+    fOutputDL->endOfInput();
+}
+
+void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
+{
+    utils::setThreadName("TASwParOrd" + id);
     RGData rgDataIn;
     RGData rgDataOut;
     bool more = false;
+//    std::cout << "Running TASwParOrd" << id << std::endl;
+    uint64_t dlOffset = 0;
 
     try
     {
-        more = fInputDL->next(fInputIterator, &rgDataIn);
-
-        if (traceOn()) dlTimes.setFirstReadTime();
-
-        StepTeleStats sts;
-        sts.query_uuid = fQueryUuid;
-        sts.step_uuid = fStepUuid;
-        sts.msg_type = StepTeleStats::ST_START;
-        sts.total_units_of_work = 1;
-        postStepStartTele(sts);
-
+        more = fInputDL->next(fInputIteratorsList[id], &rgDataIn);
+        if (more) dlOffset++;
+        
         while (more && !cancelled())
         {
-            fRowGroupIn.setData(&rgDataIn);
-            fRowGroupIn.getRow(0, &fRowIn);
-
-            for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled(); ++i)
+            if (dlOffset%fMaxThreads == id)
             {
-                fOrderBy->processRow(fRowIn);
-                fRowIn.nextRow();
-            }
+                fRowGroupInList[id].setData(&rgDataIn);
+    //            std::cout << "rg" << id << " " << fRowGroupInList[id].toString() << std::endl;
+                fRowGroupInList[id].getRow(0, &fRowInList[id]);
 
-            more = fInputDL->next(fInputIterator, &rgDataIn);
+                //std::cout << "id " << id << " " << fRowInList[id].toString() << std::endl;
+                //std::cout << "id " << id << " " << fRowGroupInList[id].getRowCount() << std::endl;
+
+                std::cout << fOrderByList[id]->toString() << std::endl;
+                for (uint64_t i = 0; i < fRowGroupInList[id].getRowCount() && !cancelled(); ++i)
+                {
+                    fOrderByList[id]->processRow(fRowInList[id]);
+                    fRowInList[id].nextRow();
+                }
+            }
+            
+            // Implement a method to skip elements in FIFO
+            more = fInputDL->next(fInputIteratorsList[id], &rgDataIn);
+            if(more) dlOffset++;
         }
 
-        fOrderBy->finalize();
-
+        //fOrderBy->finalize();
+   
+        /* 
         if (!cancelled())
         {
             while (fOrderBy->getData(rgDataIn))
@@ -681,7 +779,7 @@ void TupleAnnexStep::executeParallelOrderBy()
                     fOutputDL->insert(rgDataOut);
                 }
             }
-        }
+        }*/
     }
     catch (const std::exception& ex)
     {
@@ -693,11 +791,10 @@ void TupleAnnexStep::executeParallelOrderBy()
                      ERR_IN_PROCESS, fErrorInfo, fSessionId);
     }
 
+    // read out the input DL
     while (more)
-        more = fInputDL->next(fInputIterator, &rgDataIn);
+        more = fInputDL->next(fInputIteratorsList[id], &rgDataIn);
 
-    // Bug 3136, let mini stats to be formatted if traceOn.
-    fOutputDL->endOfInput();
 }
 
 const RowGroup& TupleAnnexStep::getOutputRowGroup() const

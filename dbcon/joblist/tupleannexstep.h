@@ -90,6 +90,14 @@ public:
         fLimitStart = s;
         fLimitCount = c;
     }
+    void setParallelOp()
+    {
+        fParallelOp = true;
+    }
+    void setMaxThreads(uint32_t number)
+    {
+        fMaxThreads = number;
+    }
 
     virtual bool stringTableFriendly()
     {
@@ -100,36 +108,48 @@ public:
 
 protected:
     void execute();
+    void execute(uint32_t);
     void executeNoOrderBy();
     void executeWithOrderBy();
-    void executeParallelOrderBy();
+    void executeParallelOrderBy(uint64_t id);
     void executeNoOrderByWithDistinct();
     void formatMiniStats();
     void printCalTrace();
+    void finalizeParallelOrderBy();
 
     // input/output rowgroup and row
     rowgroup::RowGroup      fRowGroupIn;
+    std::vector<rowgroup::RowGroup>      fRowGroupInList;
     rowgroup::RowGroup      fRowGroupOut;
     rowgroup::RowGroup      fRowGroupDeliver;
     rowgroup::Row           fRowIn;
+    std::vector<rowgroup::Row>      fRowInList;
     rowgroup::Row           fRowOut;
 
     // for datalist
     RowGroupDL*             fInputDL;
     RowGroupDL*             fOutputDL;
     uint64_t                fInputIterator;
+    std::vector<uint64_t>   fInputIteratorsList;
     uint64_t                fOutputIterator;
 
     class Runner
     {
     public:
-        Runner(TupleAnnexStep* step) : fStep(step) { }
+        Runner(TupleAnnexStep* step) : 
+            fStep(step), id(0) { }
+        Runner(TupleAnnexStep* step, uint32_t id) : 
+            fStep(step), id(id) { }
         void operator()()
         {
-            fStep->execute();
+            if(id)
+                fStep->execute(id);
+            else
+                fStep->execute();
         }
 
         TupleAnnexStep*     fStep;
+        uint16_t            id;
     };
     uint64_t fRunner; // thread pool handle
 
@@ -137,9 +157,11 @@ protected:
     uint64_t                fRowsReturned;
     uint64_t                fLimitStart;
     uint64_t                fLimitCount;
+    uint64_t                fMaxThreads;
     bool                    fLimitHit;
     bool                    fEndOfResult;
     bool                    fDistinct;
+    bool                    fParallelOp;
 
     LimitedOrderBy*         fOrderBy;
     TupleConstantStep*      fConstant;
@@ -147,6 +169,9 @@ protected:
     funcexp::FuncExp*       fFeInstance;
     JobList*                fJobList;
 
+    // WIP MCOL-894 try single linked list here
+    std::vector<LimitedOrderBy*> fOrderByList;
+    std::vector<uint64_t> fRunnersList;
 };
 
 

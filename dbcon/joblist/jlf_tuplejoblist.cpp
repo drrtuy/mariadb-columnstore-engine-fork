@@ -484,6 +484,8 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
         deliverySteps[CNX_VTABLE_ID] = ws;
     }
 
+    // WIP MCOL-894 we don't need to run sorting|distinct 
+    // every time
 //    if ((jobInfo.limitCount != (uint64_t) - 1) ||
 //            (jobInfo.constantCol == CONST_COL_EXIST) ||
 //            (jobInfo.hasDistinct))
