@@ -188,8 +188,9 @@ public:
         return fRule->less(fData, rhs.fData);
     }
 
-    rowgroup::Row::Pointer                        fData;
+    rowgroup::Row::Pointer          fData;
     CompareRule*                    fRule;
+    uint64_t                        fThreadId;
 };
 
 
@@ -253,6 +254,10 @@ public:
     bool distinct() const
     {
         return fDistinct;
+    }
+    std::priority_queue<OrderByRow>& getQueue()
+    {
+        return fOrderByQueue;
     }
 
 protected:

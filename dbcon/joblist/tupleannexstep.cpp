@@ -66,9 +66,6 @@ using namespace querytele;
 
 #include "tupleannexstep.h"
 
-// WIP MCOL-894
-#include <unistd.h>
-
 namespace
 {
 struct TAHasher
@@ -293,6 +290,8 @@ void TupleAnnexStep::join()
     if(fParallelOp)
     {
         jobstepThreadPool.join(fRunnersList);
+        // WIP move this into a separate JobStep method
+        finalizeParallelOrderBy();
     }
     else
     {
@@ -398,7 +397,6 @@ void TupleAnnexStep::execute(uint32_t id)
     if(fOrderByList[id])
         executeParallelOrderBy(id);
 
-    finalizeParallelOrderBy();
 }
 
 void TupleAnnexStep::executeNoOrderBy()
@@ -596,7 +594,6 @@ void TupleAnnexStep::executeWithOrderBy()
     RGData rgDataOut;
     bool more = false;
 
-    std::cout << "TASwOrd: fInputDL size " << fInputDL->totalSize() << std::endl;
     try
     {
         more = fInputDL->next(fInputIterator, &rgDataIn);
@@ -617,10 +614,6 @@ void TupleAnnexStep::executeWithOrderBy()
             fRowGroupIn.setData(&rgDataIn);
             fRowGroupIn.getRow(0, &fRowIn);
 
-            std::cout << "TASwOrd: rgIn rows " << fRowGroupIn.getRowCount() << std::endl;
-            //std::cout << "TASwOrd: rgIn  " << fRowGroupIn.toString() << std::endl;
-            std::cout << fOrderBy->toString() << std::endl;
-
             for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled(); ++i)
             {
                 fOrderBy->processRow(fRowIn);
@@ -629,8 +622,6 @@ void TupleAnnexStep::executeWithOrderBy()
 
             more = fInputDL->next(fInputIterator, &rgDataIn);
         }
-
-        std::cout << "TASwOrd: number of row groups " << rgCounter << std::endl;
 
         fOrderBy->finalize();
 
@@ -695,16 +686,125 @@ void TupleAnnexStep::executeWithOrderBy()
 
 void TupleAnnexStep::finalizeParallelOrderBy()
 {
-    fOutputDL->endOfInput();
+    uint64_t count = 0;
+
+    rowgroup::RGData rgDataIn;
+    rowgroup::RGData rgDataOut;
+    // WIP Remove hardcode and research the number
+    rgDataOut.reinit(fRowGroupInList[1], 8192);
+    fRowGroupOut.setData(&rgDataOut);
+    fRowGroupOut.resetRowGroup(0);
+    fRowGroupOut.getRow(0, &fRowOut);
+
+    fRowGroupInList[1].initRow(&fRowIn);
+
+    std::priority_queue<ordering::OrderByRow> finalPQ;
+
+    // We shouldn't use parallel execution if there
+    // are less then num of threads RGData units.
+    // skip unused threads here
+    std::vector<uint64_t> activeThreadsIds;
+    for(uint64_t id = 1; id <= fMaxThreads; id++)
+    {
+        // mb get queue pointers outside of the loop
+        if(fOrderByList[id]->getQueue().size() == 0)
+            continue;
+        // The reference could produce segfault here
+        ordering::OrderByRow& topOBRow = 
+            const_cast<ordering::OrderByRow&>(fOrderByList[id]->getQueue().top());
+        topOBRow.fThreadId = id;
+        finalPQ.push(topOBRow);
+        activeThreadsIds.push_back(id);
+    }
+
+    // consider the case when there is one RGData 
+    // and there is less then limit records in it
+    // This loop will return a multiply of fMaxThreads
+    // So RowGroup count must be changed
+    while(count < fLimitCount)
+    {
+        ordering::OrderByRow& topOBRow = const_cast<ordering::OrderByRow&>(finalPQ.top());
+        // If limit > RowGroup size then need to check for empty PQ
+        // Have to address this
+        ordering::OrderByRow& nextOBRow = 
+            const_cast<ordering::OrderByRow&>(fOrderByList[topOBRow.fThreadId]->getQueue().top());
+        nextOBRow.fThreadId = topOBRow.fThreadId;
+
+        fRowIn.setData(topOBRow.fData);
+        copyRow(fRowIn, &fRowOut);
+        fRowGroupOut.incRowCount();
+        // replace with nextRow(offset)
+        fRowOut.nextRow();
+
+        finalPQ.pop();
+        finalPQ.push(nextOBRow);
+        fOrderByList[topOBRow.fThreadId]->getQueue().pop();
+        count++;
+    }
+
+    std::cout << " finalizeParallelOrderBy() fRowGroupOut " << fRowGroupOut.toString() << std::endl;
+
+    if (fRowGroupOut.getRowCount() > 0)
+    {
+        fRowsReturned += fRowGroupOut.getRowCount();
+        fOutputDL->insert(rgDataOut);
+    }
+
+
+//fOrderBy->finalize();
+/* 
+if (!cancelled())
+{
+    while (fOrderBy->getData(rgDataIn))
+    {
+        if (fConstant == NULL &&
+                fRowGroupOut.getColumnCount() == fRowGroupIn.getColumnCount())
+        {
+            rgDataOut = rgDataIn;
+            fRowGroupOut.setData(&rgDataOut);
+        }
+        else
+        {
+            fRowGroupIn.setData(&rgDataIn);
+            fRowGroupIn.getRow(0, &fRowIn);
+
+            rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
+            fRowGroupOut.setData(&rgDataOut);
+            fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
+            fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
+            fRowGroupOut.getRow(0, &fRowOut);
+
+            for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
+            {
+                if (fConstant)
+                    fConstant->fillInConstants(fRowIn, fRowOut);
+                else
+                    copyRow(fRowIn, &fRowOut);
+
+                fRowGroupOut.incRowCount();
+                fRowOut.nextRow();
+                fRowIn.nextRow();
+            }
+        }
+
+        if (fRowGroupOut.getRowCount() > 0)
+        {
+            fRowsReturned += fRowGroupOut.getRowCount();
+            fOutputDL->insert(rgDataOut);
+        }
+    }
+}*/
+
+fOutputDL->endOfInput();
 }
 
 void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
 {
+    // WIP this set doesn't work properly
     utils::setThreadName("TASwParOrd" + id);
     RGData rgDataIn;
     RGData rgDataOut;
     bool more = false;
-//    std::cout << "Running TASwParOrd" << id << std::endl;
     uint64_t dlOffset = 0;
 
     try
@@ -723,7 +823,7 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
                 //std::cout << "id " << id << " " << fRowInList[id].toString() << std::endl;
                 //std::cout << "id " << id << " " << fRowGroupInList[id].getRowCount() << std::endl;
 
-                std::cout << fOrderByList[id]->toString() << std::endl;
+                //std::cout << fOrderByList[id]->toString() << std::endl;
                 for (uint64_t i = 0; i < fRowGroupInList[id].getRowCount() && !cancelled(); ++i)
                 {
                     fOrderByList[id]->processRow(fRowInList[id]);
@@ -736,50 +836,6 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
             if(more) dlOffset++;
         }
 
-        //fOrderBy->finalize();
-   
-        /* 
-        if (!cancelled())
-        {
-            while (fOrderBy->getData(rgDataIn))
-            {
-                if (fConstant == NULL &&
-                        fRowGroupOut.getColumnCount() == fRowGroupIn.getColumnCount())
-                {
-                    rgDataOut = rgDataIn;
-                    fRowGroupOut.setData(&rgDataOut);
-                }
-                else
-                {
-                    fRowGroupIn.setData(&rgDataIn);
-                    fRowGroupIn.getRow(0, &fRowIn);
-
-                    rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-                    fRowGroupOut.setData(&rgDataOut);
-                    fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
-                    fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
-                    fRowGroupOut.getRow(0, &fRowOut);
-
-                    for (uint64_t i = 0; i < fRowGroupIn.getRowCount(); ++i)
-                    {
-                        if (fConstant)
-                            fConstant->fillInConstants(fRowIn, fRowOut);
-                        else
-                            copyRow(fRowIn, &fRowOut);
-
-                        fRowGroupOut.incRowCount();
-                        fRowOut.nextRow();
-                        fRowIn.nextRow();
-                    }
-                }
-
-                if (fRowGroupOut.getRowCount() > 0)
-                {
-                    fRowsReturned += fRowGroupOut.getRowCount();
-                    fOutputDL->insert(rgDataOut);
-                }
-            }
-        }*/
     }
     catch (const std::exception& ex)
     {
