@@ -46,7 +46,7 @@ public:
     LimitedOrderBy();
     virtual ~LimitedOrderBy();
 
-    void initialize(const rowgroup::RowGroup&, const JobInfo&);
+    void initialize(const rowgroup::RowGroup&, const JobInfo&, bool invertRules = false);
     void processRow(const rowgroup::Row&);
     uint64_t getKeyLength() const;
     const std::string toString() const;

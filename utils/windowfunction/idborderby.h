@@ -55,6 +55,9 @@ namespace ordering
 
 // forward reference
 class  IdbCompare;
+class OrderByRow;
+
+typedef std::priority_queue<OrderByRow> SortingPQ;
 
 // order by specification
 struct IdbSortSpec
@@ -79,6 +82,10 @@ public:
     virtual ~Compare() {}
 
     virtual int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer) = 0;
+    void revertSortSpec()
+    {
+        fSpec.fAsc = -fSpec.fAsc;
+    }
 
 protected:
     IdbSortSpec fSpec;
@@ -147,6 +154,7 @@ public:
     bool less(rowgroup::Row::Pointer r1, rowgroup::Row::Pointer r2);
 
     void compileRules(const std::vector<IdbSortSpec>&, const rowgroup::RowGroup&);
+    void revertRules();
 
     std::vector<Compare*>           fCompares;
     IdbCompare*                     fIdbCompare;
@@ -188,8 +196,9 @@ public:
         return fRule->less(fData, rhs.fData);
     }
 
-    rowgroup::Row::Pointer                        fData;
+    rowgroup::Row::Pointer          fData;
     CompareRule*                    fRule;
+    uint64_t                        fThreadId;
 };
 
 
@@ -254,10 +263,18 @@ public:
     {
         return fDistinct;
     }
+    SortingPQ& getQueue()
+    {
+        return fOrderByQueue;
+    }
+    CompareRule &getRule()
+    {
+        return fRule;
+    }
 
 protected:
     std::vector<IdbSortSpec>            fOrderByCond;
-    std::priority_queue<OrderByRow>     fOrderByQueue;
+    SortingPQ     fOrderByQueue;
     rowgroup::Row                       fRow0;
     CompareRule                         fRule;
 

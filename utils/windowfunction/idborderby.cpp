@@ -6,8 +6,8 @@
    as published by the Free Software Foundation; version 2 of
    the License.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   his program is distributed in the hope that it will be useful,
+   ut WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
@@ -251,6 +251,16 @@ bool CompareRule::less(Row::Pointer r1, Row::Pointer r2)
 
     return false;
 }
+
+void CompareRule::revertRules()
+{
+    std::vector<Compare*>::iterator fCompareIter = fCompares.begin();
+    for(; fCompareIter!=fCompares.end(); fCompareIter++)
+    {
+        (*fCompareIter)->revertSortSpec();
+    }
+}
+
 
 
 void CompareRule::compileRules(const std::vector<IdbSortSpec>& spec, const rowgroup::RowGroup& rg)
