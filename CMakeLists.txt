@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
-project(columnstore
+project(columnstore 
   LANGUAGES C CXX
   VERSION 1.4.0.0
   DESCRIPTION "Massively parallel and distributed columnar storage engine"
@@ -9,6 +9,7 @@ project(columnstore
 set(RELEASE_VERSION 1)
 
 
+option(BUILD_MISSING_TOOLS "Attempt to download and build missing tools during compilation?" TRUE)
 
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
@@ -71,7 +72,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_CURRENT_BINARY_DIR}/.external)
 list(APPEND ADDITIONAL_MAKE_CLEAN_FILES ${CMAKE_CURRENT_BINARY_DIR}/.external)
-
 
 option(BUILD_MISSING_TOOLS "Attempt to download and build missing tools during compilation?" TRUE)
 

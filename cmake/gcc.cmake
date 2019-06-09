@@ -9,13 +9,6 @@ function(set_compile_options _switch)
   add_compile_options($<$<BOOL:${${switch_name}}>:${_switch}>)
 endfunction()
 
-
-set(ENV{GCC_COLORS} "error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01")
-unset(CMAKE_REQUIRE_FLAGS)
-check_cxx_compiler_flag("-fdiagnostics-color=auto" COMPILER_COLOR_MESSAGES)
-add_compile_options($<$<AND:$<BOOL:COMPILER_COLOR_MESSAGES>,$<BOOL:CMAKE_COLOR_MAKEFILE>>:-fdiagnostics-color=auto>)
-
-
 # always on
 add_compile_options(-pipe)
 add_compile_options(-march=core2)
@@ -30,8 +23,10 @@ add_compile_options(-Wl,-z,now) # resolve all symbols when loaded or started rat
 add_compile_options(-Wl,-z,relro) # mark segments are read-only after relocation
 add_compile_options(-Wl,-map) # generate map file
 
-
-add_compile_options($<$<BOOL:${CMAKE_POSITION_INDEPENDENT_CODE}>:-pie>)
+option(ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" TRUE)
+mark_as_advanced(ENABLE_POSITION_INDEPENDENT_CODE)
+set(CMAKE_POSITION_INDEPENDENT_CODE ${ENABLE_POSITION_INDEPENDENT_CODE})
+add_compile_options($<$<BOOL:${ENABLE_POSITION_INDEPENDENT_CODE}>:-pie>)
 
 
 option(ENABLE_STACK_PROTECTION "Enable stack protection" TRUE)
@@ -129,7 +124,11 @@ mark_as_advanced(OMIT_FRAME_POINTERS)
 add_compile_options($<IF:$<BOOL:${OMIT_FRAME_POINTERS}>,-fomit-frame-pointer,-fno-omit-frame-pointer>)
 
 
-if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+option(ENABLE_LTO "Enable link-time optimizations" TRUE)
+mark_as_advanced(ENABLE_LTO)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${ENABLE_LTO})
+if(ENABLE_LTO)
+  add_compile_options(-flto)
   add_compile_options(-Wl,-flto)
   add_compile_options(-Wl,-fuse-linker-plugin)
   
@@ -147,6 +146,7 @@ add_compile_options($<IF:$<BOOL:${ENABLE_STRICT_ALIASING}>,-fstrict-aliasing,-fn
 option(ENABLE_TREE_VECTORIZATION "Perform vectorization on trees" FALSE)
 mark_as_advanced(ENABLE_TREE_VECTORIZATION)
 add_compile_options($<IF:$<BOOL:${ENABLE_TREE_VECTORIZATION}>,-ftree-vectorize,-fno-tree-vectorize>)
+
 
 
 

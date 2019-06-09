@@ -36,4 +36,5 @@ set_target_properties(Readline::Readline PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES ${Readline_INCLUDE_DIRS}
   )
 
+unset(_Readline_ROOT)
 
