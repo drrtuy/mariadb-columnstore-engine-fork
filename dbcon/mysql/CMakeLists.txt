@@ -23,8 +23,6 @@ cs_add_library(calmysql SHARED
     ha_pseudocolumn.cpp)
 
 target_compile_definitions(calmysql PRIVATE MYSQL_DYNAMIC_PLUGIN)
-add_definitions(-DEBUG_WALK_COND)
-add_definitions(-DINFINIDB_DEBUG)
 
 #set_source_files_properties(ha_calpont.cpp PROPERTIES COMPILE_FLAGS "-fno-rtti -fno-implicit-templates")
 
