@@ -52,10 +52,10 @@ int IntCompare::operator()(IdbCompare* l, Row::Pointer r1, Row::Pointer r2)
     l->row1().setData(r1);
     l->row2().setData(r2);
 
-    bool b1 = l->row1().isNullValue(fSpec.fIndex);
+    int ret = 0;
+/*    bool b1 = l->row1().isNullValue(fSpec.fIndex);
     bool b2 = l->row2().isNullValue(fSpec.fIndex);
 
-    int ret = 0;
 
     if (b1 == true || b2 == true)
     {
@@ -64,7 +64,7 @@ int IntCompare::operator()(IdbCompare* l, Row::Pointer r1, Row::Pointer r2)
         else if (b1 == true && b2 == false)
             ret = -fSpec.fNf;
     }
-    else
+    else*/
     {
         int64_t v1 = l->row1().getIntField(fSpec.fIndex);
         int64_t v2 = l->row2().getIntField(fSpec.fIndex);
@@ -373,6 +373,7 @@ OrderByData::OrderByData(const std::vector<IdbSortSpec>& spec, const rowgroup::R
 IdbOrderBy::IdbOrderBy() :
     fDistinct(false), fMemSize(0), fRowsPerRG(8192), fErrorCode(0), fRm(NULL)
 {
+    fOrderByQueue.reserve(100000000);
 }
 
 

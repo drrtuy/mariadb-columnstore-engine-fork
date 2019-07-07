@@ -40,7 +40,7 @@
 #include "rowgroup.h"
 #include "hasher.h"
 #include "stlpoolallocator.h"
-
+#include "heap.h"
 
 // forward reference
 namespace joblist
@@ -52,12 +52,29 @@ class  ResourceManager;
 namespace ordering
 {
 
+template<typename _Tp, typename _Sequence = vector<_Tp>,
+    typename _Compare  = less<typename _Sequence::value_type> >
+class reservablePQ: private std::priority_queue<_Tp, _Sequence, _Compare>
+{
+public:
+    typedef typename std::priority_queue<_Tp, _Sequence, _Compare>::size_type size_type;
+    reservablePQ(size_type capacity = 0) { reserve(capacity); };
+    void reserve(size_type capacity) { this->c.reserve(capacity); } 
+    size_type capacity() const { return this->c.capacity(); } 
+    using std::priority_queue<_Tp, _Sequence, _Compare>::size;
+    using std::priority_queue<_Tp, _Sequence, _Compare>::top;
+    using std::priority_queue<_Tp, _Sequence, _Compare>::pop;
+    using std::priority_queue<_Tp, _Sequence, _Compare>::push;
+    using std::priority_queue<_Tp, _Sequence, _Compare>::empty;
+};
 
 // forward reference
 class  IdbCompare;
 class OrderByRow;
 
-typedef std::priority_queue<OrderByRow> SortingPQ;
+typedef rocksdb::BinaryHeap<OrderByRow> SortingPQ;
+//typedef reservablePQ<OrderByRow> SortingPQ;
+
 
 // order by specification
 struct IdbSortSpec
@@ -198,7 +215,6 @@ public:
 
     rowgroup::Row::Pointer          fData;
     CompareRule*                    fRule;
-    uint64_t                        fThreadId;
 };
 
 

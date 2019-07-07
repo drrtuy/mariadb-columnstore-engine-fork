@@ -21,7 +21,9 @@
 #ifndef JOBLIST_TUPLEANNEXSTEP_H
 #define JOBLIST_TUPLEANNEXSTEP_H
 
+#include <queue>
 #include "jobstep.h"
+#include "limitedorderby.h"
 
 
 // forward reference
@@ -119,11 +121,9 @@ protected:
 
     // input/output rowgroup and row
     rowgroup::RowGroup      fRowGroupIn;
-    std::vector<rowgroup::RowGroup>      fRowGroupInList;
     rowgroup::RowGroup      fRowGroupOut;
     rowgroup::RowGroup      fRowGroupDeliver;
     rowgroup::Row           fRowIn;
-    std::vector<rowgroup::Row>      fRowInList;
     rowgroup::Row           fRowOut;
 
     // for datalist
@@ -171,9 +171,19 @@ protected:
 
     // WIP MCOL-894 try single linked list here
     std::vector<LimitedOrderBy*> fOrderByList;
+    std::vector<std::vector<ordering::OrderByRow>*> fSortingPlayGround;
     std::vector<uint64_t> fRunnersList;
 };
 
+template <class T>
+class reservablePQ: private std::priority_queue<T>
+{
+public:
+    typedef typename std::priority_queue<T>::size_type size_type;
+    reservablePQ(size_type capacity = 0) { reserve(capacity); };
+    void reserve(size_type capacity) { this->c.reserve(capacity); } 
+    size_type capacity() const { return this->c.capacity(); } 
+};
 
 } // namespace
 
