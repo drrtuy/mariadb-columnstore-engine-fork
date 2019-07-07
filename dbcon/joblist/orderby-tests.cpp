@@ -128,7 +128,8 @@ class FilterDriver : public CppUnit::TestFixture
     CPPUNIT_TEST_SUITE_END();
 
 private:
-   void orderByTest_nRGs(uint64_t numRows, uint64_t maxThreads,
+   void orderByTest_nRGs(uint64_t numRows, uint64_t limit, 
+    uint64_t maxThreads,
     bool parallelExecution,
     bool generateRandValues) 
     {
@@ -151,7 +152,6 @@ private:
         // 1st column is the sorting key
         uint8_t tupleKey = 1;
         uint8_t offset = 0;
-        uint8_t limit = 10;
         uint16_t rowsPerRG = 8192; // hardcoded max rows in RowGroup value 
         uint32_t numberOfRGs = numRows / rowsPerRG;
 
@@ -261,6 +261,7 @@ private:
         spdlOut->rowGroupDL(dlOut);
         joblist::JobStepAssociation jsaOut;
         jsaOut.outAdd(spdlOut);
+        //uint64_t outputDLIter = dlOut->getIterator();
         tns.outputAssociation(jsaOut);
 
         // Run Annex Step
@@ -273,14 +274,21 @@ private:
         // serialize RGData into bs and later back 
         // to follow ExeMgr whilst getting TAS result RowGroup
         messageqcpp::ByteStream bs;
-        uint32_t result = tns.nextBand(bs);
-        CPPUNIT_ASSERT( result == limit );  
+        uint32_t result = 0;
         rowgroup::RowGroup outRG(inRG);
         rowgroup::RGData outRGData(outRG);
+        result = tns.nextBand(bs);
+        /*bool more = false;
+        do
+        {
+            dlOut->next(outputDLIter, &outRGData);
+        } while (more);*/
+        std::cout << "orderByTest_nRGs result " << result << std::endl;
+        //CPPUNIT_ASSERT( result == limit );  
         outRGData.deserialize(bs);
         outRG.setData(&outRGData);
 
-        std::cout << "orderByTest_nRGs output RG " << outRG.toString() << std::endl;
+        //std::cout << "orderByTest_nRGs output RG " << outRG.toString() << std::endl;
         std::cout << "maxInt " << maxInt << std::endl;
         {
             rowgroup::Row r;
@@ -297,13 +305,15 @@ private:
     void ORDERBY_TIME_TEST()
     {
         uint64_t numRows = 8192;
-        uint64_t maxThreads = 8;
+        uint64_t maxThreads = 16;
+        uint64_t limit = 100;
         bool parallel = true;
-        //bool woParallel = false;
+        bool woParallel = false;
         bool generateRandValues = true;
         //orderByTest_nRGs(numRows, maxThreads, woParallel);
         //orderByTest_nRGs(numRows * 14400, maxThreads, woParallel);
-        orderByTest_nRGs(numRows * 14400, maxThreads, parallel, generateRandValues);
+        orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues);
+        orderByTest_nRGs(numRows * 14400, limit, maxThreads, parallel, generateRandValues);
     }
     void QUICK_TEST()
     {

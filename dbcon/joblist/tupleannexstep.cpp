@@ -143,8 +143,6 @@ TupleAnnexStep::~TupleAnnexStep()
             fOrderByList.clear();
         }
 
-        fRowGroupInList.clear();
-        fRowInList.clear();
         fInputIteratorsList.clear();
         fRunnersList.clear();
     }
@@ -171,37 +169,24 @@ void TupleAnnexStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
 {
     // Initialize structures used by separate workers
     uint64_t id = 1;
-    if(fParallelOp)
+    fRowGroupIn = rgIn;
+    fRowGroupIn.initRow(&fRowIn);
+    // WIP MCOL-894
+    // apply this and remove other if per-thread init works
+    // WIP MCOL-894 Put this block into AdjustLastStep
+    if(fParallelOp && fOrderBy)
     {
-        // WIP MCOL-894
-        // apply this and remove other if per-thread init works
-        fRowGroupIn = rgIn;
-
-        fRowGroupInList.resize(fMaxThreads+1);
-        fRowInList.resize(fMaxThreads+1);
+        fOrderByList.reserve(fMaxThreads+1);
         for(id = 1; id <= fMaxThreads; id++)
         {
-            fRowInList[id] = fRowIn;
-            fRowGroupInList[id] = rgIn;
-            fRowGroupInList[id].initRow(&fRowInList[id]);
-        }
-        // WIP MCOL-894 Put this block into AdjustLastStep
-        if (fOrderBy)
-        {
-            fOrderByList.resize(fMaxThreads+1);
-            for(id = 1; id <= fMaxThreads; id++)
-            {
-                // WIP use SP here?
-                fOrderByList[id] = new LimitedOrderBy();
-                fOrderByList[id]->distinct(fDistinct);
-                fOrderByList[id]->initialize(rgIn, jobInfo);
-            }
+            // WIP use SP here?
+            fOrderByList[id] = new LimitedOrderBy();
+            fOrderByList[id]->distinct(fDistinct);
+            fOrderByList[id]->initialize(rgIn, jobInfo);
         }
     }
-    else
+    //else
     {
-        //fRowGroupIn = rgIn;
-        fRowGroupIn.initRow(&fRowIn);
         if (fOrderBy)
         {
             fOrderBy->distinct(fDistinct);
@@ -693,19 +678,20 @@ void TupleAnnexStep::finalizeParallelOrderBy()
     uint64_t count = 0;
     uint32_t rowSize = 0;
 
-    rowgroup::RGData rgDataIn;
     rowgroup::RGData rgDataOut;
     // WIP Remove hardcode and research the number
-    rgDataOut.reinit(fRowGroupInList[1], 8192);
+    rgDataOut.reinit(fRowGroupIn, 8192);
     fRowGroupOut.setData(&rgDataOut);
     fRowGroupOut.resetRowGroup(0);
     // Calculate offset here
     fRowGroupOut.getRow(0, &fRowOut);
 
     // There must be at least one RowGroup
-    fRowGroupInList[1].initRow(&fRowIn);
+    //fRowGroupIn.initRow(&fRowIn);
 
     ordering::SortingPQ finalPQ;
+    // set fDistinct here
+    // add fDistinctMap
 
     // We shouldn't use parallel execution if there
     // are less then num of threads RGData units.
@@ -713,7 +699,8 @@ void TupleAnnexStep::finalizeParallelOrderBy()
     std::vector<uint64_t> activeThreadsIds;
     for(uint64_t id = 1; id <= fMaxThreads; id++)
     {
-        // Revers the ordering rules
+        // Revert the ordering rules before we
+        // add rows into the final PQ.
         fOrderByList[id]->getRule().revertRules();
         ordering::SortingPQ &currentPQ = fOrderByList[id]->getQueue();
         // Use references calculated outside of the loop
@@ -722,7 +709,7 @@ void TupleAnnexStep::finalizeParallelOrderBy()
             // The reference could produce segfault here
             ordering::OrderByRow &topOBRow =
                 const_cast<ordering::OrderByRow&>(currentPQ.top());
-            fRowIn.setData(topOBRow.fData);
+            //fRowIn.setData(topOBRow.fData);
             finalPQ.push(topOBRow);
             currentPQ.pop();
         }
@@ -749,7 +736,7 @@ void TupleAnnexStep::finalizeParallelOrderBy()
         ordering::OrderByRow& topOBRow = const_cast<ordering::OrderByRow&>(finalPQ.top());
         // If limit > RowGroup size then need to check for empty PQ
         // Have to address this
-        //ordering::OrderByRow& nextOBRow = 
+        //ordering::OrderByRow& nextOBRow =
         //    const_cast<ordering::OrderByRow&>(fOrderByList[topOBRow.fThreadId]->getQueue().top());
         //nextOBRow.fThreadId = topOBRow.fThreadId;
 
@@ -836,6 +823,7 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
     rowgroup::RowGroup rg = fRowGroupIn;
     rg.initRow(&r);
     LimitedOrderBy *limOrderBy = fOrderByList[id];
+    ordering::CompareRule &sortingRule = limOrderBy->getRule();
 
     try
     {
@@ -864,14 +852,16 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
                 for (uint64_t i = 0; i < rowCount; ++i)
                 {
                     limOrderBy->processRow(r);
+                    //ordering::OrderByRow obRow(r, sortingRule);
                     r.nextRow(rowSize);
-                }
+               }
             }
             
-            // Implement a method to skip elements in FIFO
+    // Implement a method to skip elements in FIFO
             more = fInputDL->next(fInputIteratorsList[id], &rgDataIn);
             if(more) dlOffset++;
         }
+        
         //std::cout << "TupleAnnexStep::executeParallelOrderBy id " << id << " rowCount " << rowCount << std::endl;
 
     }
