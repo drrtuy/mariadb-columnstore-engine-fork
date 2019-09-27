@@ -16,6 +16,10 @@
 
 // ha_calpont.cpp includes this file.
 
+#include "ha_mcs_pushdown.h"
+
+typedef std::tr1::unordered_map<TABLE_LIST*, Item*> orig_on_expr_t;
+
 void check_walk(const Item* item, void* arg);
 
 void mutate_optimizer_flags(THD *thd_)
@@ -38,6 +42,30 @@ void restore_optimizer_flags(THD *thd_)
     {
         thd_->variables.optimizer_switch = orig_flags;
         set_original_optimizer_flags(0, thd_);
+    }
+}
+
+void save_original_on_expr(SELECT_LEX *select_lex, orig_on_expr_t &orig_on_expr)
+{
+    TABLE_LIST* table_ptr = select_lex->get_table_list();
+    for (; table_ptr; table_ptr = table_ptr->next_global)
+    {
+        if (table_ptr->on_expr)
+        {
+            orig_on_expr[table_ptr]= table_ptr->on_expr;
+        }
+    }
+}
+
+void restore_original_on_expr(SELECT_LEX *select_lex, orig_on_expr_t &orig_on_expr)
+{
+    TABLE_LIST* table_ptr = select_lex->get_table_list();
+    for (; table_ptr; table_ptr = table_ptr->next_global)
+    {
+        if (orig_on_expr[table_ptr])
+        {
+            table_ptr->on_expr= orig_on_expr[table_ptr];
+        }
     }
 }
 
@@ -339,7 +367,7 @@ void item_check(Item* item, bool* unsupported_feature)
  *    group_by_handler if success
  *    NULL in other case
  ***********************************************************/
-static group_by_handler*
+group_by_handler*
 create_calpont_group_by_handler(THD* thd, Query* query)
 {
     ha_calpont_group_by_handler* handler = NULL;
@@ -439,7 +467,7 @@ create_calpont_group_by_handler(THD* thd, Query* query)
  *    derived_handler if possible
  *    NULL in other case
  ***********************************************************/
-static derived_handler*
+derived_handler*
 create_columnstore_derived_handler(THD* thd, TABLE_LIST *derived)
 {
     ha_columnstore_derived_handler* handler = NULL;
@@ -659,7 +687,8 @@ int ha_calpont_group_by_handler::init_scan()
 {
     DBUG_ENTER("ha_calpont_group_by_handler::init_scan");
 
-    int rc = ha_calpont_impl_group_by_init(this, table);
+    mcs_handler_info mhi = mcs_handler_info(reinterpret_cast<void*>(this), GROUP_BY);
+    int rc = ha_calpont_impl_group_by_init(&mhi, table);
 
     DBUG_RETURN(rc);
 }
@@ -673,7 +702,7 @@ int ha_calpont_group_by_handler::init_scan()
 int ha_calpont_group_by_handler::next_row()
 {
     DBUG_ENTER("ha_calpont_group_by_handler::next_row");
-    int rc = ha_calpont_impl_group_by_next(this, table);
+    int rc = ha_calpont_impl_group_by_next(table);
 
     DBUG_RETURN(rc);
 }
@@ -687,8 +716,7 @@ int ha_calpont_group_by_handler::next_row()
 int ha_calpont_group_by_handler::end_scan()
 {
     DBUG_ENTER("ha_calpont_group_by_handler::end_scan");
-
-    int rc = ha_calpont_impl_group_by_end(this, table);
+    int rc = ha_calpont_impl_group_by_end(table);
 
     DBUG_RETURN(rc);
 }
@@ -706,7 +734,7 @@ int ha_calpont_group_by_handler::end_scan()
  *    select_handler if possible
  *    NULL in other case
  ***********************************************************/
-static select_handler*
+select_handler*
 create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
 {
     ha_columnstore_select_handler* handler = NULL;
@@ -737,6 +765,9 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
             group_list_ptrs->push_back(order);
         }
     }
+
+    orig_on_expr_t orig_on_expr;
+    save_original_on_expr(select_lex, orig_on_expr);
 
     bool unsupported_feature = false;
     // Select_handler use the short-cut that effectively disables
@@ -797,8 +828,10 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
         }
     }
 
+
     if (!unsupported_feature)
     {
+        restore_original_on_expr(select_lex, orig_on_expr);
         handler= new ha_columnstore_select_handler(thd, select_lex);
         // This is an ugly hack to call simplify_joins()
         mcs_handler_info mhi= mcs_handler_info(reinterpret_cast<void*>(handler), SELECT);
