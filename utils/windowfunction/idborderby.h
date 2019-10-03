@@ -72,9 +72,10 @@ public:
 class  IdbCompare;
 class OrderByRow;
 
+// WIP
 //typedef rocksdb::BinaryHeap<OrderByRow> SortingPQ;
-//typedef reservablePQ<OrderByRow> SortingPQ;
-typedef std::priority_queue<OrderByRow> SortingPQ;
+typedef reservablePQ<OrderByRow> SortingPQ;
+//typedef std::priority_queue<OrderByRow> SortingPQ;
 
 
 // order by specification
@@ -289,9 +290,9 @@ public:
         return fRule;
     }
 
+    SortingPQ                           fOrderByQueue;
 protected:
     std::vector<IdbSortSpec>            fOrderByCond;
-    SortingPQ     fOrderByQueue;
     rowgroup::Row                       fRow0;
     CompareRule                         fRule;
 

@@ -209,6 +209,8 @@ void LimitedOrderBy::finalize()
         fData.reinit(fRowGroup, fRowsPerRG);
         fRowGroup.setData(&fData);
         fRowGroup.resetRowGroup(0);
+        // *DRRTUY This approach won't work with
+        // OFSET > fRowsPerRG
         offset = offset != 0 ? offset - 1 : offset;
         fRowGroup.getRow(offset, &fRow0);
         
@@ -221,7 +223,8 @@ void LimitedOrderBy::finalize()
             offset--;
             fRow0.prevRow(rSize);
             fOrderByQueue.pop();
-
+            
+            // if RG has fRowsPerRG rows
             if(offset == (uint64_t)-1)
             {
                 tempRGDataList.push_front(fData);

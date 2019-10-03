@@ -21,10 +21,12 @@
 #ifndef JOBLIST_TUPLEANNEXSTEP_H
 #define JOBLIST_TUPLEANNEXSTEP_H
 
+// WIP
 #include <queue>
+#include <boost/thread/thread.hpp>
+
 #include "jobstep.h"
 #include "limitedorderby.h"
-
 
 // forward reference
 namespace fucexp
@@ -51,6 +53,8 @@ public:
     /** @brief TupleAnnexStep constructor
      */
     TupleAnnexStep(const JobInfo& jobInfo);
+    // Copy ctor to have a class mutex
+    TupleAnnexStep(const TupleAnnexStep &copy);
 
     /** @brief TupleAnnexStep destructor
      */
@@ -118,6 +122,7 @@ protected:
     void formatMiniStats();
     void printCalTrace();
     void finalizeParallelOrderBy();
+    void finalizeParallelOrderByDistinct();
 
     // input/output rowgroup and row
     rowgroup::RowGroup      fRowGroupIn;
@@ -172,6 +177,8 @@ protected:
     // WIP MCOL-894 try single linked list here
     std::vector<LimitedOrderBy*> fOrderByList;
     std::vector<uint64_t> fRunnersList;
+    uint16_t fFinishedThreads;
+    boost::mutex fParallelFinalizeMutex;
 };
 
 template <class T>

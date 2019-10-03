@@ -496,12 +496,12 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     TupleAnnexStep* tas = dynamic_cast<TupleAnnexStep*>(jobInfo.annexStep.get());
     tas->setLimit(jobInfo.limitStart, jobInfo.limitCount);
 
-//       if (jobInfo.limitCount != (uint64_t) - 1)
-//        {
     if (jobInfo.orderByColVec.size() > 0)
+    {
         tas->addOrderBy(new LimitedOrderBy());
-
-//        }
+        tas->setParallelOp();
+        tas->setMaxThreads(16);
+    }
 
     if (jobInfo.constantCol == CONST_COL_EXIST)
         tas->addConstant(new TupleConstantStep(jobInfo));
@@ -520,7 +520,12 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
         if (jobInfo.trace) cout << "Output RowGroup 2: " << rg2.toString() << endl;
 
         AnyDataListSPtr spdlIn(new AnyDataList());
-        RowGroupDL* dlIn = new RowGroupDL(1, jobInfo.fifoSize);
+        // WIP MCOL-894 set this to 16
+        RowGroupDL* dlIn;
+        if (jobInfo.orderByColVec.size() > 0)
+            dlIn = new RowGroupDL(16, jobInfo.fifoSize);
+        else
+            dlIn = new RowGroupDL(1, jobInfo.fifoSize);
         dlIn->OID(CNX_VTABLE_ID);
         spdlIn->rowGroupDL(dlIn);
         JobStepAssociation jsaIn;

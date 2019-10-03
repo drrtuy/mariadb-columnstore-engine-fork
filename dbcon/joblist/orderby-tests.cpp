@@ -131,7 +131,8 @@ private:
    void orderByTest_nRGs(uint64_t numRows, uint64_t limit, 
     uint64_t maxThreads,
     bool parallelExecution,
-    bool generateRandValues) 
+    bool generateRandValues,
+    bool hasDistinct) 
     {
         Timer timer;
         // This test creates TAS for single bigint column and run sorting on it.
@@ -160,6 +161,7 @@ private:
         jobInfo.orderByColVec.push_back(make_pair(tupleKey, false));
         jobInfo.limitStart = offset;
         jobInfo.limitCount = limit;
+        jobInfo.hasDistinct = hasDistinct;
         // JobInfo doesn't set these SP in ctor
         jobInfo.umMemLimit.reset(new int64_t);
         *(jobInfo.umMemLimit) = MEMORY_LIMIT;
@@ -177,8 +179,8 @@ private:
             {2, 10, 18}, //oldOffset
             {oid, oid}, // column oids
             {1, 1}, //keys
-            {execplan::CalpontSystemCatalog::BIGINT, 
-                execplan::CalpontSystemCatalog::BIGINT}, // types
+            {execplan::CalpontSystemCatalog::UBIGINT, 
+                execplan::CalpontSystemCatalog::UBIGINT}, // types
             {0, 0}, //scale
             {20, 20}, // precision
             20, // sTableThreshold
@@ -295,7 +297,7 @@ private:
             outRG.initRow(&r);
             outRG.getRow(0, &r);
             CPPUNIT_ASSERT(limit == outRG.getRowCount());
-            CPPUNIT_ASSERT(maxInt == r.getUintField(1));
+            CPPUNIT_ASSERT_EQUAL(maxInt, r.getUintField(1));
         }
 
         cout << "------------------------------------------------------------" << endl;
@@ -310,10 +312,14 @@ private:
         bool parallel = true;
         bool woParallel = false;
         bool generateRandValues = true;
+        bool hasDistinct = true;
+        bool noDistinct = false;
         //orderByTest_nRGs(numRows, maxThreads, woParallel);
         //orderByTest_nRGs(numRows * 14400, maxThreads, woParallel);
-        orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues);
-        orderByTest_nRGs(numRows * 14400, limit, maxThreads, parallel, generateRandValues);
+        orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues, noDistinct);
+        orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues, hasDistinct);
+        orderByTest_nRGs(numRows * 14400, limit, maxThreads, parallel, generateRandValues, noDistinct);
+        //orderByTest_nRGs(10, limit, maxThreads, parallel, generateRandValues, hasDistinct);
     }
     void QUICK_TEST()
     {
