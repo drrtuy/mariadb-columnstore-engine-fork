@@ -584,6 +584,16 @@ public:
         return fSpecHandlerProcessed;
     } 
 
+    void orderByThreads(const uint32_t number)
+    {
+        fOrderByThreads = number;
+    }
+    const uint32_t orderByThreads() const
+    {
+        return fOrderByThreads;
+    } 
+
+
     void selectSubList(const SelectList& selectSubList)
     {
         fSelectSubList = selectSubList;
@@ -883,6 +893,7 @@ private:
     
     // for specific handlers processing, e.g. GROUP BY
     bool fSpecHandlerProcessed;
+    uint32_t fOrderByThreads;
 
     // Derived table involved in the query. For derived table optimization
     std::vector<SCSEP> fSubSelectList;

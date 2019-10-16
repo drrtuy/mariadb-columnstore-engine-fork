@@ -40,7 +40,6 @@
 #include "rowgroup.h"
 #include "hasher.h"
 #include "stlpoolallocator.h"
-#include "heap.h"
 
 // forward reference
 namespace joblist
@@ -72,11 +71,7 @@ public:
 class  IdbCompare;
 class OrderByRow;
 
-// WIP
-//typedef rocksdb::BinaryHeap<OrderByRow> SortingPQ;
 typedef reservablePQ<OrderByRow> SortingPQ;
-//typedef std::priority_queue<OrderByRow> SortingPQ;
-
 
 // order by specification
 struct IdbSortSpec
@@ -110,6 +105,25 @@ protected:
     IdbSortSpec fSpec;
 };
 
+// Comparators for signed types
+
+class TinyIntCompare : public Compare
+{
+public:
+    TinyIntCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+
+class SmallIntCompare : public Compare
+{
+public:
+    SmallIntCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
 
 class IntCompare : public Compare
 {
@@ -120,23 +134,55 @@ public:
 };
 
 
-class UintCompare : public Compare
+class BigIntCompare : public Compare
 {
 public:
-    UintCompare(const IdbSortSpec& spec) : Compare(spec) {}
+    BigIntCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+// End of comparators for signed types
+// Comparators for unsigned types
+
+class UTinyIntCompare : public Compare
+{
+public:
+    UTinyIntCompare(const IdbSortSpec& spec) : Compare(spec) {}
 
     int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
 };
 
 
-class StringCompare : public Compare
+class USmallIntCompare : public Compare
 {
 public:
-    StringCompare(const IdbSortSpec& spec) : Compare(spec) {}
+    USmallIntCompare(const IdbSortSpec& spec) : Compare(spec) {}
 
     int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
 };
 
+
+class UIntCompare : public Compare
+{
+public:
+    UIntCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+
+class UBigIntCompare : public Compare
+{
+public:
+    UBigIntCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+// end of comparators for unsigned types
+
+// Comparators for float types
 
 class DoubleCompare : public Compare
 {
@@ -145,6 +191,7 @@ public:
 
     int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
 };
+
 
 class LongDoubleCompare : public Compare
 {
@@ -163,6 +210,48 @@ public:
     int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
 };
 
+// End of comparators for float types
+// Comparators for temporal types
+
+class DateCompare : public Compare
+{
+public:
+    DateCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+
+class DatetimeCompare : public Compare
+{
+public:
+    DatetimeCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+
+class TimeCompare : public Compare
+{
+public:
+    TimeCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+// End of comparators for temporal types
+
+// Comparators for non-fixed size types
+
+class StringCompare : public Compare
+{
+public:
+    StringCompare(const IdbSortSpec& spec) : Compare(spec) {}
+
+    int operator()(IdbCompare*, rowgroup::Row::Pointer, rowgroup::Row::Pointer);
+};
+
+// End of comparators for variable sized types
 
 class CompareRule
 {
@@ -234,7 +323,6 @@ public:
 
     bool operator()(rowgroup::Row::Pointer, rowgroup::Row::Pointer);
 
-//protected:
     std::vector<uint64_t>           fIndex;
 };
 

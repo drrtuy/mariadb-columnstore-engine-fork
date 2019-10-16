@@ -45,8 +45,6 @@ using namespace std;
 using namespace joblist;
 using namespace messageqcpp;
 
-
-
 // Timer class used by this tdriver to output elapsed times, etc.
 class Timer
 {
@@ -175,14 +173,22 @@ private:
         jobInfo.nonConstDelCols.push_back(srcp2);
 
         // create two columns RG. 1st is the sorting key, second is the data column
+        std::vector<uint32_t> offsets, roids, tkeys, cscale, cprecision;
+        std::vector<execplan::CalpontSystemCatalog::ColDataType> types;
+        offsets.push_back(2); offsets.push_back(10); offsets.push_back(18);
+        roids.push_back(oid); roids.push_back(oid);
+        tkeys.push_back(1); tkeys.push_back(1);
+        types.push_back(execplan::CalpontSystemCatalog::UBIGINT);
+        types.push_back(execplan::CalpontSystemCatalog::UBIGINT);
+        cscale.push_back(0); cscale.push_back(0);
+        cprecision.push_back(20); cprecision.push_back(20);
         rowgroup::RowGroup inRG(2, //column count
-            {2, 10, 18}, //oldOffset
-            {oid, oid}, // column oids
-            {1, 1}, //keys
-            {execplan::CalpontSystemCatalog::UBIGINT, 
-                execplan::CalpontSystemCatalog::UBIGINT}, // types
-            {0, 0}, //scale
-            {20, 20}, // precision
+            offsets, //oldOffset
+            roids, // column oids
+            tkeys, //keys
+            types, // types
+            cscale, //scale
+            cprecision, // precision
             20, // sTableThreshold
             false //useStringTable
         );
@@ -258,7 +264,9 @@ private:
         timer.stop(message);
 
         joblist::AnyDataListSPtr spdlOut(new AnyDataList());
-        joblist::RowGroupDL* dlOut = new RowGroupDL(1, jobInfo.fifoSize);
+        // Set the ring buffer big enough to take RGData-s with results b/c
+        // there is nobody to read out of the buffer.
+        joblist::RowGroupDL* dlOut = new RowGroupDL(1, numberOfRGs);
         dlOut->OID(oid);
         spdlOut->rowGroupDL(dlOut);
         joblist::JobStepAssociation jsaOut;
@@ -296,7 +304,7 @@ private:
             rowgroup::Row r;
             outRG.initRow(&r);
             outRG.getRow(0, &r);
-            CPPUNIT_ASSERT(limit == outRG.getRowCount());
+            CPPUNIT_ASSERT(limit == outRG.getRowCount() || outRG.getRowCount() == 8192);
             CPPUNIT_ASSERT_EQUAL(maxInt, r.getUintField(1));
         }
 
@@ -308,18 +316,17 @@ private:
     {
         uint64_t numRows = 8192;
         uint64_t maxThreads = 16;
-        uint64_t limit = 100;
+        // limit == 100000 is still twice as good to sort in parallel
+        // limit == 1000000 however is better to sort using single threaded sorting
+        uint64_t limit = 100000;
         bool parallel = true;
         bool woParallel = false;
         bool generateRandValues = true;
         bool hasDistinct = true;
         bool noDistinct = false;
-        //orderByTest_nRGs(numRows, maxThreads, woParallel);
-        //orderByTest_nRGs(numRows * 14400, maxThreads, woParallel);
-        orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues, noDistinct);
-        orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues, hasDistinct);
+        //orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues, noDistinct);
+        //orderByTest_nRGs(numRows * 14400, limit, maxThreads, woParallel, generateRandValues, hasDistinct);
         orderByTest_nRGs(numRows * 14400, limit, maxThreads, parallel, generateRandValues, noDistinct);
-        //orderByTest_nRGs(10, limit, maxThreads, parallel, generateRandValues, hasDistinct);
     }
     void QUICK_TEST()
     {

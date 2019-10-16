@@ -55,7 +55,7 @@ LimitedOrderBy::~LimitedOrderBy()
 }
 
 
-void LimitedOrderBy::initialize(const RowGroup& rg, const JobInfo& jobInfo, bool invertRules)
+void LimitedOrderBy::initialize(const RowGroup& rg, const JobInfo& jobInfo, bool invertRules, bool isMultiThreaded)
 {
     fRm = jobInfo.rm;
     fSessionMemLimit = jobInfo.umMemLimit;
@@ -81,8 +81,18 @@ void LimitedOrderBy::initialize(const RowGroup& rg, const JobInfo& jobInfo, bool
     }
 
     // limit row count info
-    fStart = jobInfo.limitStart;
-    fCount = jobInfo.limitCount;
+    if (isMultiThreaded)
+    {
+        // CS can't apply offset at the first stage
+        // otherwise it looses records. 
+        fStart = 0;
+        fCount = jobInfo.limitStart+jobInfo.limitCount;
+    }
+    else
+    {
+        fStart = jobInfo.limitStart;
+        fCount = jobInfo.limitCount;
+    }
 
     IdbOrderBy::initialize(rg);
 }

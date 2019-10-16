@@ -21,7 +21,6 @@
 #ifndef JOBLIST_TUPLEANNEXSTEP_H
 #define JOBLIST_TUPLEANNEXSTEP_H
 
-// WIP
 #include <queue>
 #include <boost/thread/thread.hpp>
 
@@ -174,7 +173,6 @@ protected:
     funcexp::FuncExp*       fFeInstance;
     JobList*                fJobList;
 
-    // WIP MCOL-894 try single linked list here
     std::vector<LimitedOrderBy*> fOrderByList;
     std::vector<uint64_t> fRunnersList;
     uint16_t fFinishedThreads;

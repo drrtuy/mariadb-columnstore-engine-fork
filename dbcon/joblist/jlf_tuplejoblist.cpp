@@ -484,7 +484,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
         deliverySteps[CNX_VTABLE_ID] = ws;
     }
 
-    // WIP MCOL-894 we don't need to run sorting|distinct 
+    // TODO MCOL-894 we don't need to run sorting|distinct 
     // every time
 //    if ((jobInfo.limitCount != (uint64_t) - 1) ||
 //            (jobInfo.constantCol == CONST_COL_EXIST) ||
@@ -499,8 +499,9 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     if (jobInfo.orderByColVec.size() > 0)
     {
         tas->addOrderBy(new LimitedOrderBy());
-        tas->setParallelOp();
-        tas->setMaxThreads(16);
+        if (jobInfo.orderByThreads > 1)
+            tas->setParallelOp();
+        tas->setMaxThreads(jobInfo.orderByThreads);
     }
 
     if (jobInfo.constantCol == CONST_COL_EXIST)
@@ -520,10 +521,9 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
         if (jobInfo.trace) cout << "Output RowGroup 2: " << rg2.toString() << endl;
 
         AnyDataListSPtr spdlIn(new AnyDataList());
-        // WIP MCOL-894 set this to 16
         RowGroupDL* dlIn;
-        if (jobInfo.orderByColVec.size() > 0)
-            dlIn = new RowGroupDL(16, jobInfo.fifoSize);
+        if (jobInfo.orderByColVec.size() > 0) 
+            dlIn = new RowGroupDL(jobInfo.orderByThreads, jobInfo.fifoSize);
         else
             dlIn = new RowGroupDL(1, jobInfo.fifoSize);
         dlIn->OID(CNX_VTABLE_ID);

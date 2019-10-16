@@ -66,6 +66,8 @@ using namespace querytele;
 
 #include "tupleannexstep.h"
 
+#define QUEUE_RESERVE_SIZE 100000
+
 namespace
 {
 struct TAHasher
@@ -172,18 +174,15 @@ void TupleAnnexStep::initialize(const RowGroup& rgIn, const JobInfo& jobInfo)
     uint64_t id = 1;
     fRowGroupIn = rgIn;
     fRowGroupIn.initRow(&fRowIn);
-    // WIP MCOL-894
-    // apply this and remove other if per-thread init works
-    // WIP MCOL-894 Put this block into AdjustLastStep
     if(fParallelOp && fOrderBy)
     {
         fOrderByList.resize(fMaxThreads+1);
         for(id = 0; id <= fMaxThreads; id++)
         {
-            // WIP use SP here?
+            // *DRRTUY use SP here?
             fOrderByList[id] = new LimitedOrderBy();
             fOrderByList[id]->distinct(fDistinct);
-            fOrderByList[id]->initialize(rgIn, jobInfo);
+            fOrderByList[id]->initialize(rgIn, jobInfo, false, true);
         }
     }
     else
@@ -251,9 +250,20 @@ void TupleAnnexStep::run()
 
     if(fParallelOp)
     {
-        // This one differs in index numbering to use
+        // Indexing begins with 1
         fRunnersList.resize(fMaxThreads);
         fInputIteratorsList.resize(fMaxThreads+1);
+
+        // Activate stats collecting before CS spawns threads.
+        if (traceOn()) dlTimes.setFirstReadTime();
+
+        // *DRRTUY Make this block conditional
+        StepTeleStats sts;
+        sts.query_uuid = fQueryUuid;
+        sts.step_uuid = fStepUuid;
+        sts.msg_type = StepTeleStats::ST_START;
+        sts.total_units_of_work = 1;
+        postStepStartTele(sts);
 
         for(uint32_t id = 1; id <= fMaxThreads; id++)
         {
@@ -289,7 +299,6 @@ void TupleAnnexStep::join()
     }
     
 }
-
 
 uint32_t TupleAnnexStep::nextBand(messageqcpp::ByteStream& bs)
 {
@@ -410,7 +419,6 @@ void TupleAnnexStep::executeNoOrderBy()
         {
             fRowGroupIn.setData(&rgDataIn);
             fRowGroupIn.getRow(0, &fRowIn);
-
             // Get a new output rowgroup for each input rowgroup to preserve the rids
             rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
             fRowGroupOut.setData(&rgDataOut);
@@ -532,7 +540,7 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
                         fJobList->abortOnLimit((JobStep*) this);
                     }
 
-                    if (UNLIKELY(fRowGroupOut.getRowCount() >= 8192))
+                    if (UNLIKELY(fRowGroupOut.getRowCount() >= rowgroup::rgCommonSize))
                     {
                         dataVec.push_back(rgDataOut);
                         rgDataOut.reinit(fRowGroupOut);
@@ -594,10 +602,8 @@ void TupleAnnexStep::executeWithOrderBy()
         sts.total_units_of_work = 1;
         postStepStartTele(sts);
 
-        uint16_t rgCounter = 0;
         while (more && !cancelled())
         {
-            rgCounter += 1;
             fRowGroupIn.setData(&rgDataIn);
             fRowGroupIn.getRow(0, &fRowIn);
 
@@ -671,252 +677,223 @@ void TupleAnnexStep::executeWithOrderBy()
     fOutputDL->endOfInput();
 }
 
+/*
+    The m() iterates over thread's LimitedOrderBy instances,
+    reverts the rules and then populates the final collection
+    used for final sorting. The method uses OrderByRow that
+    combination of Row::data and comparison rules.
+    When m() finishes with thread's LOBs it iterates over
+    final sorting collection, populates rgDataOut, then
+    sends it into outputDL.
+    Changing this method don't forget to make changes in
+    finalizeParallelOrderBy() that is a clone.
+    !!!The method doesn't set Row::baseRid
+*/
 void TupleAnnexStep::finalizeParallelOrderByDistinct()
 {
     utils::setThreadName("TASwParOrdDistM");
     uint64_t count = 0;
+    uint64_t offset = 0;
     uint32_t rowSize = 0;
 
     rowgroup::RGData rgDataOut;
-    // WIP Remove hardcode and research the number
-    rgDataOut.reinit(fRowGroupIn, 8192);
-    fRowGroupOut.setData(&rgDataOut);
-    fRowGroupOut.resetRowGroup(0);
-    // Calculate offset here
-    fRowGroupOut.getRow(0, &fRowOut);
-
-    // There must be at least one RowGroup
-    fRowGroupIn.initRow(&fRowIn);
-
-    //ordering::SortingPQ finalPQ;
-    // set fDistinct here
-    // add fDistinctMap
-
-    // We shouldn't use parallel execution if there
-    // are less then num of threads RGData units.
-    // skip unused threads here
-    std::vector<uint64_t> activeThreadsIds;
-    for(uint64_t id = 1; id <= fMaxThreads; id++)
-    {
-        // Revert the ordering rules before we
-        // add rows into the final PQ.
-        //fOrderByList[id]->getRule().revertRules();
-        ordering::SortingPQ &currentPQ = fOrderByList[id]->getQueue();
-        // Use references calculated outside of the loop
-        while (currentPQ.size() > 0)
-        {
-            // The reference could produce segfault here
-            ordering::OrderByRow &topOBRow =
-                const_cast<ordering::OrderByRow&>(currentPQ.top());
-            fRowIn.setData(topOBRow.fData);
-            fOrderByList[0]->processRow(fRowIn);
-            //finalPQ.push(topOBRow);
-            currentPQ.pop();
-        }
-    }
-
-    //fOrderByList[0]->getRule().revertRules();
-    ordering::SortingPQ &finalPQ = fOrderByList[0]->getQueue();
-
-    if (finalPQ.size())
-    {
-        ordering::OrderByRow& topOBRow = const_cast<ordering::OrderByRow&>(finalPQ.top());
-        fRowIn.setData(topOBRow.fData);
-        rowSize = fRowIn.getSize();
-        copyRow(fRowIn, &fRowOut);
-        fRowGroupOut.incRowCount();
-        fRowOut.nextRow(rowSize);
-        finalPQ.pop();
-        count++;
-    }
-
-    // consider the case when there is one RGData
-    // and there is less then limit records in it
-    // This loop will return a multiply of fMaxThreads
-    // So RowGroup count must be changed
-    while(count < fLimitCount && finalPQ.size())
-    {
-        ordering::OrderByRow& topOBRow = const_cast<ordering::OrderByRow&>(finalPQ.top());
-        // If limit > RowGroup size then need to check for empty PQ
-        // Have to address this
-        //ordering::OrderByRow& nextOBRow =
-        //    const_cast<ordering::OrderByRow&>(fOrderByList[topOBRow.fThreadId]->getQueue().top());
-        //nextOBRow.fThreadId = topOBRow.fThreadId;
-
-        fRowIn.setData(topOBRow.fData);
-        copyRow(fRowIn, &fRowOut);
-        fRowGroupOut.incRowCount();
-        fRowOut.nextRow(rowSize);
-
-        finalPQ.pop();
-        //finalPQ.push(nextOBRow);
-        //fOrderByList[topOBRow.fThreadId]->getQueue().pop();
-        count++;
-    }
-
-    //std::cout << " finalizeParallelOrderBy() fRowGroupOut " << fRowGroupOut.toString() << std::endl;
-
-    if (fRowGroupOut.getRowCount() > 0)
-    {
-        fRowsReturned += fRowGroupOut.getRowCount();
-        fOutputDL->insert(rgDataOut);
-    }
-
-    fOutputDL->endOfInput();
-}
-
-
-
-void TupleAnnexStep::finalizeParallelOrderBy()
-{
-    utils::setThreadName("TASwParOrdMerge");
-    uint64_t count = 0;
-    uint32_t rowSize = 0;
-
-    // WIP might be useless
-    rowgroup::RGData rgDataIn;
-    rowgroup::RGData rgDataOut;
-    // WIP Remove hardcode and research the number
-    rgDataOut.reinit(fRowGroupOut, 8192);
+    rgDataOut.reinit(fRowGroupOut, rowgroup::rgCommonSize);
     fRowGroupOut.setData(&rgDataOut);
     fRowGroupOut.resetRowGroup(0);
     // Calculate offset here
     fRowGroupOut.getRow(0, &fRowOut);
     ordering::SortingPQ finalPQ;
+    scoped_ptr<DistinctMap_t> distinctMap(new DistinctMap_t(10, TAHasher(this), TAEq(this)));
 
-    for(uint64_t id = 1; id <= fMaxThreads; id++)
-    {
-        if (cancelled())
-        {
-            break;
-        }
-        // Revert the ordering rules before we
-        // add rows into the final PQ.
-        fOrderByList[id]->getRule().revertRules();
-        ordering::SortingPQ &currentPQ = fOrderByList[id]->getQueue();
-        // Use references calculated outside of the loop
-        while (currentPQ.size() > 0)
-        {
-            // The reference could produce segfault here
-            ordering::OrderByRow &topOBRow =
-                const_cast<ordering::OrderByRow&>(currentPQ.top());
-            finalPQ.push(topOBRow);
-            currentPQ.pop();
-        }
-    }
 
-    // Doing this once to calculate rowSize
-    if (finalPQ.size())
+    try
     {
-        ordering::OrderByRow& topOBRow =
-            const_cast<ordering::OrderByRow&>(finalPQ.top());
-        fRowIn.setData(topOBRow.fData);
-        rowSize = fRowIn.getSize();
-        copyRow(fRowIn, &fRowOut);
-        fRowGroupOut.incRowCount();
-        fRowOut.nextRow(rowSize);
-        finalPQ.pop();
-        count++;
-    }
-
-    // consider the case when there is one RGData
-    // and there is less then limit records in it
-    // This loop will return a multiply of fMaxThreads
-    // So RowGroup count must be changed
-    // WIP add ConstantColumn at this point as single threaded sort does
-    // Simple loop for cases w/o ConstantColumns that was
-    // optimized out
-    if (fConstant == NULL) 
-            // second predicate is meaningless
-            //&& fRowGroupOut.getColumnCount() == fRowGroupIn.getColumnCount())
-    {
-        while(finalPQ.size())
+        for(uint64_t id = 1; id <= fMaxThreads; id++)
         {
             if (cancelled())
             {
                 break;
             }
-
-            while (count < fLimitCount && finalPQ.size())
+            // Revert the ordering rules before we
+            // add rows into the final PQ.
+            fOrderByList[id]->getRule().revertRules();
+            ordering::SortingPQ &currentPQ = fOrderByList[id]->getQueue();
+            finalPQ.reserve(finalPQ.size()+currentPQ.size());
+            pair<DistinctMap_t::iterator, bool> inserted;
+            while (currentPQ.size())
             {
-                ordering::OrderByRow &topOBRow = 
-                    const_cast<ordering::OrderByRow&>(finalPQ.top());
-
-                fRowIn.setData(topOBRow.fData);
-                copyRow(fRowIn, &fRowOut);
-                fRowGroupOut.incRowCount();
-                fRowOut.nextRow(rowSize);
-
-                finalPQ.pop();
-                count++;
-                // WIP
-                if (!(count % 8192))
+                ordering::OrderByRow &topOBRow =
+                    const_cast<ordering::OrderByRow&>(currentPQ.top());
+                inserted = distinctMap->insert(topOBRow.fData);
+                if (inserted.second)
                 {
-                    break;
+                    finalPQ.push(topOBRow);
                 }
+                currentPQ.pop();
             }
-
-            if (fRowGroupOut.getRowCount() > 0)
-            {
-                fRowsReturned += fRowGroupOut.getRowCount();
-                // WIP for a loop w/o ConstantColumns
-                fOutputDL->insert(rgDataOut);
-                // WIP
-                rgDataOut.reinit(fRowGroupIn, 8192);
-                fRowGroupOut.setData(&rgDataOut);
-                fRowGroupOut.resetRowGroup(0);
-            }
-            else
-            {
-                break;
-            }
-        } // end of limit bound while loop
+        }
     }
-    else // Add ConstantColumns striped earlier
+    catch (const std::exception& ex)
     {
-        while(finalPQ.size())
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderByDistinct execute\
+                         caught an unknown exception 1",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+
+
+    try
+    {
+        // OFFSET processing
+        while (finalPQ.size() && offset < fLimitStart)
         {
-            if (cancelled())
-            {
-                break;
-            }
+            offset++;
+            finalPQ.pop();
+        } 
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderByDistinct execute\
+                         caught an unknown exception 2",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
 
-            while (count < fLimitCount && finalPQ.size())
-            {
-                ordering::OrderByRow &topOBRow = 
-                    const_cast<ordering::OrderByRow&>(finalPQ.top());
-
-                fRowIn.setData(topOBRow.fData);
-                // WIP do we really want a copy or these are references
+    try
+    {
+        // Calculate rowSize only once
+        if (finalPQ.size())
+        {
+            ordering::OrderByRow& topOBRow =
+                const_cast<ordering::OrderByRow&>(finalPQ.top());
+            fRowIn.setData(topOBRow.fData);
+            if (!fConstant)
                 copyRow(fRowIn, &fRowOut);
-                //fConstant->fillInConstants(fRowIn, fRowOut);
-                fRowGroupOut.incRowCount();
-                fRowOut.nextRow(rowSize);
+            else
+                fConstant->fillInConstants(fRowIn, fRowOut);
+            rowSize = fRowOut.getSize();
+            fRowGroupOut.incRowCount();
+            fRowOut.nextRow(rowSize);
+            finalPQ.pop();
+            count++;
+        }
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderByDistinct execute\
+                         caught an unknown exception 3",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
 
-                finalPQ.pop();
-                count++;
-                // WIP
-                if (!(count % 8192))
+    try
+    {
+        if (!fConstant) 
+        {
+            while(finalPQ.size())
+            {
+                if (cancelled())
                 {
                     break;
                 }
-            }
-       
-            if (fRowGroupOut.getRowCount() > 0)
+
+                while (count < fLimitCount && finalPQ.size()
+                        && fRowGroupOut.getRowCount() < rowgroup::rgCommonSize)
+                {
+                    ordering::OrderByRow &topOBRow = 
+                        const_cast<ordering::OrderByRow&>(finalPQ.top());
+
+                    fRowIn.setData(topOBRow.fData);
+                    copyRow(fRowIn, &fRowOut);
+                    fRowGroupOut.incRowCount();
+                    fRowOut.nextRow(rowSize);
+
+                    finalPQ.pop();
+                    count++;
+                    if (fRowGroupOut.getRowCount() == rowgroup::rgCommonSize)
+                    {
+                        break;
+                    }
+                }
+
+                if (fRowGroupOut.getRowCount() > 0)
+                {
+                    fRowsReturned += fRowGroupOut.getRowCount();
+                    fOutputDL->insert(rgDataOut);
+                    rgDataOut.reinit(fRowGroupIn, rowgroup::rgCommonSize);
+                    fRowGroupOut.setData(&rgDataOut);
+                    fRowGroupOut.resetRowGroup(0);
+                    fRowGroupOut.getRow(0, &fRowOut);
+                }
+                else
+                {
+                    break;
+                }
+            } // end of limit bound while loop
+        }
+        else // Add ConstantColumns striped earlier
+        {
+            while(finalPQ.size())
             {
-                fRowsReturned += fRowGroupOut.getRowCount();
-                // WIP for a loop w/o ConstantColumns
-                fOutputDL->insert(rgDataOut);
-                rgDataOut.reinit(fRowGroupIn, 8192);
-                fRowGroupOut.setData(&rgDataOut);
-                fRowGroupOut.resetRowGroup(0);
-            }
-            else
-            {
-                break;
-            }
-        } // end of limit bound while loop
-    } // end of if-else
+                if (cancelled())
+                {
+                    break;
+                }
+
+                while (count < fLimitCount && finalPQ.size()
+                        && fRowGroupOut.getRowCount() < rowgroup::rgCommonSize)
+                {
+                    ordering::OrderByRow &topOBRow = 
+                        const_cast<ordering::OrderByRow&>(finalPQ.top());
+
+                    fRowIn.setData(topOBRow.fData);
+                    fConstant->fillInConstants(fRowIn, fRowOut);
+                    fRowGroupOut.incRowCount();
+                    fRowOut.nextRow(rowSize);
+
+                    finalPQ.pop();
+                    count++;
+                    if (fRowGroupOut.getRowCount() == rowgroup::rgCommonSize)
+                    {
+                        break;
+                    }
+                }
+           
+                if (fRowGroupOut.getRowCount() > 0)
+                {
+                    fRowsReturned += fRowGroupOut.getRowCount();
+                    fOutputDL->insert(rgDataOut);
+                    rgDataOut.reinit(fRowGroupOut, rowgroup::rgCommonSize);
+                    fRowGroupOut.setData(&rgDataOut);
+                    fRowGroupOut.resetRowGroup(0);
+                    fRowGroupOut.getRow(0, &fRowOut);
+                }
+                else
+                {
+                    break;
+                }
+            } // end of limit bound while loop
+        } // end of if-else
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderByDistinct execute\
+                         caught an unknown exception 4",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
 
     if (fRowGroupOut.getRowCount() > 0)
     {
@@ -925,11 +902,262 @@ void TupleAnnexStep::finalizeParallelOrderBy()
     }
 
     fOutputDL->endOfInput();
+
+    StepTeleStats sts;
+    sts.query_uuid = fQueryUuid;
+    sts.step_uuid = fStepUuid;
+    sts.msg_type = StepTeleStats::ST_SUMMARY;
+    sts.total_units_of_work = sts.units_of_work_completed = 1;
+    sts.rows = fRowsReturned;
+    postStepSummaryTele(sts);
+
+    if (traceOn())
+    {
+        if (dlTimes.FirstReadTime().tv_sec == 0)
+            dlTimes.setFirstReadTime();
+
+        dlTimes.setLastReadTime();
+        dlTimes.setEndOfInputTime();
+        printCalTrace();
+    }
+}
+
+/*
+    The m() iterates over thread's LimitedOrderBy instances,
+    reverts the rules and then populates the final collection
+    used for final sorting. The method uses OrderByRow that
+    combination of Row::data and comparison rules.
+    When m() finishes with thread's LOBs it iterates over
+    final sorting collection, populates rgDataOut, then
+    sends it into outputDL.
+    Changing this method don't forget to make changes in
+    finalizeParallelOrderByDistinct() that is a clone.
+    !!!The method doesn't set Row::baseRid
+*/
+void TupleAnnexStep::finalizeParallelOrderBy()
+{
+    utils::setThreadName("TASwParOrdMerge");
+    uint64_t count = 0;
+    uint64_t offset = 0;
+    uint32_t rowSize = 0;
+
+    rowgroup::RGData rgDataOut;
+    ordering::SortingPQ finalPQ;
+    rgDataOut.reinit(fRowGroupOut, rowgroup::rgCommonSize);
+    fRowGroupOut.setData(&rgDataOut);
+    fRowGroupOut.resetRowGroup(0);
+    // Calculate offset here
+    fRowGroupOut.getRow(0, &fRowOut);
+
+    try
+    {
+        for(uint64_t id = 1; id <= fMaxThreads; id++)
+        {
+            if (cancelled())
+            {
+                break;
+            }
+            // Revert the ordering rules before we
+            // add rows into the final PQ.
+            fOrderByList[id]->getRule().revertRules();
+            ordering::SortingPQ &currentPQ = fOrderByList[id]->getQueue();
+            finalPQ.reserve(currentPQ.size());
+            while (currentPQ.size())
+            {
+                ordering::OrderByRow &topOBRow =
+                    const_cast<ordering::OrderByRow&>(currentPQ.top());
+                finalPQ.push(topOBRow);
+                currentPQ.pop();
+            }
+        }
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderBy execute\
+                         caught an unknown exception 1",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+
+
+    try
+    {
+        // OFFSET processing
+        while (finalPQ.size() && offset < fLimitStart)
+        {
+            offset++;
+            finalPQ.pop();
+        } 
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderBy execute\
+                         caught an unknown exception 2",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+
+    try
+    {
+        // Calculate rowSize only once
+        if (finalPQ.size())
+        {
+            ordering::OrderByRow& topOBRow =
+                const_cast<ordering::OrderByRow&>(finalPQ.top());
+            fRowIn.setData(topOBRow.fData);
+            if (!fConstant)
+                copyRow(fRowIn, &fRowOut);
+            else
+                fConstant->fillInConstants(fRowIn, fRowOut);
+            rowSize = fRowOut.getSize();
+            fRowGroupOut.incRowCount();
+            fRowOut.nextRow(rowSize);
+            finalPQ.pop();
+            count++;
+        }
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderBy execute\
+                         caught an unknown exception 3",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+
+    try
+    {
+        if (!fConstant) 
+        {
+            while(finalPQ.size())
+            {
+                if (cancelled())
+                {
+                    break;
+                }
+
+                while (count < fLimitCount && finalPQ.size()
+                        && fRowGroupOut.getRowCount() < rowgroup::rgCommonSize)
+                {
+                    ordering::OrderByRow &topOBRow = 
+                        const_cast<ordering::OrderByRow&>(finalPQ.top());
+
+                    fRowIn.setData(topOBRow.fData);
+                    copyRow(fRowIn, &fRowOut);
+                    fRowGroupOut.incRowCount();
+                    fRowOut.nextRow(rowSize);
+
+                    finalPQ.pop();
+                    count++;
+                }
+
+                if (fRowGroupOut.getRowCount() > 0)
+                {
+                    fRowsReturned += fRowGroupOut.getRowCount();
+                    fOutputDL->insert(rgDataOut);
+                    rgDataOut.reinit(fRowGroupIn, rowgroup::rgCommonSize);
+                    fRowGroupOut.setData(&rgDataOut);
+                    fRowGroupOut.resetRowGroup(0);
+                    fRowGroupOut.getRow(0, &fRowOut);
+                }
+                else
+                {
+                    break;
+                }
+            } // end of limit bound while loop
+        }
+        else // Add ConstantColumns striped earlier
+        {
+            while(finalPQ.size())
+            {
+                if (cancelled())
+                {
+                    break;
+                }
+
+                while (count < fLimitCount && finalPQ.size()
+                        && fRowGroupOut.getRowCount() < rowgroup::rgCommonSize)
+                {
+                    ordering::OrderByRow &topOBRow = 
+                        const_cast<ordering::OrderByRow&>(finalPQ.top());
+
+                    fRowIn.setData(topOBRow.fData);
+                    fConstant->fillInConstants(fRowIn, fRowOut);
+                    fRowGroupOut.incRowCount();
+                    fRowOut.nextRow(rowSize);
+
+                    finalPQ.pop();
+                    count++;
+                    if (fRowGroupOut.getRowCount() == rowgroup::rgCommonSize)
+                    {
+                        break;
+                    }
+                }
+           
+                if (fRowGroupOut.getRowCount() > 0)
+                {
+                    fRowsReturned += fRowGroupOut.getRowCount();
+                    fOutputDL->insert(rgDataOut);
+                    rgDataOut.reinit(fRowGroupOut, rowgroup::rgCommonSize);
+                    fRowGroupOut.setData(&rgDataOut);
+                    fRowGroupOut.resetRowGroup(0);
+                    fRowGroupOut.getRow(0, &fRowOut);
+                }
+                else
+                {
+                    break;
+                }
+            } // end of limit bound while loop
+        } // end of if-else
+    }
+    catch (const std::exception& ex)
+    {
+        catchHandler(ex.what(),ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+    catch (...)
+    {
+        catchHandler("TupleAnnexStep::finalizeParallelOrderBy execute\
+                         caught an unknown exception 4",
+                         ERR_IN_PROCESS, fErrorInfo, fSessionId);
+    }
+
+    if (fRowGroupOut.getRowCount() > 0)
+    {
+        fRowsReturned += fRowGroupOut.getRowCount();
+        fOutputDL->insert(rgDataOut);
+    }
+
+    fOutputDL->endOfInput();
+
+    StepTeleStats sts;
+    sts.query_uuid = fQueryUuid;
+    sts.step_uuid = fStepUuid;
+    sts.msg_type = StepTeleStats::ST_SUMMARY;
+    sts.total_units_of_work = sts.units_of_work_completed = 1;
+    sts.rows = fRowsReturned;
+    postStepSummaryTele(sts);
+
+    if (traceOn())
+    {
+        if (dlTimes.FirstReadTime().tv_sec == 0)
+            dlTimes.setFirstReadTime();
+
+        dlTimes.setLastReadTime();
+        dlTimes.setEndOfInputTime();
+        printCalTrace();
+    }
 }
 
 void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
 {
-    // WIP this set doesn't work properly
     utils::setThreadName("TASwParOrd");
     RGData rgDataIn;
     RGData rgDataOut;
@@ -937,53 +1165,55 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
     uint64_t dlOffset = 0;
     uint32_t rowSize = 0;
 
-    // WIP MCOL-894
-    uint64_t rowCount = 0; 
+    uint64_t rowCount = 0;
+    uint64_t doubleRGSize = 2*rowgroup::rgCommonSize;
     rowgroup::Row r = fRowIn;
     rowgroup::RowGroup rg = fRowGroupIn;
     rg.initRow(&r);
     LimitedOrderBy *limOrderBy = fOrderByList[id];
-    //ordering::CompareRule &sortingRule = limOrderBy->getRule();
+    ordering::SortingPQ &currentPQ = limOrderBy->getQueue();
+    if (limOrderBy->getLimitCount() < QUEUE_RESERVE_SIZE)
+    {
+        currentPQ.reserve(limOrderBy->getLimitCount());
+    }
+    else
+    {
+        currentPQ.reserve(QUEUE_RESERVE_SIZE);
+    }
 
     try
     {
         more = fInputDL->next(fInputIteratorsList[id], &rgDataIn);
         if (more) dlOffset++;
-        
+
         while (more && !cancelled())
         {
             if (dlOffset%fMaxThreads == id-1)
             {
-                //fRowGroupInList[id].setData(&rgDataIn);
-                //fRowGroupInList[id].getRow(0, &fRowInList[id]);
-                // WIP MCOL-894
-                // Move this size into the Class attributes
-                //rowSize = fRowInList[id].getSize();
-                //rowCount = fRowGroupInList[id].getRowCount();
+                if (cancelled())
+                    break;
+
+                if (currentPQ.capacity()-currentPQ.size() < doubleRGSize)
+                {
+                    currentPQ.reserve(QUEUE_RESERVE_SIZE);
+                }
 
                 rg.setData(&rgDataIn);
                 rg.getRow(0, &r);
-                // WIP MCOL-894
-                // Move this size into the Class attributes
                 rowSize = r.getSize();
                 rowCount = rg.getRowCount();
 
-                //for (uint64_t i = 0; i < fRowGroupInList[id].getRowCount() && !cancelled(); ++i)
                 for (uint64_t i = 0; i < rowCount; ++i)
                 {
                     limOrderBy->processRow(r);
-                    //ordering::OrderByRow obRow(r, sortingRule);
                     r.nextRow(rowSize);
                }
             }
             
-    // Implement a method to skip elements in FIFO
+            // *DRRTUY Implement a method to skip elements in FIFO
             more = fInputDL->next(fInputIteratorsList[id], &rgDataIn);
             if(more) dlOffset++;
         }
-        
-        //std::cout << "TupleAnnexStep::executeParallelOrderBy id " << id << " rowCount " << rowCount << std::endl;
-
     }
     catch (const std::exception& ex)
     {
@@ -991,7 +1221,7 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
     }
     catch (...)
     {
-        catchHandler("TupleAnnexStep execute caught an unknown exception",
+        catchHandler("TupleAnnexStep::executeParallelOrderBy execute caught an unknown exception",
                      ERR_IN_PROCESS, fErrorInfo, fSessionId);
     }
 
@@ -999,7 +1229,8 @@ void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
     while (more)
         more = fInputDL->next(fInputIteratorsList[id], &rgDataIn);
 
-    // WIP
+    // Count finished sorting threads under mutex and run final 
+    // sort step when the last thread converges
     fParallelFinalizeMutex.lock();
     fFinishedThreads++;
     if (fFinishedThreads == fMaxThreads)
@@ -1049,7 +1280,8 @@ bool TupleAnnexStep::deliverStringTableRowGroup() const
 const string TupleAnnexStep::toString() const
 {
     ostringstream oss;
-    oss << "AnnexStep   ses:" << fSessionId << " txn:" << fTxnId << " st:" << fStepId;
+    oss << "AnnexStep ";
+    oss << "  ses:" << fSessionId << " txn:" << fTxnId << " st:" << fStepId;
 
     oss << " in:";
 
@@ -1096,8 +1328,8 @@ void TupleAnnexStep::printCalTrace()
 void TupleAnnexStep::formatMiniStats()
 {
     ostringstream oss;
-    oss << "TNS "
-        << "UM "
+    oss << "TNS ";
+    oss << "UM "
         << "- "
         << "- "
         << "- "

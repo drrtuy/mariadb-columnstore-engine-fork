@@ -7846,6 +7846,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
             {
                 gwi.thd->infinidb_vtable.has_order_by = true;
                 csep->hasOrderBy(true);
+                csep->orderByThreads(gwi.thd->variables.infinidb_orderby_threads);
                 ord_cols = " order by " + ord_cols;
                 select_query += ord_cols;
             }
@@ -7865,6 +7866,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
                 {
                     Item_int* select = (Item_int*)select_lex.master_unit()->global_parameters()->select_limit;
                     csep->limitNum(select->val_int());
+                    // MCOL-894 Activate parallel ORDER BY
+                    csep->orderByThreads(gwi.thd->variables.infinidb_orderby_threads);
                 }
 
                 if (unionSel && gwi.subSelectType == CalpontSelectExecutionPlan::MAIN_SELECT)
@@ -10090,6 +10093,7 @@ int getGroupPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, cal_gro
                 gwi.thd->infinidb_vtable.has_order_by = true;
                 csep->hasOrderBy(true);
                 csep->specHandlerProcessed(true);
+                csep->orderByThreads(gwi.thd->variables.infinidb_orderby_threads);
             }
         }
 
