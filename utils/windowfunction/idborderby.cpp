@@ -109,8 +109,11 @@ int IntCompare::operator()(IdbCompare* l, Row::Pointer r1, Row::Pointer r2)
     l->row2().setData(r2);
 
     int ret = 0;
-    int32_t v1 = l->row1().getIntField(fSpec.fIndex);
-    int32_t v2 = l->row2().getIntField(fSpec.fIndex);
+    //int32_t v1 = l->row1().getIntField(fSpec.fIndex);
+    //int32_t v2 = l->row2().getIntField(fSpec.fIndex);
+    int32_t v1 = l->row1().getIntField__<int32_t>(fSpec.fColumnOffset);
+    int32_t v2 = l->row2().getIntField__<int32_t>(fSpec.fColumnOffset);
+
     int32_t nullValue = static_cast<int32_t>(joblist::INTNULL);
 
     if (v1 == nullValue || v2 == nullValue)
@@ -137,8 +140,10 @@ int BigIntCompare::operator()(IdbCompare* l, Row::Pointer r1, Row::Pointer r2)
     l->row2().setData(r2);
 
     int ret = 0;
-    int64_t v1 = l->row1().getIntField(fSpec.fIndex);
-    int64_t v2 = l->row2().getIntField(fSpec.fIndex);
+    //int64_t v1 = l->row1().getIntField(fSpec.fIndex);
+    //int64_t v2 = l->row2().getIntField(fSpec.fIndex);
+    int64_t v1 = l->row1().getIntField__<int64_t>(fSpec.fColumnOffset);
+    int64_t v2 = l->row2().getIntField__<int64_t>(fSpec.fColumnOffset);
     int64_t nullValue = static_cast<int64_t>(joblist::BIGINTNULL);
 
     if (v1 == nullValue || v2 == nullValue)
@@ -503,12 +508,14 @@ void CompareRule::revertRules()
 
 
 
-void CompareRule::compileRules(const std::vector<IdbSortSpec>& spec, const rowgroup::RowGroup& rg)
+void CompareRule::compileRules(std::vector<IdbSortSpec>& spec, const rowgroup::RowGroup& rg)
 {
     const vector<CalpontSystemCatalog::ColDataType>& types = rg.getColTypes();
+    const std::vector<uint32_t> &offsets = rg.getOffsets();
 
-    for (vector<IdbSortSpec>::const_iterator i = spec.begin(); i != spec.end(); i++)
+    for (vector<IdbSortSpec>::iterator i = spec.begin(); i != spec.end(); i++)
     {
+        i->fColumnOffset = offsets[i->fIndex];
         switch (types[i->fIndex])
         {
             case CalpontSystemCatalog::TINYINT:
@@ -660,7 +667,7 @@ void IdbCompare::setStringTable(bool b)
 
 
 // OrderByData class implementation
-OrderByData::OrderByData(const std::vector<IdbSortSpec>& spec, const rowgroup::RowGroup& rg)
+OrderByData::OrderByData(std::vector<IdbSortSpec>& spec, const rowgroup::RowGroup& rg)
 {
     IdbCompare::initialize(rg);
     fRule.compileRules(spec, rg);

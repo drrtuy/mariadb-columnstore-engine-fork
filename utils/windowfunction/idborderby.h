@@ -77,6 +77,7 @@ typedef reservablePQ<OrderByRow> SortingPQ;
 struct IdbSortSpec
 {
     int fIndex;
+    uint32_t fColumnOffset;
     // TODO There are three ordering specs since 10.2
     int fAsc;   // <ordering specification> ::= ASC | DESC
     int fNf;    // <null ordering> ::= NULLS FIRST | NULLS LAST
@@ -298,7 +299,7 @@ public:
 
     bool less(rowgroup::Row::Pointer r1, rowgroup::Row::Pointer r2);
 
-    void compileRules(const std::vector<IdbSortSpec>&, const rowgroup::RowGroup&);
+    void compileRules(std::vector<IdbSortSpec>&, const rowgroup::RowGroup&);
     void revertRules();
 
     std::vector<Compare*>           fCompares;
@@ -367,7 +368,7 @@ public:
 class OrderByData : public IdbCompare
 {
 public:
-    OrderByData(const std::vector<IdbSortSpec>&, const rowgroup::RowGroup&);
+    OrderByData(std::vector<IdbSortSpec>&, const rowgroup::RowGroup&);
     virtual ~OrderByData() {};
 
     bool operator() (rowgroup::Row::Pointer p1, rowgroup::Row::Pointer p2)

@@ -329,6 +329,7 @@ public:
 
     template<int len> inline uint64_t getUintField(uint32_t colIndex) const;
     inline uint64_t getUintField(uint32_t colIndex) const;
+    template<typename T> inline T getIntField__(uint32_t offset) const;
     template<int len> inline int64_t getIntField(uint32_t colIndex) const;
     inline int64_t getIntField(uint32_t colIndex) const;
     template<int len> inline bool equals(uint64_t val, uint32_t colIndex) const;
@@ -726,6 +727,12 @@ inline int64_t Row::getIntField(uint32_t colIndex) const
             idbassert(0);
             throw std::logic_error("Row::getIntField(): bad length.");
     }
+}
+
+template<typename T>
+inline T Row::getIntField__(uint32_t offset) const
+{
+    return *((T*) &data[offset]);
 }
 
 inline const uint8_t* Row::getStringPointer(uint32_t colIndex) const
