@@ -23,6 +23,8 @@ SET ( libcalmysql_SRCS
     ha_pseudocolumn.cpp)
 
 add_definitions(-DMYSQL_DYNAMIC_PLUGIN)
+add_definitions(-DDEBUG_WALK_COND)
+add_definitions(-DINFINIDB_DEBUG)
 
 set_source_files_properties(ha_mcs.cpp PROPERTIES COMPILE_FLAGS "-fno-implicit-templates")
 

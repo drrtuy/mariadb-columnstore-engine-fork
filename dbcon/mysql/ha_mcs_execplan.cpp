@@ -1321,6 +1321,7 @@ uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
 
         if (table_ptr->outer_join && table_ptr->on_expr)
         {
+            // inner tables block
             Item_cond* expr = reinterpret_cast<Item_cond*>(table_ptr->on_expr);
             gwi_outer.innerTables.insert(tan);
 
@@ -1394,7 +1395,7 @@ uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
         }
         // @bug 2849
         else if (table_ptr->embedding && table_ptr->embedding->nested_join)
-        {
+        /*{
             // if this is dervied table process phase, mysql may have not developed the plan
             // completely. Return and let it finish. It will come to rnd_init again.
             if (table_ptr->embedding->is_natural_join && table_ptr->derived)
@@ -1434,7 +1435,7 @@ uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
                     }
                 }
             }
-        }
+        }*/
 
         // Error out subquery in outer join on filter for now
         if (gwi_outer.hasSubSelect)
@@ -6166,6 +6167,9 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
 
 #endif
 
+    // WIP
+    List<Item> on_expr_list;
+
     // @bug 1796. Remember table order on the FROM list.
     gwi.clauseType = FROM;
 
@@ -6182,6 +6186,12 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
                 setError(gwi.thd, ER_CHECK_NOT_IMPLEMENTED, gwi.parseErrorText, gwi);
                 return ER_CHECK_NOT_IMPLEMENTED;
             }
+
+            // Save on_expr to use it for WHERE processing 
+            if (!table_ptr->outer_join && table_ptr->on_expr)
+            {
+                on_expr_list.push_back(table_ptr->on_expr);
+            } 
 
             string viewName = getViewName(table_ptr);
 
@@ -6410,7 +6420,29 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
         (dynamic_cast<ConstantColumn*>(gwi.rcWorkStack.top()))->timeZone(gwi.thd->variables.time_zone->get_name()->ptr());
     }
 
+#ifdef DEBUG_WALK_COND
+        std::cerr << "------------------ ON_EXPR -----------------------" << endl;
+#endif
+    // MCOL-3593 MDB now doesn't rewrite and/or consolidate ON and WHERE expressions
+    // and CS handles INNER ON expressions here.
+    if (!on_expr_list.is_empty())
+    {
+        List_iterator<Item> on_expr_it(on_expr_list);
+        Item_cond *on_expr = NULL;
+        while((on_expr = reinterpret_cast<Item_cond*>(on_expr_it++)))
+        {
+            on_expr->traverse_cond(gp_walk, &gwi, Item::POSTFIX);
+#ifdef DEBUG_WALK_COND
+            on_expr->traverse_cond(debug_walk, &gwi, Item::POSTFIX);
+#endif
+        }
+    }
+#ifdef DEBUG_WALK_COND
+        std::cerr << "-------------------------------------------------\n" << std::endl;
+#endif
 
+
+    // WIP Remove or refactor this block
     // ZZ - the followinig debug shows the structure of nested outer join. should
     // use a recursive function.
 #ifdef OUTER_JOIN_DEBUG
@@ -6500,7 +6532,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     // ptWorkStack empty, the item is in rcWorkStack.
     // MySQL 5.6 (MariaDB?). when icp is null and zero_result_cause is set, a constant 0
     // is pushed to rcWorkStack.
-    if (/*icp && */gwi.ptWorkStack.empty() && !gwi.rcWorkStack.empty())
+    if (gwi.ptWorkStack.empty() && !gwi.rcWorkStack.empty())
     {
         filters = new ParseTree(gwi.rcWorkStack.top());
         gwi.rcWorkStack.pop();
@@ -6515,11 +6547,9 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
             break;
 
         ptp = new ParseTree(new LogicOperator("and"));
-        //ptp->left(filters);
         ptp->right(filters);
         lhs = gwi.ptWorkStack.top();
         gwi.ptWorkStack.pop();
-        //ptp->right(rhs);
         ptp->left(lhs);
         gwi.ptWorkStack.push(ptp);
     }
@@ -7084,7 +7114,6 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
 
     for (uint32_t i = 0; i < funcFieldVec.size(); i++)
     {
-        //SimpleColumn *sc = new SimpleColumn(funcFieldVec[i]->db_name, bestTableName(funcFieldVec[i])/*funcFieldVec[i]->table_name*/, funcFieldVec[i]->field_name, sessionID);
         SimpleColumn* sc = buildSimpleColumn(funcFieldVec[i], gwi);
 
         if (!sc || gwi.fatalParseError)
@@ -7110,7 +7139,6 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
         String str;
         funcFieldVec[i]->print(&str, QT_ORDINARY);
         sc->alias(string(str.c_ptr()));
-        //sc->tableAlias(funcFieldVec[i]->table_name);
         sc->tableAlias(sc->tableAlias());
         SRCP srcp(sc);
         uint32_t j = 0;
