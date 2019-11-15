@@ -6124,14 +6124,14 @@ void setExecutionParams(gp_walk_info &gwi, SCSEP &csep)
  * next_row - get a row back from sm.
  * end_scan - finish and clean the things up.
  ***********************************************************/
-int processFrom(bool &unionSel, 
+int processFrom(bool &isUnion,
     SELECT_LEX &select_lex,
     gp_walk_info &gwi,
     SCSEP &csep,
     List<Item> &on_expr_list)
 {
-    // WIP Remove this useless bool?
-    bool isUnion = false;
+    // Send this recursively to getSelectPlan
+    bool unionSel = false;
     // populate table map and trigger syscolumn cache for all the tables (@bug 1637).
     // all tables on FROM list must have at least one col in colmap
     TABLE_LIST* table_ptr = select_lex.get_table_list();
@@ -6269,6 +6269,7 @@ int processFrom(bool &unionSel,
         CalpontSelectExecutionPlan::SelectList unionVec;
         SELECT_LEX* select_cursor = select_lex.master_unit()->first_select();
         unionSel = true;
+        isUnion = true;
         uint8_t distUnionNum = 0;
 
         for (SELECT_LEX* sl = select_cursor; sl; sl = sl->next_select())
@@ -6315,6 +6316,7 @@ int processWhere(SELECT_LEX &select_lex,
     if (join != 0)
         icp = reinterpret_cast<Item_cond*>(join->conds);
 
+    // WIP
     //COND *conds = simplify_joins(join, join->join_list, join->conds, TRUE, FALSE);
 
     // if icp is null, try to find the where clause other where
@@ -6596,8 +6598,8 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     gwi.clauseType = FROM;
     // WIP We might need a map here
     List<Item> on_expr_list;
-    // WIP
-    bool unionSel = false;
+    // WIP!!!! Remove two vars
+    bool unionSel = isUnion;
     if ((rc = processFrom(unionSel, select_lex, gwi, csep, on_expr_list)))
     {
         return rc;
