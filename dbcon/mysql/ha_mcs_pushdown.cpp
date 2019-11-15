@@ -838,7 +838,6 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
     if (!unsupported_feature)
     {
         handler= new ha_columnstore_select_handler(thd, select_lex);
-        // This is an ugly hack to call simplify_joins()
         mcs_handler_info mhi= mcs_handler_info(reinterpret_cast<void*>(handler), SELECT);
         // this::table is the place for the result set
         int rc= ha_cs_impl_pushdown_init(&mhi, handler->table);
