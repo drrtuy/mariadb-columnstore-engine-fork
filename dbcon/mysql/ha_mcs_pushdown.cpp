@@ -19,7 +19,6 @@
 
 #include "ha_mcs_pushdown.h"
 
-// WIP 
 COND *simplify_joins_(JOIN *join, List<TABLE_LIST> *join_list, COND *conds, bool top, bool in_sj);
 
 void check_walk(const Item* item, void* arg);
@@ -759,6 +758,7 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
         return handler;
     }
 
+    // Remove this in 1.4.3
     // Save the original group_list as it can be mutated by the
     // optimizer which calls the remove_const() function
     Group_list_ptrs *group_list_ptrs = NULL;
@@ -779,19 +779,12 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
     }
 
     JOIN *join= select_lex->join;
-    // WIP
-    COND *original_where = join->conds;
     // Next block tries to execute the query using SH very early to fallback
     // if execution fails.
     if (!unsupported_feature)
     {
-        // Most of optimizer_switch flags disabled in external_lock
-        //join->optimization_state= JOIN::OPTIMIZATION_IN_PROGRESS;
-        //join->optimize_inner();
-        // WIP
         COND *conds = simplify_joins_(join, select_lex->join_list, join->conds, TRUE, FALSE);
     
-        // WIP
         if (conds)
         {
 #ifdef DEBUG_WALK_COND
@@ -834,7 +827,6 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
         }
     }
 
-
     if (!unsupported_feature)
     {
         handler= new ha_columnstore_select_handler(thd, select_lex);
@@ -842,40 +834,11 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
         // this::table is the place for the result set
         int rc= ha_cs_impl_pushdown_init(&mhi, handler->table);
 
-        // WIP check the xpression
-        // Return SH if query execution is fine or fallback is disabled
-        if (!rc || !get_fallback_knob(thd))
-        {
-            join->conds = original_where;
-            return handler;
-        }
-
-        // Reset the DA and restore optimizer flags
-        // to allow query to fallback to other handlers
-        if (thd->get_stmt_da()->is_error())
-        {
-            thd->get_stmt_da()->reset_diagnostics_area();
-            restore_optimizer_flags(thd);
+        // Return SH even if init fails b/c CS changed SELECT_LEX structures
+        // with simplify_joins_()
+        if (rc)
             unsupported_feature = true;
-        }
-        // WIP
-        join->conds = original_where;
-    }
-
-    if (join->optimization_state != JOIN::NOT_OPTIMIZED)
-    {
-        if (!join->with_two_phase_optimization)
-        {
-            if (unsupported_feature && join->have_query_plan != JOIN::QEP_DELETED)
-            {
-                join->build_explain();
-            }
-            join->optimization_state= JOIN::OPTIMIZATION_DONE;
-        }
-        else
-        {
-            join->optimization_state= JOIN::OPTIMIZATION_PHASE_1_DONE;
-        }
+        return handler;
     }
 
     return NULL;

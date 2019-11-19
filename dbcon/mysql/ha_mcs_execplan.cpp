@@ -16,11 +16,6 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/*
- * $Id: ha_mcs_execplan.cpp 9749 2013-08-15 04:00:39Z zzhu $
- */
- 
-/** @file */
 //#define DEBUG_WALK_COND
 #include <my_config.h>
 #include <string>
@@ -61,7 +56,6 @@ using namespace logging;
 #include "ha_mcs_impl_if.h"
 #include "ha_mcs_sysvars.h"
 #include "ha_subquery.h"
-//#include "ha_view.h"
 using namespace cal_impl_if;
 
 #include "calpontselectexecutionplan.h"
@@ -90,9 +84,6 @@ using namespace execplan;
 #include "funcexp.h"
 #include "functor.h"
 using namespace funcexp;
-
-// WIP
-//COND *simplify_joins(JOIN *join, List<TABLE_LIST> *join_list, COND *conds, bool top, bool in_sj);
 
 const uint64_t AGG_BIT = 0x01;
 const uint64_t SUB_BIT = 0x02;
@@ -135,7 +126,6 @@ public:
     gp_walk_info* fgwip;
 };
 
-//#define OUTER_JOIN_DEBUG
 namespace
 {
 string lower(string str)
@@ -6061,14 +6051,18 @@ bool isMCSTable(TABLE* table_ptr)
     string engineName = table_ptr->s->db_plugin->name.str;
 #endif
 
-    // WIP Replace string cmp with TABLE_SHARE plugin ptrs comparison
     if (engineName == "Columnstore" || engineName == "InfiniDB")
         return true;
     else
         return false;
 }
 
-// WIP
+/*@brief  set some runtime params to run the query         */
+/***********************************************************
+ * DESCRIPTION:
+ * This function just sets a number of runtime params that
+ * limits resource consumed.
+ ***********************************************************/
 void setExecutionParams(gp_walk_info &gwi, SCSEP &csep)
 {
     gwi.internalDecimalScale = (get_use_decimal_scale(gwi.thd) ? get_decimal_scale(gwi.thd) : -1);
@@ -6094,34 +6088,18 @@ void setExecutionParams(gp_walk_info &gwi, SCSEP &csep)
     else
         csep->umMemLimit(get_um_mem_limit(gwi.thd) * 1024ULL * 1024);
 }
-// WIP
-/*@brief  group_by_handler class*/
+
+/*@brief  Process FROM part of the query or sub-query      */
 /***********************************************************
  * DESCRIPTION:
- * Provides server with group_by_handler API methods.
- * One should read comments in server/sql/group_by_handler.h
- * Attributes:
- * select - attribute contains all GROUP BY, HAVING, ORDER items and calls it
- *              an extended SELECT list according to comments in
- *              server/sql/group_handler.cc.
- *              So the temporary table for
- *              select count(*) from b group by a having a > 3 order by a
- *              will have 4 columns not 1.
- *              However server ignores all NULLs used in
- *              GROUP BY, HAVING, ORDER.
- * select_list_descr - contains Item description returned by Item->print()
- *              that is used in lookup for corresponding columns in
- *              extended SELECT list.
- * table_list - contains all tables involved. Must be CS tables only.
- * distinct - looks like a useless thing for now. Couldn't get it set by server.
- * where - where items.
- * group_by - group by ORDER items.
- * order_by - order by ORDER items.
- * having - having Item.
- * Methods:
- * init_scan - get plan and send it to ExeMgr. Get the execution result.
- * next_row - get a row back from sm.
- * end_scan - finish and clean the things up.
+ *  This function processes elements of List<TABLE_LIST> in
+ *  FROM part of the query.
+ *  isUnion tells that CS processes FROM taken from UNION UNIT.
+ *  The notion is described in MDB code.
+ *  on_expr_list ON expressions used in OUTER JOINs. These are
+ *  later used in processWhere()
+ * RETURNS
+ *  error id as an int
  ***********************************************************/
 int processFrom(bool &isUnion,
     SELECT_LEX &select_lex,
@@ -6143,13 +6121,10 @@ int processFrom(bool &isUnion,
     }
 #endif
 
-    // WIP Check for functors that throws
     try
     {
         for (; table_ptr; table_ptr = table_ptr->next_local)
         {
-            // WIP Move this check into create SH/DH. Make appropriate
-            // changes in getGroupByPlan
             // Until we handle recursive cte:
             // Checking here ensures we catch all with clauses in the query.
             if (table_ptr->is_recursive_with_table())
@@ -6302,7 +6277,16 @@ int processFrom(bool &isUnion,
     return 0;
 }
 
-// WIP
+/*@brief  Process WHERE part of the query or sub-query      */
+/***********************************************************
+ * DESCRIPTION:
+ *  This function processes conditions from either JOIN->conds
+ *  or SELECT_LEX->where|prep_where
+ *  on_expr_list ON expressions used in OUTER JOINs. These are
+ *  populated used in processFrom()
+ * RETURNS
+ *  error id as an int
+ ***********************************************************/
 int processWhere(SELECT_LEX &select_lex,
     gp_walk_info &gwi,
     SCSEP &csep,
@@ -6393,8 +6377,6 @@ int processWhere(SELECT_LEX &select_lex,
         std::cerr << "-------------------------------------------------\n" << std::endl;
 #endif
 
-
-    // WIP Remove or refactor this block
     // ZZ - the followinig debug shows the structure of nested outer join. should
     // use a recursive function.
 #ifdef OUTER_JOIN_DEBUG
@@ -6517,34 +6499,20 @@ int processWhere(SELECT_LEX &select_lex,
     return 0;
 }
 
-// WIP
-/*@brief  group_by_handler class*/
+/*@brief  Translates SELECT_LEX into CSEP                  */
 /***********************************************************
  * DESCRIPTION:
- * Provides server with group_by_handler API methods.
- * One should read comments in server/sql/group_by_handler.h
- * Attributes:
- * select - attribute contains all GROUP BY, HAVING, ORDER items and calls it
- *              an extended SELECT list according to comments in
- *              server/sql/group_handler.cc.
- *              So the temporary table for
- *              select count(*) from b group by a having a > 3 order by a
- *              will have 4 columns not 1.
- *              However server ignores all NULLs used in
- *              GROUP BY, HAVING, ORDER.
- * select_list_descr - contains Item description returned by Item->print()
- *              that is used in lookup for corresponding columns in
- *              extended SELECT list.
- * table_list - contains all tables involved. Must be CS tables only.
- * distinct - looks like a useless thing for now. Couldn't get it set by server.
- * where - where items.
- * group_by - group by ORDER items.
- * order_by - order by ORDER items.
- * having - having Item.
- * Methods:
- * init_scan - get plan and send it to ExeMgr. Get the execution result.
- * next_row - get a row back from sm.
- * end_scan - finish and clean the things up.
+ *  This function takes SELECT_LEX and tries to produce
+ *  a corresponding CSEP out of it. It is made of parts that
+ *  process parts of the query, e.g. FROM, WHERE, SELECT,
+ *  HAVING, GROUP BY, ORDER BY. FROM and WHERE are processed
+ *  by processFrom(), processWhere(). CS calls getSelectPlan()
+ *  recursively to process subqueries.
+ * ARGS
+ *  isUnion if true CS processes UNION unit now
+ *  isPushdownHand legacy to be removed
+ * RETURNS
+ *  error id as an int
  ***********************************************************/
 int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     SCSEP& csep,
@@ -6555,20 +6523,6 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     cerr << "getSelectPlan()" << endl;
 #endif
     int rc = 0;
-    // WIP Remove this if block
-    // by pass the derived table resolve phase of mysql
-    if ( !isPushdownHand &&
-            !(((gwi.thd->lex)->sql_command == SQLCOM_UPDATE ) ||
-            ((gwi.thd->lex)->sql_command == SQLCOM_DELETE ) ||
-            ((gwi.thd->lex)->sql_command == SQLCOM_UPDATE_MULTI ) ||
-            ((gwi.thd->lex)->sql_command == SQLCOM_DELETE_MULTI ) ) && gwi.thd->derived_tables_processing)
-    {
-        // MCOL-2178 isUnion member only assigned, never used
-        //MIGR::infinidb_vtable.isUnion = false;
-        return -1;
-    }
-
-    // WIP Move this into create_SH/DH/GBH
     // rollup is currently not supported
     if (select_lex.olap == ROLLUP_TYPE)
     {
@@ -6591,7 +6545,6 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     CalpontSelectExecutionPlan::SelectList derivedTbList;
     // @bug 1796. Remember table order on the FROM list.
     gwi.clauseType = FROM;
-    // WIP We might need a map here
     List<Item> on_expr_list;
     if ((rc = processFrom(isUnion, select_lex, gwi, csep, on_expr_list)))
     {
@@ -7938,7 +7891,6 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
         {
             uint32_t limitOffset = 0;
 
-            // WIP get rid from this join variable set far away from here
             if (select_lex.join)
             {
                 JOIN* join = select_lex.join;

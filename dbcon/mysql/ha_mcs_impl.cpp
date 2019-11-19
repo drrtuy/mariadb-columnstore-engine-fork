@@ -3274,7 +3274,6 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 
             std::istringstream ss(aCmdLine);
             std::string arg;
-// WIP very unfortunate decision
             std::vector<std::string> v2(20, "");
             unsigned int i = 0;
 
@@ -3299,20 +3298,6 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
             saAttr.lpSecurityDescriptor = NULL;
             HANDLE handleList[2];
             const char* pSectionMsg;
-// WIP
-            // Create a pipe for the child process's STDOUT.
-#if 0       // We don't need stdout to come back right now.
-            pSectionMsg = "Create Stdout";
-            bSuccess = CreatePipe(&ci->cpimport_stdout_Rd, &ci->cpimport_stdout_Wr, &saAttr, 0);
-
-            // Ensure the read handle to the pipe for STDIN is not inherited.
-            if (bSuccess)
-            {
-                pSectionMsg = "SetHandleInformation(stdout)";
-                bSuccess = SetHandleInformation(ci->cpimport_stdout_Rd, HANDLE_FLAG_INHERIT, 0);
-            }
-
-#endif
             bSuccess = true;
 
             // Create a pipe for the child process's STDIN.
@@ -3362,10 +3347,8 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
                 pSectionMsg = "UpdateProcThreadAttribute";
                 bInitialized = true;
                 handleList[0] = ci->cpimport_stdin_Rd;
-//				handleList[1] = ci->cpimport_stdout_Wr;
                 bSuccess = UpdateProcThreadAttribute(lpAttributeList,
                                                      0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-//                    handleList, 2*sizeof(HANDLE), NULL, NULL);
                                                      handleList, sizeof(HANDLE), NULL, NULL);
             }
 
@@ -3387,8 +3370,6 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
                 siStartInfo.lpAttributeList = lpAttributeList;
                 siStartInfo.StartupInfo.hStdError = NULL;
                 siStartInfo.StartupInfo.hStdOutput = NULL;
-//				siStartInfo.StartupInfo.hStdError = ci->cpimport_stdout_Wr;
-//				siStartInfo.StartupInfo.hStdOutput = ci->cpimport_stdout_Wr;
                 siStartInfo.StartupInfo.hStdInput = ci->cpimport_stdin_Rd;
                 siStartInfo.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
                 // Create the child process.
@@ -3507,14 +3488,11 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
             {
                 ci->filePtr = fdopen(ci->fdt[1], "w");
                 ci->cpimport_pid = aChPid;	// This is the child PID
-                //cout << "Child PID is " << aChPid << endl;
                 close(ci->fdt[0]);	//close the READER of PARENT
                 ci->fdt[0] = -1;
                 // now we can send all the data thru FIFO[1], writer of PARENT
             }
 
-            //if(aChPid == 0)
-            //cout << "******** Child finished its work ********" << endl;
 #endif
         }
         else
@@ -3522,7 +3500,6 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
             if (!ci->dmlProc)
             {
                 ci->dmlProc = new MessageQueueClient("DMLProc");
-                //cout << "start_bulk_insert starts a client " << ci->dmlProc << " for session " << thd->thread_id << endl;
             }
         }
     }
@@ -3638,23 +3615,6 @@ int ha_mcs_impl_end_bulk_insert(bool abort, TABLE* table)
     // @bug 2515. Check command intead of vtable state
     if ( ( ((thd->lex)->sql_command == SQLCOM_INSERT) ||  ((thd->lex)->sql_command == SQLCOM_LOAD) || (thd->lex)->sql_command == SQLCOM_INSERT_SELECT) && !ci->singleInsert )
     {
-
-//WIP
-        //@Bug 2438. Only load data infile calls last batch process
-        /*		if ( ci->isLoaddataInfile && ((thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) || (ci->useCpimport == 0))) {
-        			//@Bug 2829 Handle ctrl-C
-        			if ( thd->killed > 0 )
-        				abort = true;
-
-        			if ( !ci->dmlProc )
-        			{
-        				ci->dmlProc = new MessageQueueClient("DMLProc");
-        				//cout << "end_bulk_insert starts a client " << ci->dmlProc << " for session " << thd->thread_id << endl;
-        			}
-        			rc = ha_mcs_impl_write_last_batch(table, *ci, abort);
-        		}
-        	    else if ((ci->useCpimport > 0) && (!(thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))) && (!ci->singleInsert) && ((ci->isLoaddataInfile) ||
-        		}  */
         if ((ci->useCpimport > 0) && (!(thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))) && (!ci->singleInsert) && ((ci->isLoaddataInfile) ||
                 ((thd->lex)->sql_command == SQLCOM_INSERT) || ((thd->lex)->sql_command == SQLCOM_LOAD) ||
                 ((thd->lex)->sql_command == SQLCOM_INSERT_SELECT)) )
