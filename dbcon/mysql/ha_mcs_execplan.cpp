@@ -1397,7 +1397,8 @@ uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
             expr->traverse_cond(gp_walk, &gwi_outer, Item::POSTFIX);
         }
         // @bug 2849
-        else if (table_ptr->embedding && table_ptr->embedding->nested_join)
+        //else if (table_ptr->embedding && table_ptr->embedding->nested_join)
+        // WIP
         /*{
             // if this is dervied table process phase, mysql may have not developed the plan
             // completely. Return and let it finish. It will come to rnd_init again.
@@ -1438,8 +1439,7 @@ uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
                     }
                 }
             }
-        }*/
-
+        } */
         // Error out subquery in outer join on filter for now
         if (gwi_outer.hasSubSelect)
         {
@@ -1448,9 +1448,8 @@ uint32_t buildOuterJoin(gp_walk_info& gwi, SELECT_LEX& select_lex)
             setError(gwi.thd, ER_INTERNAL_ERROR, gwi.parseErrorText);
             return -1;
         }
-
         // build outerjoinon filter
-        ParseTree* filters = NULL, *ptp = NULL, /**rhs = NULL*/*lhs = NULL;
+        ParseTree* filters = NULL, *ptp = NULL, *lhs = NULL;
 
         while (!gwi_outer.ptWorkStack.empty())
         {
@@ -6130,8 +6129,6 @@ int processFrom(bool &isUnion,
     SCSEP &csep,
     List<Item> &on_expr_list)
 {
-    // Send this recursively to getSelectPlan
-    bool unionSel = false;
     // populate table map and trigger syscolumn cache for all the tables (@bug 1637).
     // all tables on FROM list must have at least one col in colmap
     TABLE_LIST* table_ptr = select_lex.get_table_list();
@@ -6163,7 +6160,7 @@ int processFrom(bool &isUnion,
                 return ER_CHECK_NOT_IMPLEMENTED;
             }
           
-            // Save on_expr to use it for WHERE processing 
+            // Save on_expr to use it for WHERE processing
             if (!table_ptr->outer_join && table_ptr->on_expr)
             {
                 on_expr_list.push_back(table_ptr->on_expr);
@@ -6258,6 +6255,8 @@ int processFrom(bool &isUnion,
 
     csep->tableList(gwi.tbList);
 
+    // Send this recursively to getSelectPlan
+    bool unionSel = false;
     // UNION master unit check
     // Existed pushdown handlers won't get in this scope
     // except UNION pushdown that is to come.
@@ -6269,7 +6268,6 @@ int processFrom(bool &isUnion,
         CalpontSelectExecutionPlan::SelectList unionVec;
         SELECT_LEX* select_cursor = select_lex.master_unit()->first_select();
         unionSel = true;
-        isUnion = true;
         uint8_t distUnionNum = 0;
 
         for (SELECT_LEX* sl = select_cursor; sl; sl = sl->next_select())
@@ -6315,9 +6313,6 @@ int processWhere(SELECT_LEX &select_lex,
 
     if (join != 0)
         icp = reinterpret_cast<Item_cond*>(join->conds);
-
-    // WIP
-    //COND *conds = simplify_joins(join, join->join_list, join->conds, TRUE, FALSE);
 
     // if icp is null, try to find the where clause other where
     if (!join && gwi.thd->lex->derived_tables)
@@ -6598,12 +6593,11 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex,
     gwi.clauseType = FROM;
     // WIP We might need a map here
     List<Item> on_expr_list;
-    // WIP!!!! Remove two vars
-    bool unionSel = isUnion;
-    if ((rc = processFrom(unionSel, select_lex, gwi, csep, on_expr_list)))
+    if ((rc = processFrom(isUnion, select_lex, gwi, csep, on_expr_list)))
     {
         return rc;
     }
+    bool unionSel = (!isUnion && select_lex.master_unit()->is_unit_op()) ? true : false;
 
     gwi.clauseType = WHERE;
     if ((rc = processWhere(select_lex, gwi, csep, on_expr_list)))

@@ -413,6 +413,23 @@ int vbin2hex(const uint8_t* p, const unsigned l, char* o)
     return 0;
 }
 
+// Table Map is used by both cond_push and table mode processing
+// Entries made by cond_push don't have csep though.
+// When 
+bool onlyOneTableinTM(cal_impl_if::cal_connection_info* ci)
+{
+    size_t counter = 0;
+    for (auto &tableMapEntry: ci->tableMap)
+    {
+        if (tableMapEntry.second.csep)
+            counter++;
+        if (counter >= 1)
+            return false; 
+    }
+
+    return true;
+}
+
 int fetchNextRow(uchar* buf, cal_table_info& ti, cal_connection_info* ci, bool handler_flag = false)
 {
     int rc = HA_ERR_END_OF_FILE;
@@ -2441,7 +2458,9 @@ int ha_mcs_impl_rnd_init(TABLE* table)
         csep = ti.csep;
 
         // for ExeMgr logging sqltext. only log once for the query although multi plans may be sent
-        if (ci->tableMap.size() == 1)
+        // CS adds the ti into TM in the end of rnd_init thus we log the SQL
+        // only once when there is no ti with csep.
+        if (onlyOneTableinTM(ci))
         {
             ti.csep->data(idb_mysql_query_str(thd));
         }
@@ -3236,7 +3255,8 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 #ifdef _MSC_VER
                     aCmdLine = "cpimport.exe -N -P " + to_string(localModuleId) + " -s " + ci->delimiter + " -e 0" + " -E " + escapechar + ci->enclosed_by + " ";
 #else
-                    aCmdLine = "cpimport -m 1 -N -P " + boost::to_string(localModuleId) + " -s " + ci->delimiter + " -e 0" + " -T " + thd->variables.time_zone->get_name()->ptr() + " -E " + escapechar + ci->enclosed_by + " ";
+//WIP
+                    aCmdLine = "/usr/bin/cpimport -m 1 -N -P " + boost::to_string(localModuleId) + " -s " + ci->delimiter + " -e 0" + " -T " + thd->variables.time_zone->get_name()->ptr() + " -E " + escapechar + ci->enclosed_by + " ";
 #endif
                 }
             }
@@ -3245,15 +3265,16 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
 #ifdef _MSC_VER
                 aCmdLine = "cpimport.exe -N -s " + ci->delimiter + " -e 0" + " -E " + escapechar + ci->enclosed_by + " ";
 #else
-                aCmdLine = std::string("cpimport -m 1 -N -s ") + ci->delimiter + " -e 0" + " -T " + thd->variables.time_zone->get_name()->ptr() + " -E " + escapechar + ci->enclosed_by + " ";
+//WIP
+                aCmdLine = std::string("/usr/bin/cpimport -m 1 -N -s ") + ci->delimiter + " -e 0" + " -T " + thd->variables.time_zone->get_name()->ptr() + " -E " + escapechar + ci->enclosed_by + " ";
 #endif
             }
 
             aCmdLine = aCmdLine + table->s->db.str + " " + table->s->table_name.str ;
 
-            //cout << "aCmdLine = " << aCmdLine << endl;
             std::istringstream ss(aCmdLine);
             std::string arg;
+// WIP very unfortunate decision
             std::vector<std::string> v2(20, "");
             unsigned int i = 0;
 
@@ -3278,6 +3299,7 @@ void ha_mcs_impl_start_bulk_insert(ha_rows rows, TABLE* table)
             saAttr.lpSecurityDescriptor = NULL;
             HANDLE handleList[2];
             const char* pSectionMsg;
+// WIP
             // Create a pipe for the child process's STDOUT.
 #if 0       // We don't need stdout to come back right now.
             pSectionMsg = "Create Stdout";
@@ -3617,6 +3639,7 @@ int ha_mcs_impl_end_bulk_insert(bool abort, TABLE* table)
     if ( ( ((thd->lex)->sql_command == SQLCOM_INSERT) ||  ((thd->lex)->sql_command == SQLCOM_LOAD) || (thd->lex)->sql_command == SQLCOM_INSERT_SELECT) && !ci->singleInsert )
     {
 
+//WIP
         //@Bug 2438. Only load data infile calls last batch process
         /*		if ( ci->isLoaddataInfile && ((thd->variables.option_bits & (OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) || (ci->useCpimport == 0))) {
         			//@Bug 2829 Handle ctrl-C
@@ -4076,9 +4099,7 @@ int ha_mcs_impl_external_lock(THD* thd, TABLE* table, int lock_type)
     CalTableMap::iterator mapiter = ci->tableMap.find(table);
     // make sure this is a release lock (2nd) call called in
     // the table mode.
-    if (mapiter != ci->tableMap.end()
-          && (mapiter->second.condInfo && mapiter->second.csep)
-          && lock_type == 2)
+    if (mapiter != ci->tableMap.end() && mapiter->second.csep && lock_type == 2)
     {
         // table mode
         if (mapiter->second.conn_hndl)
