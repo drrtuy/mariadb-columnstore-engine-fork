@@ -24,6 +24,7 @@
 #define NEED_CALPONT_EXTERNS
 #include "ha_mcs_impl.h"
 #include "ha_mcs_impl_if.h"
+#include "ha_mcs_opt_rewrites.h"
 
 void mutate_optimizer_flags(THD *thd_);
 void restore_optimizer_flags(THD *thd_);
