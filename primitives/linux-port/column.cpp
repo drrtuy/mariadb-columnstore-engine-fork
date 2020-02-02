@@ -616,7 +616,7 @@ inline bool isMinMaxValid(const NewColRequestHeader* in)
 
             case CalpontSystemCatalog::DECIMAL:
             case CalpontSystemCatalog::UDECIMAL:
-                return (in->DataSize <= 8);
+                return (in->DataSize <= 16);
 
             default:
                 return false;
@@ -1540,11 +1540,6 @@ inline void p_Col_ridArray(NewColRequestHeader* in,
 using uint128_t = unsigned __int128;
 using int128_t = __int128;
 
-struct uint128_pod {
-    uint64_t lo;
-    uint64_t hi;
-};
-
 // for BINARY
 template<int W>
 inline void p_Col_bin_ridArray(NewColRequestHeader* in,
@@ -1588,13 +1583,13 @@ inline void p_Col_bin_ridArray(NewColRequestHeader* in,
     {
         if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
         {
-            out->Min = static_cast<int64_t>(numeric_limits<uint64_t>::max());
+            out->Min = -1;
             out->Max = 0;
         }
         else
         {
-            out->Min = numeric_limits<int64_t>::max();
-            out->Max = numeric_limits<int64_t>::min();
+            dataconvert::DataConvert::int128Max(out->Min);
+            dataconvert::DataConvert::int128Min(out->Max);
         }
     }
     else
@@ -1606,7 +1601,6 @@ inline void p_Col_bin_ridArray(NewColRequestHeader* in,
     typedef char binWtype [W];
 
     const ColArgs* args = NULL;
-    int64_t val = 0;
     binWtype* bval;
     int nextRidIndex = 0, argIndex = 0;
     bool done = false, cmp = false, isNull = false, isEmpty = false;
@@ -1655,8 +1649,14 @@ inline void p_Col_bin_ridArray(NewColRequestHeader* in,
     bval = (binWtype*)nextBinColValue<W>(in->DataType, ridArray, in->NVALS, &nextRidIndex, &done, &isNull,
                 &isEmpty, &rid, in->OutputType, reinterpret_cast<uint8_t*>(block), itemsPerBlk);
 
+    uint128_t val;
+    dataconvert::Int128Pod_t *valPod;
+    valPod = reinterpret_cast<dataconvert::Int128Pod_t*>(&val);
+
     while (!done)
     {
+        valPod->lo = *reinterpret_cast<uint64_t*>(*bval);
+        valPod->hi = *(reinterpret_cast<uint64_t*>(*bval) + 1);
 //        if((*((uint64_t *) (bval))) != 0)
 //        {
 //            cout << "rid "<< rid << " value ";
@@ -1701,13 +1701,9 @@ inline void p_Col_bin_ridArray(NewColRequestHeader* in,
 //               if((*((uint64_t *) (uval))) != 0) cout << "comparing " << dec << (*((uint64_t *) (uval)))  << " to " << (*((uint64_t *) (argVals[argIndex])))  << endl;
 
                 // WIP MCOL-641
-                uint128_t val, filterVal;
-                uint128_pod *valPod, *filterValPod;
-                valPod = reinterpret_cast<uint128_pod*>(&val);
-                filterValPod = reinterpret_cast<uint128_pod*>(&filterVal);
-
-                valPod->lo = *reinterpret_cast<uint64_t*>(*bval);
-                valPod->hi = *(reinterpret_cast<uint64_t*>(*bval) + 1);
+                uint128_t filterVal;
+                dataconvert::Int128Pod_t *filterValPod;
+                filterValPod = reinterpret_cast<dataconvert::Int128Pod_t*>(&filterVal);
 
                 filterValPod->lo = *reinterpret_cast<uint64_t*>(argVals[argIndex]);
                 filterValPod->hi = *(reinterpret_cast<uint64_t*>(argVals[argIndex]) + 1);
@@ -1764,6 +1760,36 @@ inline void p_Col_bin_ridArray(NewColRequestHeader* in,
             if ((argIndex == in->NOPS && in->BOP == BOP_AND) || in->NOPS == 0)
             {
                 store(in, out, outSize, written, rid, reinterpret_cast<const uint8_t*>(block));
+            }
+        }
+
+        // Set the min and max if necessary.  Ignore nulls.
+        if (out->ValidMinMax && !isNull && !isEmpty)
+        {
+            if ((in->DataType == CalpontSystemCatalog::CHAR || in->DataType == CalpontSystemCatalog::VARCHAR ||
+                    in->DataType == CalpontSystemCatalog::BLOB || in->DataType == CalpontSystemCatalog::TEXT ) && 1 < W)
+            {
+                if (colCompare(out->Min, val, COMPARE_GT, false, in->DataType, W, placeholderRegex))
+                    out->Min = val;
+
+                if (colCompare(out->Max, val, COMPARE_LT, false, in->DataType, W, placeholderRegex))
+                    out->Max = val;
+            }
+            else if (isUnsigned((CalpontSystemCatalog::ColDataType)in->DataType))
+            {
+                if (static_cast<unsigned __int128>(out->Min) > val)
+                    out->Min = static_cast<unsigned __int128>(val);
+
+                if (static_cast<unsigned __int128>(out->Max) < val)
+                    out->Max = static_cast<unsigned __int128>(val);;
+            }
+            else
+            {
+                if (out->Min > (__int128) val)
+                    out->Min = (__int128) val;
+
+                if (out->Max < (__int128) val)
+                    out->Max = (__int128) val;
             }
         }
 

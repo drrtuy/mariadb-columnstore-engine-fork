@@ -230,6 +230,9 @@ private:
     bool validCPData;
     int64_t minVal, maxVal;    // CP data from a scanned column
     uint64_t lbidForCP;
+    // MCOL-641
+    bool hasBinaryColumn;
+    __int128 bigMinVal, bigMaxVal;
 
     // IO counters
     boost::mutex counterLock;

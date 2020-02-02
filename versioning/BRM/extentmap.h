@@ -102,14 +102,26 @@ const char CP_VALID = 2;
 
 struct EMCasualPartition_struct
 {
-    RangePartitionData_t hi_val;	// This needs to be reinterpreted as unsigned for uint64_t column types.
+    RangePartitionData_t hi_val;       // This needs to be reinterpreted as unsigned for uint64_t column types.
     RangePartitionData_t lo_val;
     int32_t sequenceNum;
     char isValid; //CP_INVALID - No min/max and no DML in progress. CP_UPDATING - Update in progress. CP_VALID- min/max is valid
     EXPORT EMCasualPartition_struct();
     EXPORT EMCasualPartition_struct(const int64_t lo, const int64_t hi, const int32_t seqNum);
+    // TODO MCOL-641
+    //EXPORT EMCasualPartition_struct(const __int128 bigLo, const __int128 bigHi, const int32_t seqNum);
     EXPORT EMCasualPartition_struct(const EMCasualPartition_struct& em);
     EXPORT EMCasualPartition_struct& operator= (const EMCasualPartition_struct& em);
+    union
+    {
+        __int128 bigLoVal;
+        int64_t loVal;
+    };
+    union
+    {
+        __int128 bigHiVal;
+        int64_t hiVal;
+    };
 };
 typedef EMCasualPartition_struct EMCasualPartition_t;
 
@@ -828,7 +840,7 @@ public:
      * @param firstNode - if true, logs a debugging msg when CP data is updated
      * @return 0 if all tests pass, -1 (or throws logic_error) if not.
     */
-    EXPORT void setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode, bool useLock = true);
+    EXPORT void setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode, bool useLock = true, bool isBinaryColumn = false);
 
     /** @brief Merges the CP info for the extents contained in cpMap.
      * @param cpMap - The key must be the starting LBID in the range.
@@ -836,7 +848,8 @@ public:
     */
     void mergeExtentsMaxMin(CPMaxMinMergeMap_t& cpMap, bool useLock = true);
 
-    EXPORT int getMaxMin(const LBID_t lbidRange, int64_t& max, int64_t& min, int32_t& seqNum);
+    template <typename T>
+    EXPORT int getMaxMin(const LBID_t lbidRange, T& max, T& min, int32_t& seqNum);
 
     inline bool empty()
     {

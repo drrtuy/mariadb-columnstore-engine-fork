@@ -801,7 +801,8 @@ public:
                                  execplan::CalpontSystemCatalog::ColDataType colDataType) DBRM_THROW;
     EXPORT int markExtentsInvalid(const std::vector<LBID_t>& lbids,
                                   const std::vector<execplan::CalpontSystemCatalog::ColDataType>& colDataTypes) DBRM_THROW;
-    EXPORT int getExtentMaxMin(const LBID_t lbid, int64_t& max, int64_t& min, int32_t& seqNum) throw();
+    template <typename T>
+    EXPORT int getExtentMaxMin(const LBID_t lbid, T& max, T& min, int32_t& seqNum) throw();
 
     EXPORT int setExtentMaxMin(const LBID_t lbid, const int64_t max, const int64_t min, const int32_t seqNum) DBRM_THROW;
 
@@ -812,7 +813,7 @@ public:
      * @param cpInfos vector of CPInfo objects.  The firstLbid must be the first LBID in the extent.
      * @return 0 on success, -1 on error
      */
-    EXPORT int setExtentsMaxMin(const CPInfoList_t& cpInfos) DBRM_THROW;
+    EXPORT int setExtentsMaxMin(const CPInfoList_t& cpInfos, bool isBinaryColumn = false) DBRM_THROW;
 
     /** @brief Merges max/min casual partitioning info for the specified
      *  extents, with the current CP info.

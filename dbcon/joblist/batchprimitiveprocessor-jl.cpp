@@ -712,7 +712,16 @@ bool BatchPrimitiveProcessorJL::countThisMsg(messageqcpp::ByteStream& in) const
     if (_hasScan)
     {
         if (data[offset] != 0)
-            offset += 25;  // skip the CP data
+        {
+            if (data[offset + 9] != 0)
+            {
+                offset += 42;  // skip the CP data
+            }
+            else
+            {
+                offset += 26;  // skip the CP data
+            }
+        }
         else
             offset += 9;  // skip only the "valid CP data" & LBID bytes
     }
@@ -738,11 +747,12 @@ void BatchPrimitiveProcessorJL::deserializeAggregateResult(ByteStream* in,
 }
 
 void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream& in, vector<RGData>* out,
-        bool* validCPData, uint64_t* lbid, int64_t* min, int64_t* max,
+        bool* validCPData, uint64_t* lbid, __int128* min, __int128* max,
         uint32_t* cachedIO, uint32_t* physIO, uint32_t* touchedBlocks, bool* countThis,
-        uint32_t threadID) const
+        uint32_t threadID, bool* hasBinaryColumn, const execplan::CalpontSystemCatalog::ColType& colType) const
 {
     uint64_t tmp64;
+    unsigned __int128 tmp128;
     uint8_t tmp8;
     RGData rgData;
     uint32_t rowCount;
@@ -774,10 +784,23 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream& in, vector<RGData>* 
         if (*validCPData)
         {
             in >> *lbid;
-            in >> tmp64;
-            *min = (int64_t) tmp64;
-            in >> tmp64;
-            *max = (int64_t) tmp64;
+            in >> tmp8;
+            *hasBinaryColumn = (tmp8 != 0);
+            if (*hasBinaryColumn)
+            {
+                idbassert(colType.colWidth > 8);
+                in >> tmp128;
+                *min = tmp128;
+                in >> tmp128;
+                *max = tmp128;
+            }
+            else
+            {
+                in >> tmp64;
+                *min = (__int128) tmp64;
+                in >> tmp64;
+                *max = (__int128) tmp64;
+            }
         }
         else
             in >> *lbid;

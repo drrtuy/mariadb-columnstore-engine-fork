@@ -1123,11 +1123,11 @@ int SlaveDBRMNode::setExtentMaxMin(const LBID_t lbid,
 }
 
 // @bug 1970 - Added setExtentsMaxMin below.
-int SlaveDBRMNode::setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode)
+int SlaveDBRMNode::setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode, bool isBinaryColumn)
 {
     try
     {
-        em.setExtentsMaxMin(cpMap, firstNode);
+        em.setExtentsMaxMin(cpMap, firstNode, true, isBinaryColumn);
     }
     catch ( exception& e)
     {

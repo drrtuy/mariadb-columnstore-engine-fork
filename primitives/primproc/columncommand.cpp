@@ -256,8 +256,17 @@ void ColumnCommand::issuePrimitive()
         //if (wasVersioned && outMsg->ValidMinMax)
         //	cout << "CC: versioning overriding min max data\n";
         bpp->lbidForCP = lbid;
-        bpp->maxVal = outMsg->Max;
-        bpp->minVal = outMsg->Min;
+        if (primMsg->DataSize > 8)
+        {
+            bpp->hasBinaryColumn = true;
+            bpp->bigMaxVal = outMsg->Max;
+            bpp->bigMinVal = outMsg->Min;
+        }
+        else
+        {
+            bpp->maxVal = static_cast<int64_t>(outMsg->Max);
+            bpp->minVal = static_cast<int64_t>(outMsg->Min);
+        }
     }
 
 } // issuePrimitive()

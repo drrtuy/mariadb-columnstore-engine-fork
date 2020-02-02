@@ -118,6 +118,8 @@ EMCasualPartition_struct::EMCasualPartition_struct()
 {
     lo_val = numeric_limits<int64_t>::min();
     hi_val = numeric_limits<int64_t>::max();
+    dataconvert::DataConvert::int128Min(bigLoVal);
+    dataconvert::DataConvert::int128Max(bigHiVal);
     sequenceNum = 0;
     isValid = CP_INVALID;
 }
@@ -134,6 +136,8 @@ EMCasualPartition_struct::EMCasualPartition_struct(const EMCasualPartition_struc
 {
     lo_val = em.lo_val;
     hi_val = em.hi_val;
+    bigLoVal = em.bigLoVal;
+    bigHiVal = em.bigHiVal;
     sequenceNum = em.sequenceNum;
     isValid = em.isValid;
 }
@@ -142,6 +146,8 @@ EMCasualPartition_struct& EMCasualPartition_struct::operator= (const EMCasualPar
 {
     lo_val = em.lo_val;
     hi_val = em.hi_val;
+    bigLoVal = em.bigLoVal;
+    bigHiVal = em.bigHiVal;
     sequenceNum = em.sequenceNum;
     isValid = em.isValid;
     return *this;
@@ -557,7 +563,7 @@ int ExtentMap::setMaxMin(const LBID_t lbid,
 
 // @bug 1970.  Added updateExtentsMaxMin function.
 // @note - The key passed in the map must the the first LBID in the extent.
-void ExtentMap::setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode, bool useLock)
+void ExtentMap::setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode, bool useLock, bool isBinaryColumn)
 {
     CPMaxMinMap_t::const_iterator it;
 
@@ -626,8 +632,16 @@ void ExtentMap::setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode, boo
                         fExtentMap[i].partition.cprange.isValid == CP_INVALID)
                 {
                     makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
-                    fExtentMap[i].partition.cprange.hi_val = it->second.max;
-                    fExtentMap[i].partition.cprange.lo_val = it->second.min;
+                    if (isBinaryColumn)
+                    {
+                        fExtentMap[i].partition.cprange.bigHiVal = it->second.bigMax;
+                        fExtentMap[i].partition.cprange.bigLoVal = it->second.bigMin;
+                    }
+                    else
+                    {
+                        fExtentMap[i].partition.cprange.hi_val = it->second.max;
+                        fExtentMap[i].partition.cprange.lo_val = it->second.min;
+                    }
                     fExtentMap[i].partition.cprange.isValid = CP_VALID;
                     incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
                     extentsUpdated++;
@@ -663,8 +677,16 @@ void ExtentMap::setExtentsMaxMin(const CPMaxMinMap_t& cpMap, bool firstNode, boo
                 else if (it->second.seqNum == -2)
                 {
                     makeUndoRecord(&fExtentMap[i], sizeof(struct EMEntry));
-                    fExtentMap[i].partition.cprange.hi_val = it->second.max;
-                    fExtentMap[i].partition.cprange.lo_val = it->second.min;
+                    if (isBinaryColumn)
+                    {
+                        fExtentMap[i].partition.cprange.bigHiVal = it->second.bigMax;
+                        fExtentMap[i].partition.cprange.bigLoVal = it->second.bigMin;
+                    }
+                    else
+                    {
+                        fExtentMap[i].partition.cprange.hi_val = it->second.max;
+                        fExtentMap[i].partition.cprange.lo_val = it->second.min;
+                    }
                     fExtentMap[i].partition.cprange.isValid = CP_INVALID;
                     incSeqNum(fExtentMap[i].partition.cprange.sequenceNum);
                     extentsUpdated++;
@@ -969,9 +991,9 @@ bool ExtentMap::isValidCPRange(int64_t max, int64_t min, execplan::CalpontSystem
 * return the sequenceNum of the extent and the max/min values as -1.
 **/
 
+template <typename T>
 int ExtentMap::getMaxMin(const LBID_t lbid,
-                         int64_t& max,
-                         int64_t& min,
+                         T& max, T& min,
                          int32_t& seqNum)
 {
 #ifdef BRM_INFO
@@ -987,7 +1009,7 @@ int ExtentMap::getMaxMin(const LBID_t lbid,
     }
 
 #endif
-    max = numeric_limits<uint64_t>::max();
+    max = -1;
     min = 0;
     seqNum *= (-1);
     int entries;
@@ -1014,8 +1036,16 @@ int ExtentMap::getMaxMin(const LBID_t lbid,
 
             if (lbid >= fExtentMap[i].range.start && lbid <= lastBlock)
             {
-                max = fExtentMap[i].partition.cprange.hi_val;
-                min = fExtentMap[i].partition.cprange.lo_val;
+                if (typeid(T) == typeid(__int128))
+                {
+                    max = fExtentMap[i].partition.cprange.bigHiVal;
+                    min = fExtentMap[i].partition.cprange.bigLoVal;
+                }
+                else
+                {
+                    max = fExtentMap[i].partition.cprange.hi_val;
+                    min = fExtentMap[i].partition.cprange.lo_val;
+                }
                 seqNum = fExtentMap[i].partition.cprange.sequenceNum;
                 isValid = fExtentMap[i].partition.cprange.isValid;
                 releaseEMEntryTable(READ);
@@ -5839,6 +5869,12 @@ void ExtentMap::dumpTo(ostream& os)
 	return 0;
 }
 */
+
+template
+int ExtentMap::getMaxMin<__int128>(const LBID_t lbidRange, __int128& max, __int128& min, int32_t& seqNum);
+
+template
+int ExtentMap::getMaxMin<int64_t>(const LBID_t lbidRange, int64_t& max, int64_t& min, int32_t& seqNum);
 
 }	//namespace
 // vim:ts=4 sw=4:

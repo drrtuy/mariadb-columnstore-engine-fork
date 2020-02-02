@@ -461,7 +461,8 @@ int DBRM::markExtentsInvalid(const vector<LBID_t>& lbids,
     return err;
 }
 
-int DBRM::getExtentMaxMin(const LBID_t lbid, int64_t& max, int64_t& min, int32_t& seqNum) throw()
+template <typename T>
+int DBRM::getExtentMaxMin(const LBID_t lbid, T& max, T& min, int32_t& seqNum) throw()
 {
 #ifdef BRM_INFO
 
@@ -523,7 +524,7 @@ int DBRM::setExtentMaxMin(const LBID_t lbid, const int64_t max, const int64_t mi
 }
 
 // @bug 1970 - Added function below to set multiple extents casual partition info in one call.
-int DBRM::setExtentsMaxMin(const CPInfoList_t& cpInfos) DBRM_THROW
+int DBRM::setExtentsMaxMin(const CPInfoList_t& cpInfos, bool isBinaryColumn) DBRM_THROW
 {
     CPInfoList_t::const_iterator it;
 #ifdef BRM_INFO
@@ -556,7 +557,14 @@ int DBRM::setExtentsMaxMin(const CPInfoList_t& cpInfos) DBRM_THROW
 
     for (it = cpInfos.begin(); it != cpInfos.end(); it++)
     {
-        command << (uint64_t)it->firstLbid << (uint64_t)it->max << (uint64_t)it->min << (uint32_t)it->seqNum;
+        if (isBinaryColumn)
+        {
+            command << (uint8_t)1 << (uint64_t)it->firstLbid << (unsigned __int128)it->bigMax << (unsigned __int128)it->bigMin << (uint32_t)it->seqNum;
+        }
+        else
+        {
+            command << (uint8_t)0 << (uint64_t)it->firstLbid << (uint64_t)it->max << (uint64_t)it->min << (uint32_t)it->seqNum;
+        }
     }
 
     err = send_recv(command, response);
@@ -4515,5 +4523,11 @@ void DBRM::invalidateUncommittedExtentLBIDs(execplan::CalpontSystemCatalog::SCN 
     // Call setExtentsMaxMin to invalidate and set the proper max/min in each extent
     setExtentsMaxMin(cpInfos);
 }
+
+template
+int DBRM::getExtentMaxMin<__int128>(const LBID_t lbid, __int128& max, __int128& min, int32_t& seqNum) throw();
+
+template
+int DBRM::getExtentMaxMin<int64_t>(const LBID_t lbid, int64_t& max, int64_t& min, int32_t& seqNum) throw();
 
 }   //namespace

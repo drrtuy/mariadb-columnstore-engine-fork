@@ -467,7 +467,7 @@ public:
      *
      **/
     // @bug 1970.  Added setExtentsMaxMin.
-    EXPORT int setExtentsMaxMin(const CPMaxMinMap_t& cpMaxMinMap, bool firstNode);
+    EXPORT int setExtentsMaxMin(const CPMaxMinMap_t& cpMaxMinMap, bool firstNode, bool isBinaryColumn = false);
 
     /** @brief Merges list of min/max values with current CP min/max info
      *

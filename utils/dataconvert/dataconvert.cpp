@@ -1162,17 +1162,6 @@ bool stringToTimestampStruct(const string& data, TimeStamp& timeStamp, const str
 
 }
 
-// WIP 
-#include <stdio.h>
-using int128_t = __int128;
-using uint128_t = unsigned __int128;
-
-struct uint128_pod
-{ 
-  uint64_t lo;
-  uint64_t hi;
-};
-
 // WIP MCOL-641
 // Check for overflows with buflen
 template<typename T>
@@ -1192,9 +1181,9 @@ void DataConvert::toString(T* dec, char *p, size_t buflen)
   // WIP How to treat PODs here ?
   // use typeof
   // Or a templated structure
-  uint128_pod *high_pod = reinterpret_cast<uint128_pod*>(&high);
-  uint128_pod *mid_pod = reinterpret_cast<uint128_pod*>(&mid);
-  uint128_pod *low_pod = reinterpret_cast<uint128_pod*>(&low);
+  Int128Pod_t *high_pod = reinterpret_cast<Int128Pod_t*>(&high);
+  Int128Pod_t *mid_pod = reinterpret_cast<Int128Pod_t*>(&mid);
+  Int128Pod_t *low_pod = reinterpret_cast<Int128Pod_t*>(&low);
   char* original_p = p;
   int printed_chars = 0;
  
@@ -1203,12 +1192,16 @@ void DataConvert::toString(T* dec, char *p, size_t buflen)
     printed_chars = snprintf(p, div_log+1, "%lu", high_pod->lo);
     p += printed_chars; 
     printed_chars = snprintf(p, div_log+1, "%019lu", mid_pod->lo);
-    p += printed_chars;  
+    p += printed_chars;
+    snprintf(p, div_log+1, "%019lu", low_pod->lo);
   } else if (mid_pod->lo != 0) {
     printed_chars = snprintf(p, div_log+1, "%lu", mid_pod->lo);
     p += printed_chars;
+    snprintf(p, div_log+1, "%019lu", low_pod->lo);
   }
-  snprintf(p, div_log+1, "%019lu", low_pod->lo);
+  else {
+      snprintf(p, div_log+1, "%lu", low_pod->lo);
+  }
   if (buflen <= p-original_p)
     std::cout << "DataConvert::toString char buffer overflow" << std::endl;
 }

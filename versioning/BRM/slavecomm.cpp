@@ -1325,9 +1325,12 @@ void SlaveComm::do_setExtentsMaxMin(ByteStream& msg)
     LBID_t lbid;
     uint64_t tmp64;
     uint32_t tmp32;
+    uint8_t tmp8;
+    unsigned __int128 tmp128;
     int err;
     ByteStream reply;
     int32_t updateCount;
+    bool isBinaryColumn = false;
 
 #ifdef BRM_VERBOSE
     cerr << "WorkerComm: do_setExtentsMaxMin()" << endl;
@@ -1338,6 +1341,9 @@ void SlaveComm::do_setExtentsMaxMin(ByteStream& msg)
     CPMaxMinMap_t cpMap;
     CPMaxMin cpMaxMin;
 
+    msg >> tmp8;
+    isBinaryColumn = (tmp8 != 0);
+
     if (printOnly)
         cout << "setExtentsMaxMin: size=" << updateCount << " CPdata..." << endl;
 
@@ -1347,11 +1353,22 @@ void SlaveComm::do_setExtentsMaxMin(ByteStream& msg)
         msg >> tmp64;
         lbid = tmp64;
 
-        msg >> tmp64;
-        cpMaxMin.max = tmp64;
+        if (isBinaryColumn)
+        {
+            msg >> tmp128;
+            cpMaxMin.bigMax = tmp128;
 
-        msg >> tmp64;
-        cpMaxMin.min = tmp64;
+            msg >> tmp128;
+            cpMaxMin.bigMin = tmp128;
+        }
+        else
+        {
+            msg >> tmp64;
+            cpMaxMin.max = tmp64;
+
+            msg >> tmp64;
+            cpMaxMin.min = tmp64;
+        }
 
         msg >> tmp32;
         cpMaxMin.seqNum = tmp32;
@@ -1366,7 +1383,7 @@ void SlaveComm::do_setExtentsMaxMin(ByteStream& msg)
     if (printOnly)
         return;
 
-    err = slave->setExtentsMaxMin(cpMap, firstSlave);
+    err = slave->setExtentsMaxMin(cpMap, firstSlave, isBinaryColumn);
     reply << (uint8_t)err;
 #ifdef BRM_VERBOSE
     cerr << "WorkerComm: do_setExtentsMaxMin() err code is " << err << endl;
