@@ -57,13 +57,6 @@ class PrimTest;
 namespace primitives
 {
 
-enum ColumnFilterMode
-{
-    STANDARD,
-    TWO_ARRAYS,
-    UNORDERED_SET
-};
-
 class pcfHasher
 {
 public:
@@ -105,15 +98,27 @@ struct idb_regex_t
     }
 };
 
+enum ColumnFilterMode
+{
+    ALWAYS_TRUE,            // empty filter is always true
+    SINGLE_COMPARISON,      // exactly one comparison operation
+    ANY_COMPARISON_TRUE,    // ANY comparison is true (BOP_OR)
+    ALL_COMPARISONS_TRUE,   // ALL comparisons are true (BOP_AND)
+    XOR_COMPARISONS,        // XORing results of comparisons (BOP_XOR)
+    ONE_OF_VALUES_IN_SET,   // ONE of the values in the set is equal to the value checked (BOP_OR + all COMPARE_EQ)
+    NONE_OF_VALUES_IN_SET,  // NONE of the values in the set is equal to the value checked (BOP_AND + all COMPARE_NE)
+    ONE_OF_VALUES_IN_ARRAY, // ONE of the values in the small set represented by an array (BOP_OR + all COMPARE_EQ)
+    NONE_OF_VALUES_IN_ARRAY,// NONE of the values in the small set represented by an array (BOP_AND + all COMPARE_NE)
+};
+
 struct ParsedColumnFilter
 {
-    ColumnFilterMode columnFilterMode;
+    ColumnFilterMode columnFilterMode = ALWAYS_TRUE;
     boost::shared_array<int64_t> prestored_argVals;
     boost::shared_array<uint8_t> prestored_cops;
     boost::shared_array<uint8_t> prestored_rfs;
     boost::shared_ptr<prestored_set_t> prestored_set;
     boost::shared_array<idb_regex_t> prestored_regex;
-    uint8_t  likeOps;
 
     ParsedColumnFilter();
     ~ParsedColumnFilter();
@@ -238,7 +243,7 @@ public:
      * a NewColResultHeader, followed by the output type specified by in->OutputType.
      * \li If OT_RID, it will be an array of RIDs
      * \li If OT_DATAVALUE, it will be an array of matching data values stored in the column
-     * \li If OT_BOTH, it will be an array of <DataValue, RID> pairs
+     * \li If OT_BOTH, it will be an array of <RID, DataValue> pairs
      * @param outSize The size of the output buffer in bytes.
      * @param written (out parameter) A pointer to 1 int, which will contain the
      * number of bytes written to out.
