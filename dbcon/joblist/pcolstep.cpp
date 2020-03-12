@@ -180,7 +180,8 @@ pColStep::pColStep(
     // WIP MCOL-641
     else if (fColType.colWidth > 8 
         && fColType.colDataType != CalpontSystemCatalog::BINARY
-        && fColType.colDataType != CalpontSystemCatalog::DECIMAL)
+        && fColType.colDataType != CalpontSystemCatalog::DECIMAL
+        && fColType.colDataType != CalpontSystemCatalog::UDECIMAL)
     {
         fColType.colWidth = 8;
         fIsDict = true;
@@ -634,13 +635,13 @@ void pColStep::addFilter(int8_t COP, int64_t value, uint8_t roundFlag)
 }
 
 // WIP MCOL-641
-void pColStep::addFilter(int8_t COP, unsigned __int128 value, uint8_t roundFlag)
+void pColStep::addFilter(int8_t COP, const int128_t& value, uint8_t roundFlag)
 {
     fFilterString << (uint8_t) COP;
     fFilterString << roundFlag;
 
     // bitwise copies into the filter ByteStream
-    fFilterString << value;
+    fFilterString << *reinterpret_cast<const uint128_t*>(&value);
 
     fFilterCount++;
 }
