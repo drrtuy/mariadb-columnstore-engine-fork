@@ -68,159 +68,17 @@ typedef execplan::CalpontSystemCatalog::ColType Type;
  */
 struct IDB_Decimal
 {
-    IDB_Decimal(): value(0), scale(0), precision(0)
-    {
-        s128Value = 0;
-    }
-    IDB_Decimal(int64_t val, int8_t s, uint8_t p) :
-        value (val),
-        scale(s),
-        precision(p)
-    {
-        s128Value = 0;
-    }
+    IDB_Decimal();
+    IDB_Decimal(int64_t val, int8_t s, uint8_t p);
 
-    int decimalComp(const IDB_Decimal& d) const
-    {
-        lldiv_t d1 = lldiv(value, IDB_pow[scale]);
-        lldiv_t d2 = lldiv(d.value, IDB_pow[d.scale]);
+    int decimalComp(const IDB_Decimal& d) const;
 
-        int ret = 0;
-
-        if (d1.quot > d2.quot)
-        {
-            ret = 1;
-        }
-        else if (d1.quot < d2.quot)
-        {
-            ret = -1;
-        }
-        else
-        {
-            // rem carries the value's sign, but needs to be normalized.
-            int64_t s = scale - d.scale;
-
-            if (s < 0)
-            {
-                if ((d1.rem * IDB_pow[-s]) > d2.rem)
-                    ret = 1;
-                else if ((d1.rem * IDB_pow[-s]) < d2.rem)
-                    ret = -1;
-            }
-            else
-            {
-                if (d1.rem > (d2.rem * IDB_pow[s]))
-                    ret = 1;
-                else if (d1.rem < (d2.rem * IDB_pow[s]))
-                    ret = -1;
-            }
-        }
-
-        return ret;
-    }
-
-    bool operator==(const IDB_Decimal& rhs) const
-    {
-        if (utils::widthByPrecision(precision) == 16)
-        {
-            if (scale == rhs.scale)
-                return s128Value == rhs.s128Value;
-            else
-                return (datatypes::Decimal::compare(*this, rhs) == 0);
-        }
-        else
-        {
-            if (scale == rhs.scale)
-                return value == rhs.value;
-            else
-                return (decimalComp(rhs) == 0);
-        }
-    }
-    bool operator>(const IDB_Decimal& rhs) const
-    {
-        if (utils::widthByPrecision(precision) == 16)
-        {
-            if (scale == rhs.scale)
-                return s128Value > rhs.s128Value;
-            else
-                return (datatypes::Decimal::compare(*this, rhs) > 0);
-        }
-        else
-        {
-            if (scale == rhs.scale)
-                return value > rhs.value;
-            else
-                return (decimalComp(rhs) > 0);
-        }
-    }
-    bool operator<(const IDB_Decimal& rhs) const
-    {
-        if (utils::widthByPrecision(precision) == 16)
-        {
-            if (scale == rhs.scale)
-                return s128Value < rhs.s128Value;
-            else
-                return (datatypes::Decimal::compare(*this, rhs) < 0);
-        }
-        else
-        {
-            if (scale == rhs.scale)
-                return value < rhs.value;
-            else
-                return (decimalComp(rhs) < 0);
-        }
-    }
-    bool operator>=(const IDB_Decimal& rhs) const
-    {
-        if (utils::widthByPrecision(precision) == 16)
-        {
-            if (scale == rhs.scale)
-                return s128Value >= rhs.s128Value;
-            else
-                return (datatypes::Decimal::compare(*this, rhs) >= 0);
-        }
-        else
-        {
-            if (scale == rhs.scale)
-                return value >= rhs.value;
-            else
-                return (decimalComp(rhs) >= 0);
-        }
-    }
-    bool operator<=(const IDB_Decimal& rhs) const
-    {
-        if (utils::widthByPrecision(precision) == 16)
-        {
-            if (scale == rhs.scale)
-                return s128Value <= rhs.s128Value;
-            else
-                return (datatypes::Decimal::compare(*this, rhs) <= 0);
-        }
-        else
-        {
-            if (scale == rhs.scale)
-                return value <= rhs.value;
-            else
-                return (decimalComp(rhs) <= 0);
-        }
-    }
-    bool operator!=(const IDB_Decimal& rhs) const
-    {
-        if (utils::widthByPrecision(precision) == 16)
-        {
-            if (scale == rhs.scale)
-                return s128Value != rhs.s128Value;
-            else
-                return (datatypes::Decimal::compare(*this, rhs) != 0);
-        }
-        else
-        {
-            if (scale == rhs.scale)
-                return value != rhs.value;
-            else
-                return (decimalComp(rhs) != 0);
-        }
-    }
+    bool operator==(const IDB_Decimal& rhs) const;
+    bool operator>(const IDB_Decimal& rhs) const;
+    bool operator<(const IDB_Decimal& rhs) const;
+    bool operator>=(const IDB_Decimal& rhs) const;
+    bool operator<=(const IDB_Decimal& rhs) const;
+    bool operator!=(const IDB_Decimal& rhs) const;
 
     int128_t s128Value;
     int64_t value;

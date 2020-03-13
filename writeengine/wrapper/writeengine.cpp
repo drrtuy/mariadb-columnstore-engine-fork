@@ -70,9 +70,6 @@ namespace WriteEngine
 {
 StopWatch timer;
 
-using dataconvert::int128_t;
-using dataconvert::uint128_t;
-
 /**@brief WriteEngineWrapper Constructor
 */
 WriteEngineWrapper::WriteEngineWrapper() :  m_opType(NOOP)

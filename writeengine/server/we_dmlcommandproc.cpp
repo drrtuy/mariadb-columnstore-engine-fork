@@ -2981,7 +2981,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
                         case CalpontSystemCatalog::UDECIMAL:
                         {
                             // WIP MCOL-641
-                            if (fetchColColwidths[fetchColPos] == 16)
+                            if (fetchColColwidths[fetchColPos] == datatypes::MAXDECIMALWIDTH)
                             {
                                 int128_t* dec;
                                 char buf[utils::MAXLENGTH16BYTES];
@@ -3329,7 +3329,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
                             case CalpontSystemCatalog::DECIMAL:
                             case CalpontSystemCatalog::UDECIMAL:
                             {
-                                if (fetchColColwidths[fetchColPos] == 16)
+                                if (fetchColColwidths[fetchColPos] == datatypes::MAXDECIMALWIDTH)
                                 {
                                     // WIP MCOL-641
                                     int128_t* dec;
