@@ -821,7 +821,7 @@ create_columnstore_select_handler(THD* thd, SELECT_LEX* select_lex)
         {
             unsupported_feature = true;
             handler->err_msg.assign("create_columnstore_select_handler(): \
-                Internal error occured in optimize_unflattened_subqueries_mcs()");
+                Internal error occured in in_subselect_rewrite()");
         }
 
     }

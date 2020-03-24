@@ -255,7 +255,7 @@ simplify_joins_mcs(JOIN *join, List<TABLE_LIST> *join_list, COND *conds, bool to
 * to finalise IN_2_EXISTS rewrite.
 * PARAMETERS:
 *    item_arg - Item to check.
-*    arg - unused dummy arg.
+*    arg - bool to early return if predicate injection fails.
 * RETURN:
 ***********************************************************/
 void in_subselect_rewrite_walk(const Item* item_arg, void* arg)
@@ -306,6 +306,7 @@ void in_subselect_rewrite_walk(const Item* item_arg, void* arg)
 * PARAMETERS:
 *   select_lex
 * RETURN:
+*   bool to to indicate predicate injection failures.
 ***********************************************************/
 bool in_subselect_rewrite(SELECT_LEX *select_lex)
 {
