@@ -64,6 +64,30 @@ void restore_optimizer_flags(THD *thd_)
     }
 }
 
+/*@brief  restore_derived_handler - disable DH             */
+/**********************************************************
+* DESCRIPTION:
+*  INSERT..SELECT, CTAS, INSERT INTO OUTFILE now creates
+*  DH before SH. DH is optimized by MDB as of 1.4.3.
+*  Optimization can break MCS compatibility so MCS disables
+*  DH in ha::external_lock().
+* PARAMETERS:
+*  THD current THD object.
+* RETURN:
+***********************************************************/
+void restore_derived_handler(THD *thd_)
+{
+    bool original_derived_handler= get_original_derived_handler(thd_);
+    set_derived_handler(thd_, original_derived_handler);
+}
+
+void disable_derived_handler(THD *thd_)
+{
+    bool derived_handler= get_derived_handler(thd_);
+    set_original_derived_handler(thd_, derived_handler);
+    set_derived_handler(thd_, false);
+}
+
 /*@brief  find_tables - This traverses Item              */
 /**********************************************************
 * DESCRIPTION:

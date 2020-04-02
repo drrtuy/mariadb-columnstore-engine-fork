@@ -90,6 +90,15 @@ static MYSQL_THDVAR_BOOL(
 );
 
 static MYSQL_THDVAR_BOOL(
+    original_derived_handler,
+    PLUGIN_VAR_NOSYSVAR | PLUGIN_VAR_NOCMDOPT,
+    "Vault for original derived_handler setting.",
+    NULL,
+    NULL,
+    1
+);
+
+static MYSQL_THDVAR_BOOL(
     group_by_handler,
     PLUGIN_VAR_NOCMDARG,
     "Enable/Disable the MCS group_by_handler",
@@ -293,6 +302,7 @@ st_mysql_sys_var* mcs_system_variables[] =
   MYSQL_SYSVAR(compression_type),
   MYSQL_SYSVAR(fe_conn_info_ptr),
   MYSQL_SYSVAR(original_optimizer_flags),
+  MYSQL_SYSVAR(original_derived_handler),
   MYSQL_SYSVAR(select_handler),
   MYSQL_SYSVAR(derived_handler),
   MYSQL_SYSVAR(group_by_handler),
@@ -352,6 +362,16 @@ void set_original_optimizer_flags(ulonglong ptr, THD* thd)
     }
     
     THDVAR(current_thd, original_optimizer_flags) = (uint64_t)(ptr);
+}
+
+bool get_original_derived_handler(THD* thd)
+{
+    return THDVAR(current_thd, original_derived_handler);
+}
+
+void set_original_derived_handler(THD* thd, bool value)
+{
+    THDVAR(current_thd, original_derived_handler) = value;
 }
 
 bool get_select_handler(THD* thd)

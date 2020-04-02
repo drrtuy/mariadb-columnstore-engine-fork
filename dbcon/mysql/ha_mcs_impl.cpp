@@ -4100,6 +4100,12 @@ int ha_mcs_impl_external_lock(THD* thd, TABLE* table, int lock_type)
     {
         if (lock_type == 0)
         {
+            if (thd->lex->sql_command == SQLCOM_INSERT_SELECT
+                && ci->physTablesList.empty())
+            {
+                disable_derived_handler(thd);
+            }
+
             ci->physTablesList.insert(table);
             // MCOL-2178 Disable Conversion of Big IN Predicates Into Subqueries
             thd->variables.in_subquery_conversion_threshold=~ 0;
@@ -4143,6 +4149,11 @@ int ha_mcs_impl_external_lock(THD* thd, TABLE* table, int lock_type)
                 // MCOL-2178 Enable Conversion of Big IN Predicates Into Subqueries
                 thd->variables.in_subquery_conversion_threshold = IN_SUBQUERY_CONVERSION_THRESHOLD;
                 restore_optimizer_flags(thd);
+                // MCOL-3890 Re-enable derived handler.
+                if (thd->lex->sql_command == SQLCOM_INSERT_SELECT)
+                {
+                    restore_derived_handler(thd);
+                }
             }
 
         }

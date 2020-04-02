@@ -29,6 +29,9 @@
 void mutate_optimizer_flags(THD *thd_);
 void restore_optimizer_flags(THD *thd_);
 
+void restore_derived_handler(THD *thd_);
+void disable_derived_handler(THD *thd_);
+
 enum mcs_handler_types_t
 {
     SELECT,
