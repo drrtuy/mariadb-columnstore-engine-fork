@@ -121,6 +121,8 @@ public:
   int next_row() override;
   int end_scan() override;
   void print_error(int, unsigned long);
+  // MCOL-3890 MCS doesn't clean this up b/c MDB does this.
+  Group_list_ptrs* group_list_ptrs;
 };
 
 /*@brief select_handler class*/

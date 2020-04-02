@@ -88,6 +88,37 @@ void disable_derived_handler(THD *thd_)
     set_derived_handler(thd_, false);
 }
 
+int save_group_list(THD* thd, SELECT_LEX* select_lex, Group_list_ptrs **group_list_ptrs)	
+{	
+    if (select_lex->group_list.first)	
+    {	
+        void *mem = thd->stmt_arena->alloc(sizeof(Group_list_ptrs));	
+
+         if (!mem || !((*group_list_ptrs) = new (mem) Group_list_ptrs(thd->stmt_arena->mem_root)) ||	
+            (*group_list_ptrs)->reserve(select_lex->group_list.elements))	
+        {	
+            return 1;	
+        }	
+
+         for (ORDER *order = select_lex->group_list.first; order; order = order->next)	
+        {	
+            (*group_list_ptrs)->push_back(order);	
+        }	
+    }	
+    return 0;	
+}	
+
+void restore_group_list(SELECT_LEX* select_lex, Group_list_ptrs *group_list_ptrs)	
+{	
+    select_lex->group_list.empty();	
+    for (size_t i = 0; i < group_list_ptrs->size(); i++)	
+    {	
+        ORDER *order = (*group_list_ptrs)[i];	
+        select_lex->group_list.link_in_list(order, &order->next);	
+    }	
+}
+
+
 /*@brief  find_tables - This traverses Item              */
 /**********************************************************
 * DESCRIPTION:
@@ -581,8 +612,15 @@ create_columnstore_derived_handler(THD* thd, TABLE_LIST *derived)
         unsupported_feature= true;
     }
 
-    if ( !unsupported_feature )
+    if (!unsupported_feature)
+    {
         handler= new ha_columnstore_derived_handler(thd, derived);
+        // MCOL-3890 save GROUP BY list for DH.
+        if (save_group_list(thd, sl, &handler->group_list_ptrs))
+        {
+            return nullptr;
+        }
+    }
 
   return handler;
 }
@@ -598,7 +636,8 @@ ha_columnstore_derived_handler::ha_columnstore_derived_handler(THD *thd,
                                                              TABLE_LIST *dt)
   : derived_handler(thd, mcs_hton)
 {
-  derived = dt;
+  derived= dt;
+  group_list_ptrs= nullptr;
 }
 
 /***********************************************************
@@ -620,6 +659,15 @@ ha_columnstore_derived_handler::~ha_columnstore_derived_handler()
 int ha_columnstore_derived_handler::init_scan()
 {
     DBUG_ENTER("ha_columnstore_derived_handler::init_scan");
+
+    SELECT_LEX_UNIT *unit= derived->derived;
+    SELECT_LEX *sl= unit->first_select();
+
+    // MCOL-3890 restore GROUP BY list for DH.
+    if (group_list_ptrs)
+    {
+        restore_group_list(sl, group_list_ptrs);
+    }
 
     mcs_handler_info mhi = mcs_handler_info(reinterpret_cast<void*>(this), DERIVED);
     // this::table is the place for the result set

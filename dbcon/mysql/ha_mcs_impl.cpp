@@ -4103,7 +4103,7 @@ int ha_mcs_impl_external_lock(THD* thd, TABLE* table, int lock_type)
             if (thd->lex->sql_command == SQLCOM_INSERT_SELECT
                 && ci->physTablesList.empty())
             {
-                disable_derived_handler(thd);
+                //disable_derived_handler(thd);
             }
 
             ci->physTablesList.insert(table);
@@ -4152,7 +4152,7 @@ int ha_mcs_impl_external_lock(THD* thd, TABLE* table, int lock_type)
                 // MCOL-3890 Re-enable derived handler.
                 if (thd->lex->sql_command == SQLCOM_INSERT_SELECT)
                 {
-                    restore_derived_handler(thd);
+                    //restore_derived_handler(thd);
                 }
             }
 
