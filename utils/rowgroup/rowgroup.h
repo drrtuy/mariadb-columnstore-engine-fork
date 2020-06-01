@@ -61,7 +61,6 @@
 // Workaround for my_global.h #define of isnan(X) causing a std::std namespace
 
 using int128_t = __int128;
-using uint128_t = unsigned __int128;
 
 namespace rowgroup
 {
