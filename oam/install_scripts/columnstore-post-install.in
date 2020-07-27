@@ -62,24 +62,25 @@ columnstore-post-install manually after solving the authentication issues."
 	return 0;
 }
 
-rpmmode=install
+rpmmode=$1
 user=`whoami 2>/dev/null`
 
 quiet=0
 
 stop_mysqld=0
 if [ -z "$(pgrep -x mariadbd)" ];then
-
-    # Startup mysqld 
-    systemctl cat mariadb.service > /dev/null 2>&1
-    if [ $? -eq 0 ] && [ $(running_systemd) -eq 0 ]; then
-        systemctl start mariadb.service
-    else
-        /usr/bin/mysqld_safe &
+    if [ "$rpmmode" == "install" ]; then
+        # Startup mysqld
+        systemctl cat mariadb.service > /dev/null 2>&1
+        if [ $? -eq 0 ] && [ $(running_systemd) -eq 0 ]; then
+            systemctl start mariadb.service
+        else
+            /usr/bin/mysqld_safe &
+        fi
+        stop_mysqld=1
+        sleep 2
     fi
-    stop_mysqld=1
 fi
-sleep 2
 
 if [ -f @ENGINE_SYSCONFDIR@/columnstore/storagemanager.cnf.rpmsave ]; then
     /bin/cp -f @ENGINE_SYSCONFDIR@/columnstore/storagemanager.cnf @ENGINE_SYSCONFDIR@/columnstore/storagemanager.cnf.new
@@ -226,25 +227,33 @@ rm -f $lockdir/columnstore
 
 # This was the last place of postConfigure. RIP
 
-/usr/sbin/install_mcs_mysql.sh --tmpdir=$tmpDir
+if [ -n "$(pgrep -x mariadbd)" ]; then
+    /usr/sbin/install_mcs_mysql.sh --tmpdir=$tmpDir
+else
+    echo "Cannot start MariaDB server. Please run /usr/sbin/install_mcs_mysql.sh manually"
+fi
 
 # Restart MDB to enable plugin
-systemctl cat mariadb.service > /dev/null 2>&1
-if [ $? -eq 0 ] && [ $(running_systemd) -eq 0 ]; then
-    systemctl restart mariadb.service > /dev/null 2>&1
+if [ "$rpmmode" == "install" ]; then
+    systemctl cat mariadb.service > /dev/null 2>&1
+    if [ $? -eq 0 ] && [ $(running_systemd) -eq 0 ]; then
+        systemctl restart mariadb.service > /dev/null 2>&1
+    else
+        pkill mysqld > /dev/null 2>&1
+        while [ -n "$(pgrep -x mysqld)" ] ; do
+            sleep 1
+        done
+        /usr/bin/mysqld_safe &
+        sleep 2
+    fi
 else
-    pkill mysqld > /dev/null 2>&1
-    while [ -n "$(pgrep -x mysqld)" ] ; do
-        sleep 1
-    done
-    /usr/bin/mysqld_safe &
-    sleep 2  
+    echo "Please restart MariaDB server manually"
 fi
 
 checkForError
 if [ $? -ne 0 ]; then
     echo "There was an error installing MariaDB ColumnStore engine plugin. \
-Continue to install the engine though. \ 
+Continue to install the engine though. \
 Please resolve the issues and run necessary scripts manually."
 fi
 

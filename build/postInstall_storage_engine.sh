@@ -6,5 +6,5 @@ if  [ "$1" -eq "$1" 2> /dev/null ]; then
 fi
 
 mkdir -p /var/lib/columnstore/local
-columnstore-post-install --rpmmode=$rpmmode
+columnstore-post-install $rpmmode
 
