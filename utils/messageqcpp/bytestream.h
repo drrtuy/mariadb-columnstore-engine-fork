@@ -151,6 +151,9 @@ public:
      *  push an int128_t onto the end of the stream. The byte order is whatever the native byte order is.
      */
     EXPORT ByteStream& operator<<(const int128_t& o);
+
+    void assign128bitU(const uint128_t& o);
+    void assign128bit(const int128_t& o);
     /**
      *	push an uint128_t onto the end of the stream. The byte order is whatever the native byte order is.
      */
