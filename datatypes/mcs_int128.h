@@ -139,13 +139,24 @@ class TSInt128
     }
 
     //    Checks if the value is NULL
-    inline bool isNull() const
+/*    inline bool isNull() const
+    {
+      return isNullImpl();
+    }
+*/
+    inline bool isNullImpl() const
     {
       return s128Value == NullValue;
     }
-
+/*
     //    Checks if the value is Empty
     inline bool isEmpty() const
+    {
+      return isEmptyImpl();
+    }
+*/
+    //    Checks if the value is Empty
+    inline bool isEmptyImpl() const
     {
       return s128Value == EmptyValue;
     }
@@ -285,9 +296,21 @@ class TSInt128
     uint8_t writeIntPart(const int128_t& x,
                          char* buf,
                          const uint8_t buflen) const;
+    uint8_t writeIntPartWithScale(const int128_t& x,
+                                  char* buf,
+                                  const uint8_t buflen,
+                                  const uint8_t precision,
+                                  const int8_t scale) const;
+    uint8_t writeFractionalPart(const int128_t& x,
+                                          char* buf,
+                                          const uint8_t buflen,
+                                          const uint8_t precision,
+                                          const int8_t scale) const;
 
     //    string representation of TSInt128
     std::string toString() const;
+    std::string toStringImpl() const { return toString(); }
+    std::string toStringWithScaleImpl(uint8_t precision, int8_t scale) const;
 
     friend std::ostream& operator<<(std::ostream& os, const TSInt128& x);
 

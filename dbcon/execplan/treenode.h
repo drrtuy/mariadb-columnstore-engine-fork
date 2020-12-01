@@ -314,6 +314,8 @@ public:
     inline int64_t getDatetimeIntVal();
     inline int64_t getTimestampIntVal();
     inline int64_t getTimeIntVal();
+    inline int64_t getXInt64Val();
+    inline int128_t getXInt128Val();
 
     virtual const execplan::CalpontSystemCatalog::ColType& resultType() const
     {
@@ -731,6 +733,16 @@ inline int64_t TreeNode::getIntVal()
 
     return fResult.intVal;
 }
+
+inline int64_t getXInt64Val()
+{
+    return 42;
+}
+inline int128_t getXInt128Val()
+{
+    return 42;
+}
+
 inline uint64_t TreeNode::getUintVal()
 {
     switch (fResultType.colDataType)

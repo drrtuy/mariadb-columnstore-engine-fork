@@ -709,7 +709,7 @@ namespace datatypes
     std::string Decimal::toString(bool hasTSInt128) const
     {
         // There must be no empty at this point though
-        if (isNull())
+        if (isNullImpl())
         {
             return std::string("NULL");
         }
