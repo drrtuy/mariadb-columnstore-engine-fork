@@ -75,7 +75,6 @@ namespace datatypes
 using int128_t = __int128;
 using uint128_t = unsigned __int128;
 
-
 //    Type traits
 template <typename T>
 struct is_allowed_numeric {
@@ -112,14 +111,17 @@ struct is_uint128_t<uint128_t> {
   static const bool value = true;
 };
  
+constexpr int128_t TSInt128NullValue = int128_t(0x8000000000000000LL) << 64;
+constexpr int128_t TSInt128EmptyValue = (int128_t(0x8000000000000000LL) << 64) + 1;
+
 class TSInt128
 {
   public:
     static constexpr uint8_t MAXLENGTH16BYTES = 42;
-    static constexpr int128_t NullValue = int128_t(0x8000000000000000LL) << 64;
-    static constexpr int128_t EmptyValue = (int128_t(0x8000000000000000LL) << 64) + 1;
+    static inline TSInt128 getNullValue() { return TSInt128(TSInt128NullValue); }
 
     //  A variety of ctors for aligned and unaligned arguments
+    //    Replace with a NULL default
     TSInt128(): s128Value(0) { }
 
     // Copy ctor
@@ -143,13 +145,24 @@ class TSInt128
     //    Checks if the value is NULL
     inline bool isNull() const
     {
-      return s128Value == NullValue;
+      return isNullImpl();
+    }
+
+    inline bool isNullImpl() const
+    {
+      return s128Value == TSInt128NullValue;
     }
 
     //    Checks if the value is Empty
     inline bool isEmpty() const
     {
-      return s128Value == EmptyValue;
+      return isEmptyImpl();
+    }
+
+    //    Checks if the value is Empty
+    inline bool isEmptyImpl() const
+    {
+      return s128Value == TSInt128EmptyValue;
     }
 
     //     The method copies 16 bytes from one memory cell
@@ -272,9 +285,14 @@ class TSInt128
       return TFloat128(s128Value);
     }
 
-    inline const int128_t& getValue() const
+    inline int128_t getValue() const
     {
       return s128Value;
+    }
+
+    inline void setRowValueImpl(unsigned char* buf)
+    {
+      assignPtrPtr(buf, &s128Value);
     }
 
     //    print int128_t parts represented as PODs
@@ -287,9 +305,22 @@ class TSInt128
     uint8_t writeIntPart(const int128_t& x,
                          char* buf,
                          const uint8_t buflen) const;
+    uint8_t writeIntPartWithScale(const int128_t& x,
+                                  char* buf,
+                                  const uint8_t buflen,
+                                  const uint8_t precision,
+                                  const int8_t scale) const;
+    uint8_t writeFractionalPart(const int128_t& x,
+                                char* buf,
+                                const uint8_t buflen,
+                                const uint8_t precision,
+                                const int8_t scale) const;
 
     //    string representation of TSInt128
     std::string toString() const;
+    std::string toStringImpl() const { return toString(); }
+    std::string toStringWithScaleImpl(uint8_t precision,
+                                              int8_t scale) const;
 
     friend std::ostream& operator<<(std::ostream& os, const TSInt128& x);
 

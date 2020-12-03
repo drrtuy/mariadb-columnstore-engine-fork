@@ -37,6 +37,7 @@
 #include "rowgroup.h"
 #include "returnedcolumn.h"
 #include "parsetree.h"
+#include "mcs_decimal.h"
 
 namespace execplan
 {
@@ -98,6 +99,41 @@ public:
     * @return functor pointer. If non-support function, return NULL
     */
     Func* getFunctor(std::string& funcName);
+
+    // Process decimal part of evaluate()
+    template<typename T>
+    inline void evaluateDecimal(rowgroup::Row& row, execplan::SRCP& expression, bool& isNull)
+    {
+        datatypes::Decimal val = expression->getDecimalVal(row, isNull);
+        auto ptr = row.getRowBufferByColIdx(expression->outputIndex());
+        T(val, isNull).setRowValue(ptr);
+/*
+        if (expression[i]->resultType().colWidth
+            == datatypes::MAXDECIMALWIDTH)
+        {
+            if (isNull)
+            {
+                 row.setBinaryField_offset(
+                    const_cast<int128_t*>(&datatypes::Decimal128Null),
+                    expression[i]->resultType().colWidth,
+                    row.getOffset(expression[i]->outputIndex()));
+            }
+            else
+            {
+                row.setBinaryField_offset(&val.s128Value,
+                    expression[i]->resultType().colWidth,
+                    row.getOffset(expression[i]->outputIndex()));
+            }
+        }
+        else
+        {
+            if (isNull)
+                row.setIntField<8>(BIGINTNULL, expression[i]->outputIndex());
+            else
+                row.setIntField<8>(val.value, expression[i]->outputIndex());
+        }
+*/
+    }
 
 private:
     static FuncExp* fInstance;

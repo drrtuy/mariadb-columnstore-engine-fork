@@ -42,8 +42,6 @@ using namespace joblist;
 #include "../udfsdk/udfsdk.h"
 #endif
 
-#include "mcs_decimal.h"
-
 namespace funcexp
 {
 
@@ -472,8 +470,17 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
             case CalpontSystemCatalog::DECIMAL:
             case CalpontSystemCatalog::UDECIMAL:
             {
+                if (expression[i]->resultType().colWidth
+                    == datatypes::MAXDECIMALWIDTH)
+                {
+                    evaluateDecimal<datatypes::Decimal128>(row, expression[i], isNull);
+                }
+                else
+                {
+                    evaluateDecimal<datatypes::Decimal64>(row, expression[i], isNull);
+                }
+/*
                 IDB_Decimal val = expression[i]->getDecimalVal(row, isNull);
-
                 if (expression[i]->resultType().colWidth
                     == datatypes::MAXDECIMALWIDTH)
                 {
@@ -498,7 +505,8 @@ void FuncExp::evaluate(rowgroup::Row& row, std::vector<execplan::SRCP>& expressi
                     else
                         row.setIntField<8>(val.value, expression[i]->outputIndex());
                 }
-
+*/
+                
                 break;
             }
 

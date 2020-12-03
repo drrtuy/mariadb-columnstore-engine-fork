@@ -709,7 +709,7 @@ namespace datatypes
     std::string Decimal::toString(bool hasTSInt128) const
     {
         // There must be no empty at this point though
-        if (isNull())
+        if (isNullImpl())
         {
             return std::string("NULL");
         }
@@ -735,4 +735,19 @@ namespace datatypes
         os << dec.toString();
         return os;
     }
+
+    template <>
+    TSInt128 Decimal::getValue<TSInt128>() const
+    {
+        return TSInt128(s128Value);
+    }
+
+    template <>
+    TSInt64 Decimal::getValue<TSInt64>() const
+    {
+        return TSInt64(value);
+    }
+
+    template<> class TDecimal<TSInt128>;
+    template<> class TDecimal<TSInt64>;
 } // end of namespace

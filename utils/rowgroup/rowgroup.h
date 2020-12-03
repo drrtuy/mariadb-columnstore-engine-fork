@@ -466,6 +466,7 @@ public:
     // Ex: the 1-byte int null value is 0x80.  When it gets cast to an int64_t
     // it becomes 0xffffffffffffff80, which won't match anything returned by getNullValue().
     int64_t getSignedNullValue(uint32_t colIndex) const;
+    inline uint8_t* getRowBufferByColIdx(const uint32_t colIndex) const;
 
     // copy data in srcIndex field to destIndex, all data type
     inline void copyField(uint32_t destIndex, uint32_t srcIndex) const;
@@ -646,6 +647,10 @@ inline uint32_t Row::getCharsetNumber(uint32_t col) const
     return charsetNumbers[col];
 }
 
+inline uint8_t* Row::getRowBufferByColIdx(const uint32_t colIndex) const
+{
+    return &data[offsets[colIndex]];
+}
 inline bool Row::isCharType(uint32_t colIndex) const
 {
     return datatypes::isCharType(types[colIndex]);

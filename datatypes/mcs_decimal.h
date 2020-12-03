@@ -24,119 +24,23 @@
 #include "mcs_basic_types.h"
 #include "exceptclasses.h"
 #include "widedecimalutils.h"
+#include "mcs_datatypes_constants.h"
 #include "mcs_int128.h"
+#include "mcs_int64.h"
 #include "mcs_float128.h"
 #include "checks.h"
 #include "branchpred.h"
-
 
 namespace datatypes
 {
     class Decimal;
 }
 
-// A class by Fabio Fernandes pulled off of stackoverflow
-// Creates a type _xxl that can be used to create 128bit constant values
-// Ex: int128_t i128 = 12345678901234567890123456789_xxl
-namespace detail_xxl
-{
-    constexpr uint8_t hexval(char c) 
-    { return c>='a' ? (10+c-'a') : c>='A' ? (10+c-'A') : c-'0'; }
-
-    template <int BASE, uint128_t V>
-    constexpr uint128_t lit_eval() { return V; }
-
-    template <int BASE, uint128_t V, char C, char... Cs>
-    constexpr uint128_t lit_eval() {
-        static_assert( BASE!=16 || sizeof...(Cs) <=  32-1, "Literal too large for BASE=16");
-        static_assert( BASE!=10 || sizeof...(Cs) <=  39-1, "Literal too large for BASE=10");
-        static_assert( BASE!=8  || sizeof...(Cs) <=  44-1, "Literal too large for BASE=8");
-        static_assert( BASE!=2  || sizeof...(Cs) <= 128-1, "Literal too large for BASE=2");
-        return lit_eval<BASE, BASE*V + hexval(C), Cs...>();
-    }
-
-    template<char... Cs > struct LitEval 
-    {static constexpr uint128_t eval() {return lit_eval<10,0,Cs...>();} };
-
-    template<char... Cs> struct LitEval<'0','x',Cs...> 
-    {static constexpr uint128_t eval() {return lit_eval<16,0,Cs...>();} };
-
-    template<char... Cs> struct LitEval<'0','b',Cs...> 
-    {static constexpr uint128_t eval() {return lit_eval<2,0,Cs...>();} };
-
-    template<char... Cs> struct LitEval<'0',Cs...> 
-    {static constexpr uint128_t eval() {return lit_eval<8,0,Cs...>();} };
-
-    template<char... Cs> 
-    constexpr uint128_t operator "" _xxl() {return LitEval<Cs...>::eval();}
-}
-
-template<char... Cs> 
-constexpr uint128_t operator "" _xxl() {return ::detail_xxl::operator "" _xxl<Cs...>();}
-
 namespace datatypes
 {
 
-constexpr uint32_t MAXDECIMALWIDTH = 16U;
-constexpr uint8_t INT64MAXPRECISION = 18U;
-constexpr uint8_t INT128MAXPRECISION = 38U;
-constexpr uint8_t MAXLEGACYWIDTH = 8U;
-constexpr uint8_t MAXSCALEINC4AVG = 4U;
-constexpr int8_t IGNOREPRECISION = -1;
-
-
-
-const uint64_t mcs_pow_10[20] =
-{
-    1ULL,
-    10ULL,
-    100ULL,
-    1000ULL,
-    10000ULL,
-    100000ULL,
-    1000000ULL,
-    10000000ULL,
-    100000000ULL,
-    1000000000ULL,
-    10000000000ULL,
-    100000000000ULL,
-    1000000000000ULL,
-    10000000000000ULL,
-    100000000000000ULL,
-    1000000000000000ULL,
-    10000000000000000ULL,
-    100000000000000000ULL,
-    1000000000000000000ULL,
-    10000000000000000000ULL,
-};
-const int128_t mcs_pow_10_128[20] =
-{
-    10000000000000000000_xxl,
-    100000000000000000000_xxl,
-    1000000000000000000000_xxl,
-    10000000000000000000000_xxl,
-    100000000000000000000000_xxl,
-    1000000000000000000000000_xxl,
-    10000000000000000000000000_xxl,
-    100000000000000000000000000_xxl,
-    1000000000000000000000000000_xxl,
-    10000000000000000000000000000_xxl,
-    100000000000000000000000000000_xxl,
-    1000000000000000000000000000000_xxl,
-    10000000000000000000000000000000_xxl,
-    100000000000000000000000000000000_xxl,
-    1000000000000000000000000000000000_xxl,
-    10000000000000000000000000000000000_xxl,
-    100000000000000000000000000000000000_xxl,
-    1000000000000000000000000000000000000_xxl,
-    10000000000000000000000000000000000000_xxl,
-    100000000000000000000000000000000000000_xxl,
-};
-
-constexpr uint32_t maxPowOf10 = sizeof(mcs_pow_10)/sizeof(mcs_pow_10[0])-1;
-constexpr int128_t Decimal128Null = TSInt128::NullValue;
-constexpr int128_t Decimal128Empty = TSInt128::EmptyValue;
-
+constexpr int128_t Decimal128Null = TSInt128NullValue;
+constexpr int128_t Decimal128Empty = TSInt128EmptyValue;
 
 /**
     @brief The function to produce scale multiplier/divisor for
@@ -160,6 +64,7 @@ inline void getScaleDivisor(T& divisor, const int8_t scale)
     }
 }
 
+
 // @brief The class for Decimal related operations
 // The class contains Decimal related operations are scale and
 // precision aware.
@@ -177,22 +82,22 @@ class Decimal: public TSInt128
 
         static inline bool isWideDecimalNullValue(const int128_t& val)
         {
-            return (val == TSInt128::NullValue);
+            return (val == Decimal128Null);
         }
 
         static inline bool isWideDecimalEmptyValue(const int128_t& val)
         {
-            return (val == TSInt128::EmptyValue);
+            return (val == Decimal128Empty);
         }
 
         static inline void setWideDecimalNullValue(int128_t& val)
         {
-            val = TSInt128::NullValue;
+            val = Decimal128Null;
         }
 
         static inline void setWideDecimalEmptyValue(int128_t& val)
         {
-            val = TSInt128::EmptyValue;
+            val = Decimal128Empty;
         }
 
         /**
@@ -674,6 +579,13 @@ class Decimal: public TSInt128
             return scale != 0;
         }
 
+        // add enabled_if
+        template<typename T>
+        T getValue() const
+        {
+            return T(0);
+        }
+
         // hasTSInt128 explicitly tells to print int128 out in cases
         // where precision can't detect decimal type properly, e.g.
         // DECIMAL(10)/DECIMAL(38)
@@ -712,6 +624,7 @@ class Decimal: public TSInt128
             return s128Value * scaleDivisor;
         }
 }; //end of Decimal
+
 
 /**
     @brief The structure contains an overflow check for int128
@@ -850,6 +763,72 @@ struct NoOverflowCheck {
         return;
     }
 };
+
+class DecimalMeta
+{
+    public:
+        uint8_t precision;  // 1~38
+        int8_t  scale;	  // 0~38
+        DecimalMeta() : precision(0), scale(0) { };
+        DecimalMeta(const uint8_t a_precision, const int8_t a_scale):
+            precision(a_precision), scale(a_scale) { }
+};
+
+template<typename T>
+class TDecimal: public T, public DecimalMeta
+{
+  public:
+    TDecimal(T value, int8_t scale, uint8_t precision) :
+        T(value),
+        DecimalMeta(precision, scale)
+    { }
+    // Test wrapper around Decimal
+    // @isNull the NULL value flag
+    TDecimal(const Decimal& dec, const bool isNull) :
+        T((isNull) ? T::getNullValue() : dec.getValue<T>()),
+        DecimalMeta(dec.precision, dec.scale)
+    { }
+
+
+    bool inline isNull()
+    {
+        return this->isNullImpl();
+    }
+    bool inline isEmpty()
+    {
+        return this->isEmptyImpl();
+    }
+    
+    void setRowValue(unsigned char* buf)
+    {
+        this->setRowValueImpl(buf);
+    }
+
+    std::string toString()
+    {
+        // There must be no empty at this point though
+        if (isNull())
+        {
+            return std::string("NULL");
+        }
+        if (scale)
+        {
+            this->toStringWithScaleImpl(precision, scale);
+        }
+        this->toStringImpl();
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const TDecimal<T>& x)
+    {
+      os << toString();
+      return os;
+    }
+};
+
+template <> TSInt128 Decimal::getValue<TSInt128>() const;
+template <> TSInt64 Decimal::getValue<TSInt64>() const;
+typedef class TDecimal<TSInt128> Decimal128;
+typedef class TDecimal<TSInt64> Decimal64;
 
 } //end of namespace
 #endif
