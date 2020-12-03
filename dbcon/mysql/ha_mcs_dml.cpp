@@ -928,45 +928,44 @@ int ha_mcs_impl_write_batch_row_(const uchar* buf, TABLE* table, cal_impl_if::ca
 
                 case CalpontSystemCatalog::VARCHAR:
                 {
-                    uint32_t colWidthInBytes = ci.columnTypes[colpos].colWidth;
+                    Field* fieldPtr = table->field[colpos];
+                    uint32_t packedDataLength= 2;
+                    uint16_t dataLength = 0;
+                    if (typeid(*fieldPtr) == typeid(Field_varstring))
+                    {
+                        Field_varstring* fieldVarstring= reinterpret_cast<Field_varstring*>(fieldPtr);
+                        packedDataLength= fieldVarstring->length_bytes;
+                    }
+                    else
+                    {
+                        // else
+                    }
+
+                    if (packedDataLength == 1)
+                    {
+                        dataLength= *(uint8_t*) buf;
+                    }
+                    else
+                    {
+                        dataLength= *(uint16_t*) buf;
+                    }
+                    buf += packedDataLength;
 
                     if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
                     {
                         fprintf(ci.filePtr, "%c", ci.delimiter);
-
-                        if (colWidthInBytes < 256)
-                        {
-                            buf++;
-                        }
-                        else
-                        {
-                            buf = buf + 2 ;
-                        }
                     }
                     else
                     {
                         // Maximum number of bytes allowed for a VARCHAR
                         // field is 65532, so the max length fits in 2 bytes.
                         // dataLength is length in bytes, not length in chars
-                        uint16_t dataLength = 0;
-
-                        if (colWidthInBytes < 256)
-                        {
-                            dataLength = *(uint8_t*) buf;
-                            buf++;
-                        }
-                        else
-                        {
-                            dataLength = *(uint16_t*) buf;
-                            buf = buf + 2 ;
-                        }
-
                         escape.assign((char*)buf, dataLength);
                         boost::replace_all(escape, "\\", "\\\\");
                         fprintf(ci.filePtr, "%c%.*s%c%c", ci.enclosed_by, (int)escape.length(), escape.c_str(), ci.enclosed_by, ci.delimiter);
                     }
 
-                    buf += colWidthInBytes;
+                    buf += dataLength;
 
                     break;
                 }
@@ -1661,38 +1660,39 @@ int ha_mcs_impl_write_batch_row_(const uchar* buf, TABLE* table, cal_impl_if::ca
 
                 case CalpontSystemCatalog::VARBINARY:
                 {
+                    Field* fieldPtr = table->field[colpos];
+                    uint32_t packedDataLength= 2;
+                    uint16_t dataLength = 0;
+                    if (typeid(*fieldPtr) == typeid(Field_varstring))
+                    {
+                        Field_varstring* fieldVarstring= reinterpret_cast<Field_varstring*>(fieldPtr);
+                        packedDataLength= fieldVarstring->length_bytes;
+                    }
+                    else
+                    {
+                        // else
+                    }
+
+                    if (packedDataLength == 1)
+                    {
+                        dataLength= *(uint8_t*) buf;
+                    }
+                    else
+                    {
+                        dataLength= *(uint16_t*) buf;
+                    }
+                    buf += packedDataLength;
+
                     // For a VARBINARY field, ci.columnTypes[colpos].colWidth == colWidthInBytes
                     if (nullVal && (ci.columnTypes[colpos].constraintType != CalpontSystemCatalog::NOTNULL_CONSTRAINT))
                     {
                         fprintf(ci.filePtr, "%c", ci.delimiter);
-
-                        if (ci.columnTypes[colpos].colWidth < 256)
-                        {
-                            buf++;
-                        }
-                        else
-                        {
-                            buf = buf + 2;
-                        }
                     }
                     else
                     {
                         // Maximum number of bytes allowed for a VARBINARY
                         // field is 65532, so the max length fits in 2 bytes.
                         // dataLength is length in bytes, not length in chars
-                        uint16_t dataLength = 0;
-
-                        if (ci.columnTypes[colpos].colWidth < 256)
-                        {
-                            dataLength = *(uint8_t*) buf;
-                            buf++;
-                        }
-                        else
-                        {
-                            dataLength = *(uint16_t*) buf;
-                            buf = buf + 2 ;
-                        }
-
                         const uchar* tmpBuf = buf;
 
                         for (int32_t i = 0; i < dataLength; i++)
@@ -1704,7 +1704,7 @@ int ha_mcs_impl_write_batch_row_(const uchar* buf, TABLE* table, cal_impl_if::ca
                         fprintf(ci.filePtr, "%c", ci.delimiter);
                     }
 
-                    buf += ci.columnTypes[colpos].colWidth;
+                    buf += dataLength;
 
                     break;
                 }
@@ -1719,47 +1719,50 @@ int ha_mcs_impl_write_batch_row_(const uchar* buf, TABLE* table, cal_impl_if::ca
                     uint32_t dataLength = 0;
                     uintptr_t* dataptr;
                     uchar* ucharptr;
-                    uint32_t colWidthInBytes;
-
+                    Field* fieldPtr = table->field[colpos];
                     bool isBlob = ci.columnTypes[colpos].colDataType == CalpontSystemCatalog::BLOB;
                     
-                    if (isBlob)
+                    uint32_t packedDataLength= 4;
+                    if (typeid(*fieldPtr) == typeid(Field_blob))
                     {
-                        colWidthInBytes = ci.columnTypes[colpos].colWidth;
+                        Field_blob* fieldBlob= reinterpret_cast<Field_blob*>(fieldPtr);
+                        packedDataLength= fieldBlob->pack_length_no_ptr();
+                    }
+                    else if (typeid(*fieldPtr) == typeid(Field_varstring))
+                    {
+                        Field_varstring* fieldVarstring= reinterpret_cast<Field_varstring*>(fieldPtr);
+                        packedDataLength= fieldVarstring->length_bytes;
                     }
                     else
                     {
-                        // For TEXT fields, MDB sets char_length to the maximum number that will fit in the number of bytes the 
-                        // defined TEXT length will fit in.
-                        // Ex: 
-                        // TEXT(25) will have char_length() == 255; 
-                        // TEXT(200) for latin_1 will have char_length() = 255
-                        // TEXT(200) for udf8mb4 will have char_length() = 65535
-                        // the length 200 multiplied by mbmaxlen (4) is > 255, so it needs 2 bytes for length. MDB sets to max(uint_16t)
-                        colWidthInBytes = table->field[colpos]->char_length();
+
                     }
-                    
-                    if (colWidthInBytes < 256)
+
+                    switch(packedDataLength)
                     {
-                        dataLength = *(uint8_t*) buf;
-                        buf++;
+                        case 1:
+                        {
+                            dataLength = *(uint8_t*) buf;
+                            break;
+                        }
+                        case 2:
+                        {
+                            dataLength = *(uint16_t*) buf;
+                            break;
+                        }
+                        case 3:
+                        {
+                            dataLength = *(uint16_t*) buf;
+                            dataLength |= ((int) buf[2]) << 16;
+                            break;
+                        }
+                        default:
+                        {
+                            dataLength = *(uint32_t*) buf;
+                            break;
+                        }
                     }
-                    else if (colWidthInBytes < 65536)
-                    {
-                        dataLength = *(uint16_t*) buf;
-                        buf += 2;
-                    }
-                    else if (colWidthInBytes < 16777216)
-                    {
-                        dataLength = *(uint16_t*) buf;
-                        dataLength |= ((int) buf[2]) << 16;
-                        buf += 3;
-                    }
-                    else
-                    {
-                        dataLength = *(uint32_t*) buf;
-                        buf += 4;
-                    }
+                    buf += packedDataLength;
 
                     // buf contains pointer to blob, for example:
                     // (gdb) p (char*)*(uintptr_t*)buf
