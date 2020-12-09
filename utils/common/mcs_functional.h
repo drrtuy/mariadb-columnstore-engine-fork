@@ -14,9 +14,27 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
-#ifndef FUNCTIONHELPER_H
-#define FUNCTIONHELPER_H
+#ifndef FUNCTIONAL_H
+#define FUNCTIONAL_H
 
-#define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
+namespace utils
+{
+  template<typename T>
+  struct  right_shift {
+    int64_t operator()(const T x, const T y)
+    {
+      return x >> y; 
+    }
+  };
+
+  template<typename T>
+  struct  left_shift {
+    int64_t operator()(const T x, const T y)
+    {
+      return x << y;
+    }
+  };
+}
 
 #endif
+// vim:ts=2 sw=2:
