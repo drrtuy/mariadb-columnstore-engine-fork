@@ -20,7 +20,9 @@
 #include <iostream>
 
 #include "mcs_int128.h"
-#include "exceptclasses.h"
+#ifndef DATATYPE_ONLY
+  #include "exceptclasses.h"
+#endif
 
 namespace datatypes
 {
@@ -71,8 +73,10 @@ namespace datatypes
     uint8_t written = p - buf;
     if (buflen <= written)
     {
+#ifndef DATATYPE_ONLY
         throw logging::QueryDataExcept("TSInt128::writeIntPart() char buffer overflow.",
                                        logging::formatErr);
+#endif
     }
 
     return written;
