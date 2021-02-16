@@ -390,6 +390,7 @@ public:
         return 0.0;   // TODO: Do something here
     }
     inline long double getLongDoubleField(uint32_t colIndex) const;
+    inline void getInt128Field(uint32_t colIndex, uint8_t* x) const;
     inline void getInt128Field(uint32_t colIndex, int128_t& x) const;
     inline datatypes::TSInt128 getTSInt128Field(uint32_t colIndex) const;
 
@@ -1011,6 +1012,11 @@ inline float Row::getFloatField(uint32_t colIndex) const
 inline long double Row::getLongDoubleField(uint32_t colIndex) const
 {
     return *((long double*) &data[offsets[colIndex]]);
+}
+
+inline void Row::getInt128Field(uint32_t colIndex, uint8_t* x) const
+{
+    datatypes::TSInt128::assignPtrPtr(x, &data[offsets[colIndex]]);
 }
 
 inline void Row::getInt128Field(uint32_t colIndex, int128_t& x) const

@@ -1156,7 +1156,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
 
             if (LIKELY(!typelessJoin[j]))
             {
-                //cout << "not typeless join\n";
+                cout << "not typeless join\n";
                 bool isNull;
                 uint32_t colIndex = largeSideKeyColumns[j];
 
@@ -1188,7 +1188,7 @@ void BatchPrimitiveProcessor::executeTupleJoin()
             }
             else
             {
-                //cout << " typeless join\n";
+                cout << " typeless join\n";
                 // the null values are not sent by UM in typeless case.  null -> !found
                 tlLargeKey = makeTypelessKey(oldRow, tlLargeSideKeyColumns[j], tlKeyLengths[j],
                                              &tmpKeyAllocators[j]);

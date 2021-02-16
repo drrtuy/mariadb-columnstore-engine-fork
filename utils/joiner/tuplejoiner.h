@@ -56,7 +56,7 @@ public:
     void deserialize(messageqcpp::ByteStream&, utils::FixedAllocator&);
     void deserialize(messageqcpp::ByteStream&, utils::PoolAllocator&);
     std::string toString() const;
-    uint32_t hash(const rowgroup::RowGroup&, const std::vector<uint32_t>& keyCols) const;
+    uint64_t hash(const rowgroup::RowGroup&, const std::vector<uint32_t>& keyCols) const;
     static int cmp(const rowgroup::RowGroup&, const std::vector<uint32_t>& keyCols,
                    const TypelessData &a,
                    const TypelessData &b);
