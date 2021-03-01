@@ -402,7 +402,6 @@ private:
     uint32_t fCmpLen;
 };
 
-
 }
 
 #endif  // UTILS_HASHER_H
