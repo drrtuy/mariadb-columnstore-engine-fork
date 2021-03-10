@@ -55,7 +55,7 @@ public:
     };
     BLBufferStats(ColDataType colDataType) : satCount(0)
     {
-        if (isUnsigned(colDataType) || isCharType(colDataType))
+        if (isUnsigned(colDataType))
         {
             minBufferVal = static_cast<int64_t>(MAX_UBIGINT);
             maxBufferVal = static_cast<int64_t>(MIN_UBIGINT);

@@ -194,6 +194,7 @@ void pDictionaryStep::addFilter(int8_t COP, const string& value)
         else
             eqFilter.push_back(value);
     }
+
 }
 
 void pDictionaryStep::sendPrimitiveMessages()

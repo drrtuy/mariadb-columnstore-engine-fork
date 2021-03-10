@@ -110,7 +110,7 @@ void ColExtInf::addOrUpdateEntryTemplate( RID     lastInputRow,
         }
         else                // Update the range
         {
-            if (isUnsigned(colDataType) || isCharType(colDataType))
+            if (isUnsigned(colDataType))
             {
                 if (width <= 8)
                 {

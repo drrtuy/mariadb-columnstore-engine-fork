@@ -447,7 +447,9 @@ public:
     void p_Dictionary(const DictInput* in, std::vector<uint8_t>* out,
                       bool skipNulls, uint32_t charsetNumber,
                       boost::shared_ptr<DictEqualityFilter> eqFilter,
-                      uint8_t eqOp);
+                      uint8_t eqOp,
+                      uint64_t minMax[2] // as name suggests, [0] is min, [1] is max.
+                      );
 
     inline void setLogicalBlockMode(bool b)
     {

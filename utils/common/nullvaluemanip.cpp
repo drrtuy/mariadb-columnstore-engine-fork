@@ -252,6 +252,10 @@ int64_t getSignedNullValue(CalpontSystemCatalog::ColDataType t, uint32_t colWidt
             throw logic_error(os.str());
     }
 
+    ostringstream os;
+    os << "getSignedNullValue(): got bad type/column width " << t <<
+       "/" << colWidth << endl;
+    throw logic_error(os.str());
 }
 
 

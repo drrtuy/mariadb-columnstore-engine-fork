@@ -288,6 +288,8 @@ void FunctionColumn::unserialize(messageqcpp::ByteStream& b)
     ObjectReader::checkType(b, ObjectReader::FUNCTIONCOLUMN);
     ReturnedColumn::unserialize(b);
     b >> fFunctionName;
+ 
+ idblog("unserializing '" << fFunctionName << "'.");
 
     b >> size;
 

@@ -151,6 +151,7 @@ private:
     bool hasEqFilter;
     boost::shared_ptr<primitives::DictEqualityFilter> eqFilter;
     uint8_t eqOp;   // COMPARE_EQ or COMPARE_NE
+    uint64_t fMinMax[2];
 
     friend class RTSCommand;
 };

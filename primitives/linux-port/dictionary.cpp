@@ -31,6 +31,7 @@ using namespace std;
 #include "messageobj.h"
 #include "exceptclasses.h"
 #include "dataconvert.h"
+#include "string_prefixes.h"
 #include <sstream>
 
 
@@ -411,7 +412,8 @@ void PrimitiveProcessor::p_Dictionary(const DictInput* in,
                                       bool skipNulls,
                                       uint32_t charsetNumber,
                                       boost::shared_ptr<DictEqualityFilter> eqFilter,
-                                      uint8_t eqOp)
+                                      uint8_t eqOp,
+                                      uint64_t minMax[2])
 {
     PrimToken* outToken;
     const DictFilterElement* filter = 0;
@@ -430,6 +432,7 @@ void PrimitiveProcessor::p_Dictionary(const DictInput* in,
     // use this factor to scale out size of future resize calls
     const int SCALE_FACTOR = 2;
     out->resize(DEF_OUTSIZE);
+
 
     in8 = reinterpret_cast<const uint8_t*>(in);
 
@@ -458,6 +461,12 @@ void PrimitiveProcessor::p_Dictionary(const DictInput* in,
             nextSig(in->NVALS, in->tokens, &sigptr, in->OutputType,
                     (in->InputFlags ? true : false), skipNulls))
     {
+        if (minMax)
+        {
+            uint64_t v = encodeStringPrefix_check_null(sigptr.data, sigptr.len, charsetNumber);
+            minMax[1] = minMax[1] < v ? v : minMax[1];
+            minMax[0] = minMax[0] > v ? v : minMax[0];
+        }
         // do aggregate processing
         if (in->OutputType & OT_AGGREGATE)
         {

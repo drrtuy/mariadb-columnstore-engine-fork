@@ -183,6 +183,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
                 if (colStruct.tokenFlag)
                 {
                     dctnryStruct.dctnryOid = colType.ddn.dictOID;
+                    dctnryStruct.fCharsetNumber = colType.charsetNumber;
                     dctnryStruct.columnOid = colStruct.dataOid;
                     dctnryStruct.fCompressionType = colType.compressionType;
                     dctnryStruct.colWidth = colType.colWidth;
@@ -585,7 +586,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
             if (mapIter != m_txnLBIDMap.end())
             {
                 SP_TxnLBIDRec_t spTxnLBIDRec = (*mapIter).second;
-		lbidList = spTxnLBIDRec->m_LBIDs;
+                lbidList = spTxnLBIDRec->m_LBIDs;
             }
         }
         catch (...) {}
@@ -1038,6 +1039,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
                 if (colStruct.tokenFlag)
                 {
                     dctnryStruct.dctnryOid = colType.ddn.dictOID;
+                    dctnryStruct.fCharsetNumber = colType.charsetNumber;
                     dctnryStruct.columnOid = colStruct.dataOid;
                     dctnryStruct.fCompressionType = colType.compressionType;
                     dctnryStruct.colWidth = colType.colWidth;
@@ -1617,6 +1619,7 @@ uint8_t WE_DMLCommandProc::processBatchInsertBinary(messageqcpp::ByteStream& bs,
                 if (colStruct.tokenFlag)
                 {
                     dctnryStruct.dctnryOid = colType.ddn.dictOID;
+                    dctnryStruct.fCharsetNumber = colType.charsetNumber;
                     dctnryStruct.columnOid = colStruct.dataOid;
                     dctnryStruct.fCompressionType = colType.compressionType;
                     dctnryStruct.colWidth = colType.colWidth;
@@ -2814,13 +2817,13 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
                     colWidth = datatypes::MAXDECIMALWIDTH;
                 }
 
-		int rrid = (int) relativeRID / (BYTE_PER_BLOCK / colWidth);
+                int rrid = (int) relativeRID / (BYTE_PER_BLOCK / colWidth);
                 // populate stats.blocksChanged
-		if (rrid > preBlkNums[j])
+                if (rrid > preBlkNums[j])
                 {
-		    preBlkNums[j] = rrid ;
+                    preBlkNums[j] = rrid ;
                     blocksChanged++;
-		}
+                }
 
             }
 
@@ -2837,6 +2840,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs,
             dctnryStruct.dctnryOid = colType.ddn.dictOID;
             dctnryStruct.columnOid = colStruct.dataOid;
             dctnryStruct.fCompressionType = colType.compressionType;
+            dctnryStruct.fCharsetNumber = colType.charsetNumber;
             dctnryStruct.colWidth = colType.colWidth;
 
             if (NO_ERROR != (error = fWEWrapper.openDctnry (txnId, dctnryStruct, false))) // @bug 5572 HDFS tmp file
@@ -3800,7 +3804,7 @@ uint8_t WE_DMLCommandProc::getWrittenLbids(messageqcpp::ByteStream& bs, std::str
         if (mapIter != m_txnLBIDMap.end())
         {
             SP_TxnLBIDRec_t spTxnLBIDRec = (*mapIter).second;
-	    lbidList = spTxnLBIDRec->m_LBIDs;
+            lbidList = spTxnLBIDRec->m_LBIDs;
         }
     }
     catch (...) {}
@@ -4467,6 +4471,7 @@ uint8_t WE_DMLCommandProc::processFixRows(messageqcpp::ByteStream& bs,
                 colStruct.colWidth = 8;
                 colStruct.tokenFlag = true;
                 dctnryStruct.dctnryOid = colType.ddn.dictOID;
+                dctnryStruct.fCharsetNumber = colType.charsetNumber;
             }
             else
             {

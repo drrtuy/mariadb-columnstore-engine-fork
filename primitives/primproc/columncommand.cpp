@@ -110,8 +110,8 @@ void ColumnCommand::execute()
     {
         values = bpp->values;
         wide128Values = bpp->wide128Values;
+        bpp->valuesLBID = lbid;
     }
-
     _execute();
 }
 
@@ -252,9 +252,13 @@ void ColumnCommand::issuePrimitive()
     loadData();
 
     if (!suppressFilter)
+    {
         bpp->getPrimitiveProcessor().setParsedColumnFilter(parsedColumnFilter);
+    }
     else
+    {
         bpp->getPrimitiveProcessor().setParsedColumnFilter(emptyFilter);
+    }
 
     switch(colType.colWidth)
     {
@@ -321,6 +325,7 @@ void ColumnCommand::updateCPDataNarrow()
     if (_isScan)
     {
         bpp->validCPData = (outMsg->ValidMinMax && !wasVersioned);
+	bpp->cpDataFromDictScan = false;
         bpp->lbidForCP = lbid;
         bpp->maxVal = static_cast<int64_t>(outMsg->Max);
         bpp->minVal = static_cast<int64_t>(outMsg->Min);
@@ -334,6 +339,7 @@ void ColumnCommand::updateCPDataWide()
     if (_isScan)
     {
         bpp->validCPData = (outMsg->ValidMinMax && !wasVersioned);
+	bpp->cpDataFromDictScan = false;
         bpp->lbidForCP = lbid;
         if (colType.isWideDecimalType())
         {

@@ -319,10 +319,11 @@ struct DctnryStruct                     /** @brief Dctnry Interface Struct*/
     uint16_t      fColSegment;         /** @brief Segment for column file */
     uint16_t      fColDbRoot;          /** @brief DBRoot for column file */
     int            fCompressionType;    /** @brief Compression tpye for column file */
+    int            fCharsetNumber;      /** @brief Charset number to account for collation when computing string prefixes */
     DctnryStruct() : dctnryOid(0), columnOid(0),   /** @brief constructor */
         colWidth(0),
         fColPartition(0), fColSegment(0),
-        fColDbRoot(0), fCompressionType(idbdatafile::IDBPolicy::useHdfs() ? 2 : 0) { }
+        fColDbRoot(0), fCompressionType(idbdatafile::IDBPolicy::useHdfs() ? 2 : 0), fCharsetNumber(8) { }
 };
 
 struct DctnryTuple                      /** @brief Dictionary Tuple struct*/

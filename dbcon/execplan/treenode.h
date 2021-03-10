@@ -38,6 +38,7 @@
 #include "columnwidth.h"
 #include "mcs_decimal.h"
 #include "mcs_int64.h"
+#include "numericliteral.h"
 
 namespace messageqcpp
 {
@@ -663,25 +664,23 @@ inline int64_t TreeNode::getIntVal()
     switch (fResultType.colDataType)
     {
         case CalpontSystemCatalog::CHAR:
-            if (fResultType.colWidth <= 8)
-                return fResult.intVal;
-
-            return atoll(fResult.strVal.c_str());
-
         case CalpontSystemCatalog::VARCHAR:
-            if (fResultType.colWidth <= 7)
-                return fResult.intVal;
-
-            return atoll(fResult.strVal.c_str());
-
-        //FIXME: ???
         case CalpontSystemCatalog::VARBINARY:
         case CalpontSystemCatalog::BLOB:
         case CalpontSystemCatalog::TEXT:
-            if (fResultType.colWidth <= 7)
-                return fResult.intVal;
+	    {
+                //int expectedShortWidth = fResultType.colDataType == CalpontSystemCatalog::CHAR ? 8 : 7;
+                //if (fResultType.colWidth <= expectedShortWidth)
+                //    return fResult.intVal;
 
-            return atoll(fResult.strVal.c_str());
+#if 0
+                datatypes::DataCondition cnverr;
+                literal::Converter<literal::SignedInteger> cnv(fResult.strVal, cnverr);
+                return cnv.toSInt<int64_t>(cnverr);
+#else
+		return atoll(fResult.strVal.c_str());
+#endif
+            }
 
         case CalpontSystemCatalog::BIGINT:
         case CalpontSystemCatalog::TINYINT:
@@ -728,6 +727,24 @@ inline uint64_t TreeNode::getUintVal()
 {
     switch (fResultType.colDataType)
     {
+        case CalpontSystemCatalog::CHAR:
+        case CalpontSystemCatalog::VARCHAR:
+        case CalpontSystemCatalog::VARBINARY:
+        case CalpontSystemCatalog::BLOB:
+        case CalpontSystemCatalog::TEXT:
+	    {
+                //int expectedShortWidth = fResultType.colDataType == CalpontSystemCatalog::CHAR ? 8 : 7;
+                //if (fResultType.colWidth <= expectedShortWidth)
+                //    return fResult.intVal;
+
+#if 0
+                datatypes::DataCondition cnverr;
+                literal::Converter<literal::SignedInteger> cnv(fResult.strVal, cnverr);
+                return cnv.toSInt<int64_t>(cnverr);
+#else
+		return atoll(fResult.strVal.c_str());
+#endif
+            }
         case CalpontSystemCatalog::BIGINT:
         case CalpontSystemCatalog::TINYINT:
         case CalpontSystemCatalog::SMALLINT:

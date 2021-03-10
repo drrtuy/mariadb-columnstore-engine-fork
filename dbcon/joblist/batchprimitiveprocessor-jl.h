@@ -169,7 +169,7 @@ public:
     void deserializeAggregateResults(messageqcpp::ByteStream* in,
                                      std::vector<rowgroup::RGData>* out) const;
     void getRowGroupData(messageqcpp::ByteStream& in, std::vector<rowgroup::RGData>* out,
-                         bool* validCPData, uint64_t* lbid, int128_t* min, int128_t* max,
+                         bool* validCPData, uint64_t* lbid, bool* fromDictScan, int128_t* min, int128_t* max,
                          uint32_t* cachedIO,	uint32_t* physIO, uint32_t* touchedBlocks, bool* countThis,
                          uint32_t threadID, bool* hasBinaryColumn, const execplan::CalpontSystemCatalog::ColType& colType) const;
     void deserializeAggregateResult(messageqcpp::ByteStream* in,

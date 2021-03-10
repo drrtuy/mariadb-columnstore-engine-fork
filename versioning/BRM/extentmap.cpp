@@ -2943,18 +2943,24 @@ LBID_t ExtentMap::_createColumnExtent_DBroot(uint32_t size, int OID,
     e->HWM          = 0;
     e->status       = EXTENTUNAVAILABLE; // mark extent as in process
 
+#if 0 // XXX: sergueyz: I'll leave these under conditional flag for a while because it appears a huge change.
     // Partition, segment, and blockOffset 0 represents new table or column.
     // When DDL creates a table, we can mark the first extent as VALID, since
     // the table has no data.  Marking as VALID enables cpimport to update
     // the CP min/max for the first import.
     // If DDL is adding a column to an existing table, setting to VALID won't
     // hurt, because DDL resets to INVALID after the extent is created.
+    // XXX: the comment above is out of date. bulk set of extents ranges
+    // works differently right now.
     if ((e->partitionNum == 0) &&
             (e->segmentNum   == 0) &&
             (e->blockOffset  == 0))
         e->partition.cprange.isValid = CP_VALID;
     else
         e->partition.cprange.isValid = CP_INVALID;
+#else
+    e->partition.cprange.isValid = CP_INVALID;
+#endif
 
     partitionNum    = e->partitionNum;
     segmentNum      = e->segmentNum;
@@ -3168,6 +3174,7 @@ LBID_t ExtentMap::_createColumnExtentExactFile(uint32_t size, int OID,
         e->HWM          = 0;
     }
 
+#if 0 // XXX: sergueyz: I'll leave these under conditional flag for a while because it appears a huge change.
     // Partition, segment, and blockOffset 0 represents new table or column.
     // When DDL creates a table, we can mark the first extent as VALID, since
     // the table has no data.  Marking as VALID enables cpimport to update
@@ -3180,6 +3187,9 @@ LBID_t ExtentMap::_createColumnExtentExactFile(uint32_t size, int OID,
         e->partition.cprange.isValid = CP_VALID;
     else
         e->partition.cprange.isValid = CP_INVALID;
+#else
+    e->partition.cprange.isValid = CP_INVALID;
+#endif
 
     startBlockOffset = e->blockOffset;
 

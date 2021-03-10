@@ -217,6 +217,7 @@ private:
 
     uint16_t relRids[LOGICAL_BLOCK_RIDS];
     int64_t values[LOGICAL_BLOCK_RIDS];
+    uint64_t valuesLBID;
     int128_t wide128Values[LOGICAL_BLOCK_RIDS];
     boost::scoped_array<uint64_t> absRids;
     boost::scoped_array<std::string> strValues;
@@ -252,6 +253,7 @@ private:
         int128_t max128Val;
         int64_t maxVal;
     };
+    bool cpDataFromDictScan;
 
     uint64_t lbidForCP;
     bool hasWideColumnOut;

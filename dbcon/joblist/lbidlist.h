@@ -103,7 +103,7 @@ public:
                    execplan::CalpontSystemCatalog::ColDataType type);
 
     template <typename T>
-    void UpdateMinMax(T min, T max, int64_t lbid,
+    void UpdateMinMax(T min, T max, int64_t lbid, bool dictScan,
                       const execplan::CalpontSystemCatalog::ColType & type, bool validData = true);
 
     void UpdateAllPartitionInfo(const execplan::CalpontSystemCatalog::ColType& colType);
@@ -114,7 +114,7 @@ public:
                                   const messageqcpp::ByteStream* MsgDataPtr,
                                   const uint16_t NOPS,
                                   const execplan::CalpontSystemCatalog::ColType& ct,
-                                  const uint8_t BOP);
+                                  const uint8_t BOP, bool isDict);
 
     template<typename T>
     bool checkSingleValue(T min, T max, T value,

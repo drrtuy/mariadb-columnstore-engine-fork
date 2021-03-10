@@ -785,7 +785,7 @@ int BulkLoad::preProcess( Job& job, int tableNo,
                                  job.jobTableList[tableNo].tblName,
                                  lbid,
                                  oldHwm, hwm,
-                                 bSkippedToNewExtent, false) );
+                                 bSkippedToNewExtent, bSkippedToNewExtent || oldHwm < 1) );
         }
 
         tableInfo->addColumn(info);

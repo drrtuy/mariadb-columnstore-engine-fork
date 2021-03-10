@@ -1077,9 +1077,9 @@ public:
 
 struct _CPInfo
 {
-    _CPInfo(int64_t MIN, int64_t MAX, uint64_t l, bool val) : min(MIN), max(MAX), LBID(l), valid(val){};
+    _CPInfo(int64_t MIN, int64_t MAX, uint64_t l, bool dictScan, bool val) : min(MIN), max(MAX), LBID(l), dictScan(dictScan), valid(val){};
     _CPInfo(int128_t BIGMIN, int128_t BIGMAX, uint64_t l, bool val)
-        : bigMin(BIGMIN), bigMax(BIGMAX), LBID(l), valid(val){};
+        : bigMin(BIGMIN), bigMax(BIGMAX), LBID(l), dictScan(false), valid(val){};
     union
     {
         int128_t bigMin;
@@ -1092,6 +1092,7 @@ struct _CPInfo
     };
     uint64_t LBID;
     bool valid;
+    bool dictScan;
 };
 
 /** @brief class TupleBPS

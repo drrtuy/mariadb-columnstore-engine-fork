@@ -1,0 +1,37 @@
+--disable_warnings
+DROP DATABASE IF EXISTS mcol4580_perf;
+--enable_warnings
+CREATE DATABASE mcol4580_perf;
+USE mcol4580_perf;
+
+CREATE TABLE t(x VARCHAR(100)) ENGINE=COLUMNSTORE;
+
+# Create expansions.
+# We are constrained by 64K limit on the whole request, the ",('a')"
+# string we repeat takes 6 bytes. So we may insert 10800 elements per
+# one statement.
+--let $a10=('a'),('a'),('a'),('a'),('a'),('a'),('a'),('a'),('a'),('a')
+--let $a100=$a10,$a10,$a10,$a10,$a10,$a10,$a10,$a10,$a10,$a10
+--let $a1000=$a100,$a100,$a100,$a100,$a100,$a100,$a100,$a100,$a100,$a100
+--let $a10000=$a1000,$a1000,$a1000,$a1000,$a1000,$a1000,$a1000,$a1000,$a1000,$a1000
+--let $a10800=$a10000,$a100,$a100,$a100,$a100,$a100,$a100,$a100,$a100
+
+# Fill an extent of token values. 8e6 elements per extent will be filled
+# with 777 (776.723) insertions of 10800 elements.
+--let $cnt=777
+
+START TRANSACTION;
+while ($cnt > 0)
+{
+    --eval INSERT INTO t(x) VALUES $a10800;
+    --dec $cnt
+}
+COMMIT;
+
+# Now for the salient part.
+SELECT * FROM information_schema.columnstore_extents;
+--start_timer
+SELECT COUNT(*) FROM t WHERE x = 'b';
+
+DROP DATABASE mcol4580_perf;
+

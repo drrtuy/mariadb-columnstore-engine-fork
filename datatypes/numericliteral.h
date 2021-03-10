@@ -330,10 +330,11 @@ public:
 
 
 // <signed integer> := [<sign>] <unsigned integer>
-class SignedInteger: public Parser::DD2OM<Sign,UnsignedInteger>
+class SignedInteger: public Parser::DD2OM<Sign, UnsignedInteger>
 {
 public:
   using DD2OM::DD2OM;
+
   bool isNull() const { return UnsignedInteger::isNull(); }
 
   template<typename T> T abs(DataCondition & error) const

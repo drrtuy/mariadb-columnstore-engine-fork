@@ -42,6 +42,8 @@ using namespace boost;
 #include "simd_sse.h"
 #include "utils/common/columnwidth.h"
 
+#include "exceptclasses.h"
+
 using namespace logging;
 using namespace dbbc;
 using namespace primitives;
@@ -746,6 +748,7 @@ inline bool matchingColValue(const T curValue,
         case SINGLE_COMPARISON:
         {
             auto filterValue = filterValues[0];
+idblog("comparing: curValue " << ((int64_t)curValue) << ", filterValue " << ((int64_t)filterValue) << ", NULL VALUE " << ((int64_t)NULL_VALUE));
             // This can be future optimized checking if a filterValue is NULL or not
             bool cmp = colCompare<KIND, COL_WIDTH, IS_NULL>(curValue, filterValue, filterCOPs[0],
                                                             filterRFs[0], typeHolder, isNullValue<KIND,T>(filterValue,
@@ -760,6 +763,7 @@ inline bool matchingColValue(const T curValue,
             for (uint32_t argIndex = 0; argIndex < filterCount; argIndex++)
             {
                 auto filterValue = filterValues[argIndex];
+idblog("comparing " << argIndex << ": curValue " << ((int64_t)curValue) << ", filterValue " << ((int64_t)filterValue) << ", NULL VALUE " << ((int64_t)NULL_VALUE));
                 // This can be future optimized checking if a filterValues are NULLs or not before the higher level loop.
                 bool cmp = colCompare<KIND, COL_WIDTH, IS_NULL>(curValue, filterValue, filterCOPs[argIndex],
                                                                 filterRFs[argIndex], typeHolder, isNullValue<KIND,T>(filterValue,
@@ -781,6 +785,7 @@ inline bool matchingColValue(const T curValue,
             for (uint32_t argIndex = 0; argIndex < filterCount; argIndex++)
             {
                 auto filterValue = filterValues[argIndex];
+idblog("comparing " << argIndex << ": curValue " << ((int64_t)curValue) << ", filterValue " << ((int64_t)filterValue) << ", NULL VALUE " << ((int64_t)NULL_VALUE));
                 // This can be future optimized checking if a filterValues are NULLs or not before the higher level loop.
                 bool cmp = colCompare<KIND, COL_WIDTH, IS_NULL>(curValue, filterValue, filterCOPs[argIndex],
                                                                 filterRFs[argIndex], typeHolder,
@@ -818,6 +823,7 @@ inline bool matchingColValue(const T curValue,
         // ONE of the values in the small set represented by an array (BOP_OR + all COMPARE_EQ)
         case ONE_OF_VALUES_IN_ARRAY:
         {
+idblog("one of values in array");
             for (uint32_t argIndex = 0; argIndex < filterCount; argIndex++)
             {
                 if (curValue == static_cast<T>(filterValues[argIndex]))
@@ -830,6 +836,7 @@ inline bool matchingColValue(const T curValue,
 
         // NONE of the values in the small set represented by an array (BOP_AND + all COMPARE_NE)
         case NONE_OF_VALUES_IN_ARRAY:
+idblog("none of values in array");
             return noneValuesInArray<IS_NULL, T, FT>(curValue, filterValues, filterCount);
 
 
@@ -1700,6 +1707,7 @@ void filterColumnData(
     // Bit patterns in srcArray[i] representing EMPTY and NULL values
     T emptyValue = getEmptyValue<T>(dataType);
     T nullValue  = getNullValue<T>(dataType);
+idblog("data type " << ((int)dataType) << ", KIND " << ((int)KIND) << ", NULL_VALUE " << ((int64_t)nullValue) << ", size of null value is " << sizeof(nullValue));
 
     // Precompute filter results for NULL values
     bool isNullValueMatches = matchingColValue<KIND, WIDTH, true>(nullValue, columnFilterMode,
@@ -1887,7 +1895,8 @@ void PrimitiveProcessor::_scanAndFilterTypeDispatcher(NewColRequestHeader* in,
         dataType == execplan::CalpontSystemCatalog::TEXT) &&
         !isDictTokenScan(in))
     {
-        filterColumnData<T, KIND_TEXT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
+        using UT = typename std::conditional<std::is_unsigned<T>::value, T, typename datatypes::make_unsigned<T>::type>::type;
+        filterColumnData<UT, KIND_TEXT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
         return;
     }
 

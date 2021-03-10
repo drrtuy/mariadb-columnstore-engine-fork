@@ -915,22 +915,23 @@ inline bool isNull(int64_t val, const execplan::CalpontSystemCatalog::ColType& c
             break;
         }
 
+        case execplan::CalpontSystemCatalog::VARCHAR:
         case execplan::CalpontSystemCatalog::CHAR:
         {
             int colWidth = ct.colWidth;
 
             if (colWidth <= 8)
             {
-                if ((colWidth == 1) && ((int8_t) joblist::CHAR1NULL == val)) ret = true ;
-                else if ((colWidth == 2) && ((int16_t) joblist::CHAR2NULL == val)) ret = true;
-                else if ((colWidth < 5) && ((int32_t) joblist::CHAR4NULL == val)) ret = true;
+                if ((colWidth == 1) && ((uint8_t) joblist::CHAR1NULL == val)) ret = true ;
+                else if ((colWidth == 2) && ((uint16_t) joblist::CHAR2NULL == val)) ret = true;
+                else if ((colWidth < 5) && ((uint32_t) joblist::CHAR4NULL == val)) ret = true;
                 else if ((int64_t) joblist::CHAR8NULL == val) ret = true;
             }
             else
             {
                 throw std::logic_error("Not a int column.");
             }
-
+idblog("isNull char, colWidth " << colWidth << ", ret " << ((int)ret) << std::hex << ", value " << val);
             break;
         }
 
@@ -1025,24 +1026,6 @@ inline bool isNull(int64_t val, const execplan::CalpontSystemCatalog::ColType& c
         case execplan::CalpontSystemCatalog::TIMESTAMP:
         {
             if ((int64_t)joblist::TIMESTAMPNULL == val) ret = true;
-
-            break;
-        }
-
-        case execplan::CalpontSystemCatalog::VARCHAR:
-        {
-            int colWidth = ct.colWidth;
-
-            if (colWidth <= 8)
-            {
-                if ((colWidth < 3) && ((int16_t) joblist::CHAR2NULL == val)) ret = true;
-                else if ((colWidth < 5) && ((int32_t) joblist::CHAR4NULL == val)) ret = true;
-                else if ((int64_t)joblist::CHAR8NULL == val) ret = true;
-            }
-            else
-            {
-                throw std::logic_error("Not a int column.");
-            }
 
             break;
         }

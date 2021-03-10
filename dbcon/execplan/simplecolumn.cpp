@@ -590,6 +590,8 @@ void SimpleColumn::evaluate(Row& row, bool& isNull)
             else
                 fResult.intVal = atoll((char*)&fResult.origIntVal);
 
+	    fResult.uintVal = fResult.intVal;
+
             break;
         }
 
