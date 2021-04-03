@@ -483,8 +483,7 @@ void DistributedEngineComm::addQueue(uint32_t key, bool sendACKs)
     //std::mutex* lock = new std::mutex();
     //std::condition_variable* cond = new std::condition_variable();
     // add a c'tor
-    boost::shared_ptr<MQE> mqe(new MQE(pmCount));
-    //mqe->queue = StepMsgQueue(lock, cond);
+    boost::shared_ptr<MQE> mqe(new MQE(pmCount, key % fPmConnections.size()));
     mqe->sendACKs = sendACKs;
     mqe->throttled = false;
 
@@ -628,7 +627,7 @@ void DistributedEngineComm::read_all(uint32_t key, vector<SBS>& v)
     }
 }
 
-void DistributedEngineComm::read_some(uint32_t key, uint32_t divisor, vector<SBS>& v,
+size_t DistributedEngineComm::read_some(uint32_t key, uint32_t divisor, vector<SBS>& v,
                                       bool* flowControlOn)
 {
     static const std::string methodName("read_some");
@@ -653,6 +652,7 @@ void DistributedEngineComm::read_some(uint32_t key, uint32_t divisor, vector<SBS
         //if (flowControlOn)
         //    *flowControlOn = mqe->throttled;
     }
+    return mqe->queue.queueSize();
 }
 
 void DistributedEngineComm::sendAcks(uint32_t uniqueID, const vector<SBS>& msgs,
@@ -981,6 +981,7 @@ void DistributedEngineComm::addDataToOutput(SBS sbs, uint32_t connIndex, Stats* 
     }
 
     TSQSize_t queueSize = mqe->queue.push(sbs);
+    //std::cerr << "DistributedEngineComm::addDataToOutput " << uniqueId << " count " << queueSize.count << std::endl;
 
     if (mqe->sendACKs)
     {
@@ -1010,7 +1011,7 @@ void DistributedEngineComm::doHasBigMsgs(boost::shared_ptr<MQE> mqe, uint64_t ta
 
 int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uint32_t sender, bool doInterleaving)
 {
-    boost::mutex::scoped_lock lk(fMlock, boost::defer_lock_t());
+    //boost::mutex::scoped_lock lk(fMlock, boost::defer_lock_t());
     //MessageQueueMap::iterator it;
     // Keep mqe's stats from being freed early
     boost::shared_ptr<MQE> mqe;
@@ -1029,7 +1030,9 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
             senderStats = &(mqe->stats);
 
             if (doInterleaving)
+            {
                 interleaver = mqe->interleaver[index % mqe->pmCount]++;
+            }
         }
         a.release();
 /*
@@ -1082,7 +1085,7 @@ int DistributedEngineComm::writeToClient(size_t index, const ByteStream& bs, uin
         }
         */
         notifyClientsThatStreamEnds();
-        lk.unlock();
+        //lk.unlock();
         /*
         		// reconfig the connection array
         		ClientList tempConns;
@@ -1179,13 +1182,13 @@ Stats DistributedEngineComm::getNetworkStats(uint32_t uniqueID)
     return Stats();
 }
 
-DistributedEngineComm::MQE::MQE(uint32_t pCount) : ackSocketIndex(0), pmCount(pCount), hasBigMsgs(false),
+DistributedEngineComm::MQE::MQE(uint32_t pCount, uint32_t initialInterleaverValue) : ackSocketIndex(0), pmCount(pCount), hasBigMsgs(false),
     targetQueueSize(targetRecvQueueSize)
 {
     unackedWork.reset(new volatile uint32_t[pmCount]);
     interleaver.reset(new uint32_t[pmCount]);
     memset((void*) unackedWork.get(), 0, pmCount * sizeof(uint32_t));
-    memset((void*) interleaver.get(), 0, pmCount * sizeof(uint32_t));
+    memset((void*) interleaver.get(), initialInterleaverValue, pmCount * sizeof(uint32_t));
 }
 
 }
