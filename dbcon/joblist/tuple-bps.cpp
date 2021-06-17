@@ -90,7 +90,7 @@ const uint32_t DEFAULT_EXTENTS_PER_SEG_FILE = 2;
 }
 
 /** Debug macro */
-#define THROTTLE_DEBUG 0
+#define THROTTLE_DEBUG 1
 #if THROTTLE_DEBUG
 #define THROTTLEDEBUG std::cout
 #else
@@ -1405,7 +1405,8 @@ void TupleBPS::sendJobs(const vector<Job>& jobs)
         if (recvWaiting)
             condvar.notify_all();
 
-        while ((msgsSent - msgsRecvd > fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)
+        //while ((msgsSent - msgsRecvd > fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)
+        while ((msgsSent - msgsRecvd > fMaxOutstandingRequests)
                 && !fDie)
         {
             sendWaiting = true;
@@ -1847,6 +1848,7 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
             fBPP->reset();
         }
     }
+    //std::cout << "TupleBPS::makeJobs " << jobs->size() << std::endl;
 
 }
 
@@ -2130,8 +2132,8 @@ void TupleBPS::receiveMultiPrimitiveMessages(uint32_t threadID)
 
             //@Bug 1424,1298
 
-            if (sendWaiting && ((msgsSent - msgsRecvd) <=
-                                (fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)))
+            if (sendWaiting && ((msgsSent - msgsRecvd) <= fMaxOutstandingRequests))
+                                //(fMaxOutstandingRequests << LOGICAL_EXTENT_CONVERTER)))
             {
                 condvarWakeupProducer.notify_one();
                 THROTTLEDEBUG << "receiveMultiPrimitiveMessages wakes up sending side .. " << "  msgsSent: " << msgsSent << "  msgsRecvd = " << msgsRecvd << endl;

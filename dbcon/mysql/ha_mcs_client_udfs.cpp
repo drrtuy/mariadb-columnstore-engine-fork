@@ -119,6 +119,12 @@ extern "C"
                 includeInput = false;
             }
         }
+        else if (pstr == "maxoutstandingrequests")
+        {
+            ci->rmParms.push_back(execplan::RMParam(sessionID, execplan::MAXOUTSTANDINGREQ, value));
+            msg = SetParmsPrelude;
+            mlen = Plen;
+        }
 
         memcpy(result, msg, mlen);
 

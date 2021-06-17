@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <string>
 #include <iostream>
+#define QSIZE_DEBUG
 #ifdef QSIZE_DEBUG
 #include <iomanip>
 #include <fstream>
@@ -39,6 +40,8 @@
 #include <clocale>
 #include <iterator>
 #include <algorithm>
+#include <thread>
+#include <chrono>
 //#define NDEBUG
 #include <cassert>
 using namespace std;
@@ -249,7 +252,7 @@ int setupResources()
 class QszMonThd
 {
 public:
-    QszMonThd(PrimitiveServer* psp, ofstream* qszlog) : fPsp(psp), fQszLog(qszlog)
+    QszMonThd(PrimitiveServer* psp) : fPsp(psp), fStop(false)
     {
     }
 
@@ -259,42 +262,21 @@ public:
 
     void operator()()
     {
-        for (;;)
+        while (!fStop)
         {
-            uint32_t qd = fPsp->getProcessorThreadPool()->getWaiting();
 
-            if (fQszLog)
-            {
-                // Get a timestamp for output.
-                struct tm tm;
-                struct timeval tv;
+            fPsp->getProcessorThreadPool()->dump();
 
-                gettimeofday(&tv, 0);
-                localtime_r(&tv.tv_sec, &tm);
-
-                ostringstream oss;
-                oss << setfill('0')
-                    << setw(2) << tm.tm_hour << ':'
-                    << setw(2) << tm.tm_min << ':'
-                    << setw(2) << tm.tm_sec
-                    << '.'
-                    << setw(4) << tv.tv_usec / 100
-                    ;
-
-                *fQszLog << oss.str() << ' ' << qd << endl;
-            }
-
-            struct timespec req = { 0, 1000 * 100 }; //100 usec
+            struct timespec req = { 2, 0}; //100 usec
 
             nanosleep(&req, 0);
         }
     }
+    void stop() { fStop = true; }
 private:
     //defaults okay
-    //QszMonThd(const QszMonThd& rhs);
-    //QszMonThd& operator=(const QszMonThd& rhs);
     const PrimitiveServer* fPsp;
-    ofstream* fQszLog;
+    bool fStop;
 };
 #endif
 
@@ -754,26 +736,8 @@ int ServicePrimProc::Child()
                            deleteBlocks, PTTrace, prefetchThreshold, PMSmallSide);
 
 #ifdef QSIZE_DEBUG
-    thread* qszMonThd;
-
-    if (gDebugLevel >= STATS)
-    {
-#ifdef _MSC_VER
-        ofstream* qszLog = new ofstream("C:/Calpont/log/trace/ppqsz.dat");
-#else
-        ofstream* qszLog = new ofstream("/var/log/mariadb/columnstore/trace/ppqsz.dat");
-#endif
-
-        if (!qszLog->good())
-        {
-            qszLog->close();
-            delete qszLog;
-            qszLog = 0;
-        }
-
-        qszMonThd = new thread(QszMonThd(&server, qszLog));
-    }
-
+    QszMonThd queueMonitor(&server);
+    std::thread queueMonitorThread(queueMonitor);
 #endif
 
 #ifdef DUMP_CACHE_CONTENTS
@@ -790,6 +754,11 @@ int ServicePrimProc::Child()
     server.start(this);
 
     cerr << "server.start() exited!" << endl;
+
+#ifdef QSIZE_DEBUG
+    queueMonitor.stop();
+    queueMonitorThread.join();
+#endif
 
     return 1;
 }

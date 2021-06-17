@@ -272,6 +272,11 @@ public:
         return  fJlMaxOutstandingRequests;
         //getUintVal(fJobListStr, "MaxOutstandingRequests", defaultMaxOutstandingRequests);
     }
+    // WIP not synced yet
+    void setJlMaxOutstandingRequests(uint32_t val)
+    {
+        fJlMaxOutstandingRequests = val;
+    }
     uint32_t  	getJlJoinerChunkSize() const
     {
         return  getUintVal(fJobListStr, "JoinerChunkSize", defaultJoinerChunkSize);

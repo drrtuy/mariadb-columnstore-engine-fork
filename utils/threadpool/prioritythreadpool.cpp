@@ -294,5 +294,13 @@ void PriorityThreadPool::stop()
     _stop = true;
 }
 
+void PriorityThreadPool::dump()
+{
+    std::cout << "HIGH queue size: " << jobQueues[HIGH].size() << " "
+              << "MED queue size: " << jobQueues[MEDIUM].size() << " "
+              << "LOW queue size: " << jobQueues[LOW].size() << std::endl;
+}
+
+
 } // namespace threadpool
 // vim:ts=4 sw=4:

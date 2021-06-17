@@ -555,6 +555,11 @@ private:
                     fRm->addHJUmMaxSmallSideMap(it->sessionId, it->value);
                     break;
                 }
+                case execplan::MAXOUTSTANDINGREQ:
+                {
+                    fRm->setJlMaxOutstandingRequests(it->value);
+                    break;
+                }
 
                 default:
                     ;
@@ -648,6 +653,8 @@ public:
 
                 bs = fIos.read();
 
+                std::cout << "running currently " << statementsRunningCount->cur() << std::endl;
+                std::cout << "waiting currently " << statementsRunningCount->waiting() << std::endl;
                 if (bs.length() == 0)
                 {
                     if (gDebug > 1 || (gDebug && !csep.isInternal()))
