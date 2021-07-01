@@ -2296,8 +2296,6 @@ SJLP makeJobList_(
                 goto out;
             }
 
-            auto stepNo = numberSteps(querySteps, 0, jobInfo.traceFlags);
-
             jl->addQuery(querySteps);
             jl->addDelivery(deliverySteps);
 

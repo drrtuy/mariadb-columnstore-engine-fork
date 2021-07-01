@@ -202,6 +202,7 @@ const char** ha_mcs::bas_ext() const
 
 int ha_mcs::analyze(THD* thd, HA_CHECK_OPT* check_opt)
 {
+    DBUG_ENTER("ha_mcs::analyze");
     int rc;
     try
     {

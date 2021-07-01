@@ -617,7 +617,7 @@ private:
         jl = joblist::JobListFactory::makeJobList(&caep, fRm, false, true);
 
         // Joblist is empty.
-        if (jl->status() == -1)
+        if ((int)jl->status() == -1)
         {
             if (caep.traceOn())
                 std::cout << "JobList is empty " << std::endl;

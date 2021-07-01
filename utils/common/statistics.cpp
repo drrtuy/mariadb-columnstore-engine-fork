@@ -162,7 +162,7 @@ void StatisticsManager::saveToFile()
 
     // Write data.
     size = out->write(dataStreamSmartPtr.get(), dataStreamSize);
-    if (size != dataStreamSize)
+    if ((size_t)size != dataStreamSize)
     {
         auto rc = IDBPolicy::remove(fileName);
         if (rc == -1)
