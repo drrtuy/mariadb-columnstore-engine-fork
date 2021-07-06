@@ -57,52 +57,33 @@ class PrimTest;
 namespace primitives
 {
 
-enum ColumnFilterMode
-{
-    STANDARD,
-    TWO_ARRAYS,
-    UNORDERED_SET
-};
-
+template<typename T>
 class pcfHasher
 {
 public:
-    inline size_t operator()(const int64_t i) const
+    inline size_t operator()(const T i) const
     {
         return i;
     }
 };
 
+template<typename T>
 class pcfEqual
 {
 public:
-    inline size_t operator()(const int64_t f1, const int64_t f2) const
+    inline bool operator()(const T f1, const T f2) const
     {
         return f1 == f2;
     }
 };
 
-class pcfHasher128
+template<typename T>
+class prestored_set_t: public std::tr1::unordered_set<T, pcfHasher<T>, pcfEqual<T>
 {
-public:
-    inline size_t operator()(const int128_t i) const
-    {
-        return *reinterpret_cast<const uint64_t*>(&i);
-    }
-};
-
-class pcfEqual128
-{
-public:
-    inline bool operator()(const int128_t f1, const int128_t f2) const
-    {
-        return f1 == f2;
-    }
-};
-
-typedef std::tr1::unordered_set<int64_t, pcfHasher, pcfEqual> prestored_set_t;
-typedef std::tr1::unordered_set<int128_t, pcfHasher128, pcfEqual128> prestored_set_t_128;
-
+  public:
+    using std::tr1::unordered_set<T, pcfHasher<T>, pcfEqual<T>::find;
+    using std::tr1::unordered_set<T, pcfHasher<T>, pcfEqual<T>::insert;
+}
 
 class DictEqualityFilter: public std::tr1::unordered_set<std::string,
                                                          datatypes::CollationAwareHasher,
@@ -124,16 +105,29 @@ public:
     }
 };
 
+enum ColumnFilterMode
+{
+    ALWAYS_TRUE,            // empty filter is always true
+    SINGLE_COMPARISON,      // exactly one comparison operation
+    ANY_COMPARISON_TRUE,    // ANY comparison is true (BOP_OR)
+    ALL_COMPARISONS_TRUE,   // ALL comparisons are true (BOP_AND)
+    XOR_COMPARISONS,        // XORing results of comparisons (BOP_XOR)
+    ONE_OF_VALUES_IN_SET,   // ONE of the values in the set is equal to the value checked (BOP_OR + all COMPARE_EQ)
+    NONE_OF_VALUES_IN_SET,  // NONE of the values in the set is equal to the value checked (BOP_AND + all COMPARE_NE)
+    ONE_OF_VALUES_IN_ARRAY, // ONE of the values in the small set represented by an array (BOP_OR + all COMPARE_EQ)
+    NONE_OF_VALUES_IN_ARRAY,// NONE of the values in the small set represented by an array (BOP_AND + all COMPARE_NE)
+};
 
+// TODO This class uses lazy memory allocation. It might be better to allocate
+// members in its ctor.
+template<typename T>
 struct ParsedColumnFilter
 {
-    ColumnFilterMode columnFilterMode;
-    boost::shared_array<int64_t> prestored_argVals;
-    boost::shared_array<int128_t> prestored_argVals128;
+    ColumnFilterMode columnFilterMode = ALWAYS_TRUE;
+    boost::shared_array<T> prestored_argVals;
     boost::shared_array<uint8_t> prestored_cops;
     boost::shared_array<uint8_t> prestored_rfs;
-    boost::shared_ptr<prestored_set_t> prestored_set;
-    boost::shared_ptr<prestored_set_t_128> prestored_set_128;
+    boost::shared_ptr<prestored_set_t<T>> prestored_set;
 
     ParsedColumnFilter();
     ~ParsedColumnFilter();
@@ -258,7 +252,7 @@ public:
      * a NewColResultHeader, followed by the output type specified by in->OutputType.
      * \li If OT_RID, it will be an array of RIDs
      * \li If OT_DATAVALUE, it will be an array of matching data values stored in the column
-     * \li If OT_BOTH, it will be an array of <DataValue, RID> pairs
+     * \li If OT_BOTH, it will be an array of <RID, DataValue> pairs
      * @param outSize The size of the output buffer in bytes.
      * @param written (out parameter) A pointer to 1 int, which will contain the
      * number of bytes written to out.
@@ -266,11 +260,11 @@ public:
      */
     void p_Col(NewColRequestHeader* in, NewColResultHeader* out, unsigned outSize,
                unsigned* written);
-
+/*
     boost::shared_ptr<ParsedColumnFilter> parseColumnFilter(const uint8_t* filterString,
             uint32_t colWidth, uint32_t colType, uint32_t filterCount, uint32_t BOP);
     void setParsedColumnFilter(boost::shared_ptr<ParsedColumnFilter>);
-
+*/
     /** @brief The p_ColAggregate primitive processor.
      *
      * The p_ColAggregate primitive processor.  It operates on a column block
