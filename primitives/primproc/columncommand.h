@@ -44,6 +44,7 @@ class ColumnCommand : public Command
 {
 public:
     ColumnCommand();
+    ColumnCommand(execplan::ColumnCommandDataType& aColType);
     virtual ~ColumnCommand();
 
     inline uint64_t getLBID()
@@ -175,6 +176,23 @@ private:
     friend class RTSCommand;
 };
 
+class ColumnCommand64 : public ColumnCommand
+{
+    using ColumnCommand::ColumnCommand;
+};
+
+class ColumnCommand128 : public ColumnCommand
+{
+    using ColumnCommand::ColumnCommand;
+};
+
+class ColumnCommandFabric
+{
+  public:
+    ColumnCommandFabric() = default;
+    static ColumnCommand* createColumnCommand(messageqcpp::ByteStream& bs);
+};
+
 template<typename T>
 inline void ColumnCommand::fillEmptyBlock(uint8_t* dst,
                                    const uint8_t*emptyValue,
@@ -203,8 +221,7 @@ inline void ColumnCommand::fillEmptyBlock<messageqcpp::ByteStream::hexbyte>(uint
     }
 }
 
-
-}
+} // namespace
 
 #endif
 // vim:ts=4 sw=4:
