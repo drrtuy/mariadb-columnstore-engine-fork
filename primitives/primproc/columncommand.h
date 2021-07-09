@@ -37,7 +37,6 @@
 
 namespace primitiveprocessor
 {
-using CSCDataType = execplan::CalpontSystemCatalog::ColDataType;
 
 // #warning got the ColumnCommand definition
 class ColumnCommand : public Command
@@ -70,7 +69,8 @@ public:
 
     void execute();
     void execute(int64_t* vals);	//used by RTSCommand to redirect values
-    void prep(int8_t outputType, bool makeAbsRids);
+    virtual void prep(int8_t outputType, bool absRids);
+    void _prep(int8_t outputType, bool absRids);
     void project();
     void projectIntoRowGroup(rowgroup::RowGroup& rg, uint32_t pos);
     void nextLBID();
@@ -78,8 +78,8 @@ public:
     {
         return _isScan;
     }
-    void createCommand(messageqcpp::ByteStream&);
-    void createCommand(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream&, const bool widthAgnostic);
+    void createCommand(messageqcpp::ByteStream&); // obsolete method
+    void createCommand(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream&);
     void resetCommand(messageqcpp::ByteStream&);
     void setMakeAbsRids(bool m)
     {
@@ -178,19 +178,46 @@ protected:
 
 using ColumnCommandShPtr = std::unique_ptr<ColumnCommand>;
 
-class ColumnCommand64 : public ColumnCommand
+class ColumnCommandInt8 : public ColumnCommand
 {
   public:
     using ColumnCommand::ColumnCommand;
-    ColumnCommand64(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+    ColumnCommandInt8(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+    void prep(int8_t outputType, bool absRids) override;
 };
 
-class ColumnCommand128 : public ColumnCommand
+class ColumnCommandInt16 : public ColumnCommand
 {
   public:
     using ColumnCommand::ColumnCommand;
-    ColumnCommand128(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+    ColumnCommandInt16(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+    void prep(int8_t outputType, bool absRids) override;
 };
+
+class ColumnCommandInt32 : public ColumnCommand
+{
+  public:
+    using ColumnCommand::ColumnCommand;
+    ColumnCommandInt32(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+    void prep(int8_t outputType, bool absRids) override;
+};
+
+class ColumnCommandInt64 : public ColumnCommand
+{
+  public:
+    using ColumnCommand::ColumnCommand;
+    ColumnCommandInt64(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+    void prep(int8_t outputType, bool absRids) override;
+};
+
+class ColumnCommandInt128 : public ColumnCommand
+{
+  public:
+    using ColumnCommand::ColumnCommand;
+    ColumnCommandInt128(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+    void prep(int8_t outputType, bool absRids) override;
+};
+
 
 class ColumnCommandFabric
 {

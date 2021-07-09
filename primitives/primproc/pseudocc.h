@@ -36,6 +36,7 @@ public:
     virtual void resetCommand(messageqcpp::ByteStream&);
 protected:
     virtual void loadData();
+    uint32_t function;
 
 private:
 
@@ -47,7 +48,6 @@ private:
     template<typename W> void loadPartitionNum();
     template<typename W> void loadLBID();
 
-    uint32_t function;
     uint64_t valueFromUM;
     uint128_t bigValueFromUM;
 };
@@ -129,6 +129,24 @@ void PseudoCC::loadLBID()
         bData[i] = ColumnCommand::getLBID() + (i * sizeof(W)) / BLOCK_SIZE;  // breaks with tree-vectorization
     }
 }
+
+class PseudoCCInt64 : public PseudoCC, public ColumnCommandInt64
+{
+  public:
+    using PseudoCC::PseudoCC;
+    PseudoCCInt64(execplan::ColumnCommandDataType& colType,
+                  const uint32_t aFunction,
+                  messageqcpp::ByteStream& bs);
+    //void prep(int8_t outputType, bool absRids) override;
+};
+
+class PseudoCCFabric
+{
+  public:
+    PseudoCCFabric() = default;
+    static PseudoCC* createCommand(messageqcpp::ByteStream& bs);
+    //static SCommand* duplicate(const ColumnCommandShPtr& rhs);
+};
 
 }
 

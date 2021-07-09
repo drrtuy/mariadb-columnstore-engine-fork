@@ -471,25 +471,10 @@ void ColumnCommand::processResult()
 
 void ColumnCommand::createCommand(ByteStream& bs)
 {
-/*
-    uint8_t tmp8;
-
-    bs.advance(1);
-    bs >> tmp8;
-    _isScan = tmp8;
-    bs >> traceFlags;
-    bs >> filterString;
-    bs >> BOP;
-    bs >> filterCount;
-    deserializeInlineVector(bs, lastLbid);
-
-    Command::createCommand(bs);
-*/
-    throw runtime_error("some");
-    //ColumnCommand::createCommand(bs, false);
+    throw runtime_error("Obsolete method that must not be used");
 }
 
-void ColumnCommand::createCommand(execplan::ColumnCommandDataType& aColType, ByteStream& bs, const bool widthAgnostic)
+void ColumnCommand::createCommand(execplan::ColumnCommandDataType& aColType, ByteStream& bs)
 {
     colType = aColType;
     uint8_t tmp8;
@@ -498,22 +483,11 @@ void ColumnCommand::createCommand(execplan::ColumnCommandDataType& aColType, Byt
     _isScan = tmp8;
     bs >> traceFlags;
     bs >> filterString;
-    if (widthAgnostic)
-        colType.unserialize(bs);
     bs >> BOP;
     bs >> filterCount;
     deserializeInlineVector(bs, lastLbid);
 
     Command::createCommand(bs);
-    if (widthAgnostic)
-    {
-        parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                             colType.colDataType, filterCount, BOP);
-
-        /* OR hack */
-        emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                      colType.colDataType, 0, BOP);
-    }
 }
 
 void ColumnCommand::resetCommand(ByteStream& bs)
@@ -522,6 +496,11 @@ void ColumnCommand::resetCommand(ByteStream& bs)
 }
 
 void ColumnCommand::prep(int8_t outputType, bool absRids)
+{
+    throw std::runtime_error("ColumnCommand::prep(): Obsolete function that can not be used.");
+}
+
+void ColumnCommand::_prep(int8_t outputType, bool absRids)
 {
     /* make the template NewColRequestHeader */
 
@@ -551,21 +530,7 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
     primMsg->BOP = BOP;
     primMsg->NOPS = (suppressFilter ? 0 : filterCount);
     primMsg->sort = 0;
-#if 0
-    cout << "filter length is " << filterString.length() << endl;
-
-    cout << "appending filter string: ";
-
-    for (uint32_t i = 0; i < filterString.length(); ++i)
-        cout << (int) filterString.buf()[i] << " ";
-
-    cout << endl;
-#endif
-//  made unnecessary by parsedColumnFilter, just leave empty space as if the filter
-//  were still there.
-// 	memcpy(primMsg + 1, filterString.buf(), filterString.length());
-
-
+/*
     switch (colType.colWidth)
     {
         case 1:
@@ -592,18 +557,11 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
             shift = 1;
             mask = 0x01;
             break;
-
         default:
             cout << "CC: colWidth is " << colType.colWidth << endl;
             throw logic_error("ColumnCommand: bad column width?");
     }
-
-    /* TODO: re-optimize with parameterized output RG */
-// 	if (bpp->ot == ROW_GROUP) {
-// 		bpp->outputRG.initRow(&r);
-// 		rowSize = r.getSize();
-// 	}
-
+*/
 }
 
 /* Assumes OT_DATAVALUE */
@@ -966,35 +924,77 @@ ColumnCommand* ColumnCommandFabric::createCommand(messageqcpp::ByteStream& bs)
     bs.advance(1); // The higher dispatcher Command::makeCommand calls BS::peek so this increments BS ptr
     execplan::ColumnCommandDataType colType;
     colType.unserialize(bs);
-    if ((uint32_t)colType.colWidth <= datatypes::MAXLEGACYWIDTH)
-        return new ColumnCommand64(colType, bs);
-    else
-        return new ColumnCommand128(colType, bs);
+    switch (colType.colWidth)
+    {
+        case 1:
+            return new ColumnCommandInt8(colType, bs);
+            break;
+
+        case 2:
+           return new ColumnCommandInt16(colType, bs);
+           break;
+
+        case 4:
+           return new ColumnCommandInt32(colType, bs);
+           break;
+
+        case 8:
+           return new ColumnCommandInt64(colType, bs);
+           break;
+
+        case 16:
+           return new ColumnCommandInt128(colType, bs);
+           break;
+
+        default:
+           throw std::runtime_error("ColumnCommandFabric::createCommand: unsupported width " + colType.colWidth);
+    }
 
     return nullptr;
 }
 
 ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommandShPtr& rhs)
 {
-    if (typeid(*rhs) == typeid(ColumnCommand128))
+    if (LIKELY(typeid(*rhs) == typeid(ColumnCommandInt64)))
     {
-        ColumnCommand128* ret = new ColumnCommand128();
-        *ret = *dynamic_cast<ColumnCommand128*>(rhs.get());
+        ColumnCommandInt64* ret = new ColumnCommandInt64();
+        *ret = *dynamic_cast<ColumnCommandInt64*>(rhs.get());
+        return ret;
+    }
+    else if (typeid(*rhs) == typeid(ColumnCommandInt128))
+    {
+        ColumnCommandInt128* ret = new ColumnCommandInt128();
+        *ret = *dynamic_cast<ColumnCommandInt128*>(rhs.get());
+        return ret;
+    }
+    else if (typeid(*rhs) == typeid(ColumnCommandInt8))
+    {
+        ColumnCommandInt8* ret = new ColumnCommandInt8();
+        *ret = *dynamic_cast<ColumnCommandInt8*>(rhs.get());
+        return ret;
+    }
+    else if (typeid(*rhs) == typeid(ColumnCommandInt16))
+    {
+        ColumnCommandInt16* ret = new ColumnCommandInt16();
+        *ret = *dynamic_cast<ColumnCommandInt16*>(rhs.get());
+        return ret;
+    }
+    else if (typeid(*rhs) == typeid(ColumnCommandInt32))
+    {
+        ColumnCommandInt32* ret = new ColumnCommandInt32();
+        *ret = *dynamic_cast<ColumnCommandInt32*>(rhs.get());
         return ret;
     }
     else
-    {
-        ColumnCommand64* ret = new ColumnCommand64();
-        *ret = *dynamic_cast<ColumnCommand64*>(rhs.get());
-        return ret;
-    }
+        throw std::runtime_error("ColumnCommandFabric::duplicate: Can not detect ColumnCommand child class");
+
     return nullptr;
 }
 
-
-ColumnCommand64::ColumnCommand64(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+// Code duplication here for the future patch.
+ColumnCommandInt8::ColumnCommandInt8(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
 {
-    ColumnCommand::createCommand(aColType, bs, false);
+    ColumnCommand::createCommand(aColType, bs);
     parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
                      colType.colDataType, filterCount, BOP);
 
@@ -1003,18 +1003,91 @@ ColumnCommand64::ColumnCommand64(execplan::ColumnCommandDataType& aColType, mess
                       colType.colDataType, 0, BOP);
 }
 
-ColumnCommand128::ColumnCommand128(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+void ColumnCommandInt8::prep(int8_t outputType, bool absRids)
 {
-    colType = aColType;  
-    ColumnCommand::createCommand(aColType, bs, false);
+    shift = 16;
+    mask = 0xFF;
+    ColumnCommand::_prep(outputType, absRids);
+}
+
+ColumnCommandInt16::ColumnCommandInt16(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+{
+    colType = aColType;
+    ColumnCommand::createCommand(aColType, bs);
     parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(),
                                                        colType.colWidth,
                                                        colType.colDataType,
                                                        filterCount, BOP);
     /* OR hack */
     emptyFilter = primitives::parseColumnFilter(filterString.buf(),
-                                                colType.colWidth, 
+                                                colType.colWidth,
                                                 colType.colDataType, 0, BOP);
+}
+
+void ColumnCommandInt16::prep(int8_t outputType, bool absRids)
+{
+    shift = 8;
+    mask = 0xFF;
+    ColumnCommand::_prep(outputType, absRids);
+}
+
+ColumnCommandInt32::ColumnCommandInt32(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+{
+    ColumnCommand::createCommand(aColType, bs);
+    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                     colType.colDataType, filterCount, BOP);
+
+    /* OR hack */
+    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                      colType.colDataType, 0, BOP);
+}
+
+void ColumnCommandInt32::prep(int8_t outputType, bool absRids)
+{
+    shift = 4;
+    mask = 0x0F;
+    ColumnCommand::_prep(outputType, absRids);
+}
+
+ColumnCommandInt64::ColumnCommandInt64(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+{
+    ColumnCommand::createCommand(aColType, bs);
+    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                     colType.colDataType, filterCount, BOP);
+
+    /* OR hack */
+    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                      colType.colDataType, 0, BOP);
+}
+
+void ColumnCommandInt64::prep(int8_t outputType, bool absRids)
+{
+    shift = 2;
+    mask = 0x03;
+    ColumnCommand::_prep(outputType, absRids);
+}
+
+ColumnCommandInt128::ColumnCommandInt128(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+{
+    // WIP move this assignment into the class init list
+    // There is a duplicate in createCommand
+    colType = aColType;
+    ColumnCommand::createCommand(aColType, bs);
+    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(),
+                                                       colType.colWidth,
+                                                       colType.colDataType,
+                                                       filterCount, BOP);
+    /* OR hack */
+    emptyFilter = primitives::parseColumnFilter(filterString.buf(),
+                                                colType.colWidth,
+                                                colType.colDataType, 0, BOP);
+}
+
+void ColumnCommandInt128::prep(int8_t outputType, bool absRids)
+{
+    shift = 1;
+    mask = 0x01;
+    ColumnCommand::_prep(outputType, absRids);
 }
 
 }

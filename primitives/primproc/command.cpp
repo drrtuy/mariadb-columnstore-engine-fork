@@ -73,7 +73,7 @@ Command* Command::makeCommand(ByteStream& bs, CommandType* type, vector<SCommand
             break;
 
         case PSEUDOCOLUMN:
-            ret = new PseudoCC();
+            return PseudoCCFabric::createCommand(bs);
             break;
 
         default:
