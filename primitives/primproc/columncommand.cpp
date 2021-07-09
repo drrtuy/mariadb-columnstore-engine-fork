@@ -65,6 +65,12 @@ ColumnCommand::ColumnCommand() :
 {
 }
 
+ColumnCommand::ColumnCommand(execplan::ColumnCommandDataType& aColType)
+: ColumnCommand()
+{
+    colType = aColType;
+}
+
 ColumnCommand::~ColumnCommand() { }
 
 void ColumnCommand::_execute()
@@ -241,7 +247,7 @@ void ColumnCommand::issuePrimitive()
         bpp->pp.setParsedColumnFilter(parsedColumnFilter);
     else
         bpp->pp.setParsedColumnFilter(emptyFilter);
-    
+
     bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize);
 
     /* Update CP data, the PseudoColumn code should always be !_isScan.  Should be safe
@@ -465,6 +471,7 @@ void ColumnCommand::processResult()
 
 void ColumnCommand::createCommand(ByteStream& bs)
 {
+/*
     uint8_t tmp8;
 
     bs.advance(1);
@@ -472,38 +479,41 @@ void ColumnCommand::createCommand(ByteStream& bs)
     _isScan = tmp8;
     bs >> traceFlags;
     bs >> filterString;
-#if 0
-    cout << "filter string: ";
-
-    for (uint32_t i = 0; i < filterString.length(); ++i)
-        cout << (int) filterString.buf()[i] << " ";
-
-    cout << endl;
-#endif
-    colType.unserialize(bs);
     bs >> BOP;
     bs >> filterCount;
     deserializeInlineVector(bs, lastLbid);
-    
-//	cout << "lastLbid count=" << lastLbid.size() << endl;
-//	for (uint32_t i = 0; i < lastLbid.size(); i++)
-//		cout << "  " << lastLbid[i];
 
-
-    //cout << "CreateCommand() o:" << getOID() << " lastLbid: " << lastLbid << endl;
     Command::createCommand(bs);
+*/
+    throw runtime_error("some");
+    //ColumnCommand::createCommand(bs, false);
+}
 
-    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                         colType.colDataType, filterCount, BOP);
+void ColumnCommand::createCommand(execplan::ColumnCommandDataType& aColType, ByteStream& bs, const bool widthAgnostic)
+{
+    colType = aColType;
+    uint8_t tmp8;
 
-    /* OR hack */
-    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                  colType.colDataType, 0, BOP);
+    bs >> tmp8;
+    _isScan = tmp8;
+    bs >> traceFlags;
+    bs >> filterString;
+    if (widthAgnostic)
+        colType.unserialize(bs);
+    bs >> BOP;
+    bs >> filterCount;
+    deserializeInlineVector(bs, lastLbid);
 
-    /* XXXPAT: for debugging only */
-// 	bs >> colType.columnOID;
-// 	cout << "got filterCount " << filterCount << endl;
-// 	cout << "made a ColumnCommand OID = " << OID << endl;
+    Command::createCommand(bs);
+    if (widthAgnostic)
+    {
+        parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                             colType.colDataType, filterCount, BOP);
+
+        /* OR hack */
+        emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                      colType.colDataType, 0, BOP);
+    }
 }
 
 void ColumnCommand::resetCommand(ByteStream& bs)
@@ -514,7 +524,7 @@ void ColumnCommand::resetCommand(ByteStream& bs)
 void ColumnCommand::prep(int8_t outputType, bool absRids)
 {
     /* make the template NewColRequestHeader */
-    
+
     baseMsgLength = sizeof(NewColRequestHeader) +
                     (suppressFilter ? 0 : filterString.length());
 
@@ -582,7 +592,7 @@ void ColumnCommand::prep(int8_t outputType, bool absRids)
             shift = 1;
             mask = 0x01;
             break;
-            
+
         default:
             cout << "CC: colWidth is " << colType.colWidth << endl;
             throw logic_error("ColumnCommand: bad column width?");
@@ -785,7 +795,7 @@ void ColumnCommand::projectResultRG(RowGroup& rg, uint32_t pos)
             }
             break;
         }
-           
+
     }
 }
 
@@ -949,6 +959,62 @@ int64_t ColumnCommand::getLastLbid()
     dbRoot--;
     return lastLbid[dbRoot];
 #endif
+}
+
+ColumnCommand* ColumnCommandFabric::createCommand(messageqcpp::ByteStream& bs)
+{
+    bs.advance(1); // The higher dispatcher Command::makeCommand calls BS::peek so this increments BS ptr
+    execplan::ColumnCommandDataType colType;
+    colType.unserialize(bs);
+    if ((uint32_t)colType.colWidth <= datatypes::MAXLEGACYWIDTH)
+        return new ColumnCommand64(colType, bs);
+    else
+        return new ColumnCommand128(colType, bs);
+
+    return nullptr;
+}
+
+ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommandShPtr& rhs)
+{
+    if (typeid(*rhs) == typeid(ColumnCommand128))
+    {
+        ColumnCommand128* ret = new ColumnCommand128();
+        *ret = *dynamic_cast<ColumnCommand128*>(rhs.get());
+        return ret;
+    }
+    else
+    {
+        ColumnCommand64* ret = new ColumnCommand64();
+        *ret = *dynamic_cast<ColumnCommand64*>(rhs.get());
+        return ret;
+    }
+    return nullptr;
+}
+
+
+ColumnCommand64::ColumnCommand64(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+{
+    ColumnCommand::createCommand(aColType, bs, false);
+    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                     colType.colDataType, filterCount, BOP);
+
+    /* OR hack */
+    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
+                      colType.colDataType, 0, BOP);
+}
+
+ColumnCommand128::ColumnCommand128(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream& bs)
+{
+    colType = aColType;  
+    ColumnCommand::createCommand(aColType, bs, false);
+    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(),
+                                                       colType.colWidth,
+                                                       colType.colDataType,
+                                                       filterCount, BOP);
+    /* OR hack */
+    emptyFilter = primitives::parseColumnFilter(filterString.buf(),
+                                                colType.colWidth, 
+                                                colType.colDataType, 0, BOP);
 }
 
 }

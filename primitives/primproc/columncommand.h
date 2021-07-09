@@ -34,16 +34,17 @@
 #include "command.h"
 #include "calpontsystemcatalog.h"
 
-using CSCDataType = execplan::CalpontSystemCatalog::ColDataType;
 
 namespace primitiveprocessor
 {
+using CSCDataType = execplan::CalpontSystemCatalog::ColDataType;
 
 // #warning got the ColumnCommand definition
 class ColumnCommand : public Command
 {
 public:
     ColumnCommand();
+    ColumnCommand(execplan::ColumnCommandDataType& aColType);
     virtual ~ColumnCommand();
 
     inline uint64_t getLBID()
@@ -78,6 +79,7 @@ public:
         return _isScan;
     }
     void createCommand(messageqcpp::ByteStream&);
+    void createCommand(execplan::ColumnCommandDataType& aColType, messageqcpp::ByteStream&, const bool widthAgnostic);
     void resetCommand(messageqcpp::ByteStream&);
     void setMakeAbsRids(bool m)
     {
@@ -112,7 +114,6 @@ protected:
     //On the PM the rest is uninitialized
     execplan::ColumnCommandDataType colType;
 
-private:
     ColumnCommand(const ColumnCommand&);
     ColumnCommand& operator=(const ColumnCommand&);
 
@@ -175,6 +176,30 @@ private:
     friend class RTSCommand;
 };
 
+using ColumnCommandShPtr = std::unique_ptr<ColumnCommand>;
+
+class ColumnCommand64 : public ColumnCommand
+{
+  public:
+    using ColumnCommand::ColumnCommand;
+    ColumnCommand64(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+};
+
+class ColumnCommand128 : public ColumnCommand
+{
+  public:
+    using ColumnCommand::ColumnCommand;
+    ColumnCommand128(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
+};
+
+class ColumnCommandFabric
+{
+  public:
+    ColumnCommandFabric() = default;
+    static ColumnCommand* createCommand(messageqcpp::ByteStream& bs);
+    static ColumnCommand* duplicate(const ColumnCommandShPtr& rhs);
+};
+
 template<typename T>
 inline void ColumnCommand::fillEmptyBlock(uint8_t* dst,
                                    const uint8_t*emptyValue,
@@ -203,8 +228,7 @@ inline void ColumnCommand::fillEmptyBlock<messageqcpp::ByteStream::hexbyte>(uint
     }
 }
 
-
-}
+} // namespace
 
 #endif
 // vim:ts=4 sw=4:
