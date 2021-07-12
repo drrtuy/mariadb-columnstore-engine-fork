@@ -809,11 +809,14 @@ void ColumnCommand::duplicate(ColumnCommand* cc)
 
 SCommand ColumnCommand::duplicate()
 {
+/*
     SCommand ret;
 
     ret.reset(new ColumnCommand());
     duplicate((ColumnCommand*) ret.get());
     return ret;
+*/
+    return SCommand(ColumnCommandFabric::duplicate(this));
 }
 
 bool ColumnCommand::operator==(const ColumnCommand& cc) const
@@ -955,34 +958,39 @@ ColumnCommand* ColumnCommandFabric::createCommand(messageqcpp::ByteStream& bs)
 
 ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommandShPtr& rhs)
 {
+    return duplicate(rhs.get());
+}
+
+ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommand* rhs)
+{
     if (LIKELY(typeid(*rhs) == typeid(ColumnCommandInt64)))
     {
         ColumnCommandInt64* ret = new ColumnCommandInt64();
-        *ret = *dynamic_cast<ColumnCommandInt64*>(rhs.get());
+        *ret = *dynamic_cast<const ColumnCommandInt64*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt128))
     {
         ColumnCommandInt128* ret = new ColumnCommandInt128();
-        *ret = *dynamic_cast<ColumnCommandInt128*>(rhs.get());
+        *ret = *dynamic_cast<const ColumnCommandInt128*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt8))
     {
         ColumnCommandInt8* ret = new ColumnCommandInt8();
-        *ret = *dynamic_cast<ColumnCommandInt8*>(rhs.get());
+        *ret = *dynamic_cast<const ColumnCommandInt8*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt16))
     {
         ColumnCommandInt16* ret = new ColumnCommandInt16();
-        *ret = *dynamic_cast<ColumnCommandInt16*>(rhs.get());
+        *ret = *dynamic_cast<const ColumnCommandInt16*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt32))
     {
         ColumnCommandInt32* ret = new ColumnCommandInt32();
-        *ret = *dynamic_cast<ColumnCommandInt32*>(rhs.get());
+        *ret = *dynamic_cast<const ColumnCommandInt32*>(rhs);
         return ret;
     }
     else

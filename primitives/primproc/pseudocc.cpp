@@ -35,6 +35,9 @@ PseudoCC::~PseudoCC()
 
 SCommand PseudoCC::duplicate()
 {
+    return SCommand(PseudoCCFabric::duplicate(this)); 
+    //throw std::runtime_error("PseudoCC::duplicate : obsolete function. Can not be used.");
+/*
     SCommand ret;
     PseudoCC* pseudo;
 
@@ -45,6 +48,7 @@ SCommand PseudoCC::duplicate()
     pseudo->bigValueFromUM = bigValueFromUM;
     ColumnCommand::duplicate(pseudo);
     return ret;
+*/
 }
 
 void PseudoCC::createCommand(messageqcpp::ByteStream& bs)
@@ -305,12 +309,25 @@ void PseudoCC::loadData()
     }
 }
 
+PseudoCCInt64::PseudoCCInt64(PseudoCC* rhs) : PseudoCC(function)
+{
+    valueFromUM = rhs->valueFromUM;
+    ColumnCommandInt64::duplicate(rhs);         
+}
+
+PseudoCCInt128::PseudoCCInt128(PseudoCC* rhs) : PseudoCC(function)
+{
+    valueFromUM = rhs->valueFromUM;
+    ColumnCommandInt128::duplicate(rhs);         
+}
+
+/*
 PseudoCCInt64::PseudoCCInt64(execplan::ColumnCommandDataType& colType,
                              const uint32_t aFunction,
-                             messageqcpp::ByteStream& bs)
+                              messageqcpp::ByteStream& bs)
     : ColumnCommandInt64::ColumnCommandInt64(colType, bs)
 { }
-
+*/
 /*
 PseudoCCInt128::PseudoCCInt128(execplan::PseudoCCDataType& colType, const uint32_t aFunction, messageqcpp::ByteStream& bs): function(aFunction)
 {
@@ -322,28 +339,18 @@ PseudoCC* PseudoCCFabric::createCommand(messageqcpp::ByteStream& bs)
     bs.advance(1); // The higher dispatcher Command::makeCommand calls BS::peek so this increments BS ptr
     uint32_t function;
     bs >> function;
-    //ColumnCommand::createCommand(bs);
     // Skip the internal type that equals to COLUMNCOMMAND
     bs.advance(1);
     execplan::ColumnCommandDataType colType;
     colType.unserialize(bs);
-/*    switch (colType.colWidth)
+    switch (colType.colWidth)
     {
         case 1:
-            return new PseudoCCInt8(colType, function, bs);
-            break;
-
         case 2:
-           return new PseudoCCInt16(colType, function, bs);
-           break;
-
         case 4:
-           return new PseudoCCInt32(colType, function, bs);
-           break;
-
         case 8:
-*/           return new PseudoCCInt64(colType, function, bs);
- /*          break;
+           return new PseudoCCInt64(colType, function, bs);
+           break;
 
         case 16:
            return new PseudoCCInt128(colType, function, bs);
@@ -351,8 +358,17 @@ PseudoCC* PseudoCCFabric::createCommand(messageqcpp::ByteStream& bs)
 
         default:
            throw std::runtime_error("ColPseudoColumnFabric::createCommand: unsupported width " + colType.colWidth);
-    }*/
+    }
 
+    return nullptr;
+}
+
+PseudoCC* PseudoCCFabric::duplicate(PseudoCC* rhs)
+{
+    if (LIKELY(typeid(*rhs) == typeid(PseudoCCInt64)))
+        return new PseudoCCInt64(rhs);
+    else if (typeid(*rhs) == typeid(PseudoCCInt128))
+        return new PseudoCCInt128(rhs);
     return nullptr;
 }
 

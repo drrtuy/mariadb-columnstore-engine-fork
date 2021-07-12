@@ -205,7 +205,8 @@ class ColumnCommandInt32 : public ColumnCommand
 class ColumnCommandInt64 : public ColumnCommand
 {
   public:
-    using ColumnCommand::ColumnCommand;
+//    using ColumnCommand::ColumnCommand;
+    ColumnCommandInt64() : ColumnCommand() { }; 
     ColumnCommandInt64(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
 };
@@ -225,6 +226,7 @@ class ColumnCommandFabric
     ColumnCommandFabric() = default;
     static ColumnCommand* createCommand(messageqcpp::ByteStream& bs);
     static ColumnCommand* duplicate(const ColumnCommandShPtr& rhs);
+    static ColumnCommand* duplicate(const ColumnCommand* rhs);
 };
 
 template<typename T>

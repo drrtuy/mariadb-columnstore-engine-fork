@@ -29,17 +29,18 @@ class PseudoCC : public ColumnCommand
 {
 public:
     PseudoCC();
+    PseudoCC(uint32_t aFunction) : function(aFunction) {}; 
     virtual ~PseudoCC();
-
     virtual SCommand duplicate();
     virtual void createCommand(messageqcpp::ByteStream&);
     virtual void resetCommand(messageqcpp::ByteStream&);
-protected:
     virtual void loadData();
+    uint64_t valueFromUM;
+    uint128_t bigValueFromUM;
+
+protected:
     uint32_t function;
-
 private:
-
     template<typename W> void loadSingleValue(W val);
     template<typename W> void loadPMNumber();
     template<typename W> void loadRIDs();
@@ -47,9 +48,6 @@ private:
     template<typename W> void loadDBRootNum();
     template<typename W> void loadPartitionNum();
     template<typename W> void loadLBID();
-
-    uint64_t valueFromUM;
-    uint128_t bigValueFromUM;
 };
 
 
@@ -130,14 +128,26 @@ void PseudoCC::loadLBID()
     }
 }
 
-class PseudoCCInt64 : public PseudoCC, public ColumnCommandInt64
+class PseudoCCInt64 : public ColumnCommandInt64, public PseudoCC
 {
   public:
     using PseudoCC::PseudoCC;
     PseudoCCInt64(execplan::ColumnCommandDataType& colType,
                   const uint32_t aFunction,
-                  messageqcpp::ByteStream& bs);
-    //void prep(int8_t outputType, bool absRids) override;
+                  messageqcpp::ByteStream& bs) {};
+    PseudoCCInt64(PseudoCC* rhs);
+    void prep(int8_t outputType, bool absRids) { return ColumnCommandInt64::prep(outputType, absRids); };
+};
+
+class PseudoCCInt128 : public ColumnCommandInt128, public PseudoCC
+{
+  public:
+    using PseudoCC::PseudoCC;
+    PseudoCCInt128(execplan::ColumnCommandDataType& colType,
+                   const uint32_t aFunction,
+                   messageqcpp::ByteStream& bs) {};
+    PseudoCCInt128(PseudoCC* rhs);
+    void prep(int8_t outputType, bool absRids) { return ColumnCommandInt128::prep(outputType, absRids); };
 };
 
 class PseudoCCFabric
@@ -145,7 +155,7 @@ class PseudoCCFabric
   public:
     PseudoCCFabric() = default;
     static PseudoCC* createCommand(messageqcpp::ByteStream& bs);
-    //static SCommand* duplicate(const ColumnCommandShPtr& rhs);
+    static PseudoCC* duplicate(PseudoCC* src);
 };
 
 }
