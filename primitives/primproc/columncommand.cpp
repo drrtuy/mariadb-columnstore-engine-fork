@@ -956,41 +956,45 @@ ColumnCommand* ColumnCommandFabric::createCommand(messageqcpp::ByteStream& bs)
     return nullptr;
 }
 
-ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommandShPtr& rhs)
+ColumnCommand* ColumnCommandFabric::duplicate(ColumnCommandShPtr& rhs)
 {
     return duplicate(rhs.get());
 }
 
-ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommand* rhs)
+// reversed semantics comparing to the existing.
+// duplicate the argument not this
+ColumnCommand* ColumnCommandFabric::duplicate(ColumnCommand* rhs)
 {
     if (LIKELY(typeid(*rhs) == typeid(ColumnCommandInt64)))
     {
         ColumnCommandInt64* ret = new ColumnCommandInt64();
-        *ret = *dynamic_cast<const ColumnCommandInt64*>(rhs);
+        ColumnCommandInt64* src = dynamic_cast<ColumnCommandInt64*>(rhs);
+        src->duplicate(ret);
+        //*ret = *dynamic_cast<const ColumnCommandInt64*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt128))
     {
         ColumnCommandInt128* ret = new ColumnCommandInt128();
-        *ret = *dynamic_cast<const ColumnCommandInt128*>(rhs);
+        *ret = *dynamic_cast<ColumnCommandInt128*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt8))
     {
         ColumnCommandInt8* ret = new ColumnCommandInt8();
-        *ret = *dynamic_cast<const ColumnCommandInt8*>(rhs);
+        *ret = *dynamic_cast<ColumnCommandInt8*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt16))
     {
         ColumnCommandInt16* ret = new ColumnCommandInt16();
-        *ret = *dynamic_cast<const ColumnCommandInt16*>(rhs);
+        *ret = *dynamic_cast<ColumnCommandInt16*>(rhs);
         return ret;
     }
     else if (typeid(*rhs) == typeid(ColumnCommandInt32))
     {
         ColumnCommandInt32* ret = new ColumnCommandInt32();
-        *ret = *dynamic_cast<const ColumnCommandInt32*>(rhs);
+        *ret = *dynamic_cast<ColumnCommandInt32*>(rhs);
         return ret;
     }
     else

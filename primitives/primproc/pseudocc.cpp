@@ -35,7 +35,7 @@ PseudoCC::~PseudoCC()
 
 SCommand PseudoCC::duplicate()
 {
-    return SCommand(PseudoCCFabric::duplicate(this)); 
+    return SCommand(PseudoCCFabric::duplicate(this));
     //throw std::runtime_error("PseudoCC::duplicate : obsolete function. Can not be used.");
 /*
     SCommand ret;
@@ -262,7 +262,7 @@ void PseudoCC::loadData()
                 case 16:
                     loadDBRootNum<uint128_t>();
                     break;
-                    
+
                 default:
                     cout << "PC::loadData(): bad column width" << endl;
                     break;
@@ -295,7 +295,7 @@ void PseudoCC::loadData()
                 case 16:
                     loadSingleValue<uint128_t>(bigValueFromUM);
                     break;
-                    
+
                 default:
                     cout << "PC::loadData(): bad column width" << endl;
                     break;
@@ -312,13 +312,21 @@ void PseudoCC::loadData()
 PseudoCCInt64::PseudoCCInt64(PseudoCC* rhs) : PseudoCC(function)
 {
     valueFromUM = rhs->valueFromUM;
-    ColumnCommandInt64::duplicate(rhs);         
+    // template ?
+    ColumnCommandInt64* src = dynamic_cast<ColumnCommandInt64*>(rhs); 
+    ColumnCommandInt64* dst = dynamic_cast<ColumnCommandInt64*>(this);
+    idbassert(src && dst);
+    src->duplicate(dst);
 }
 
 PseudoCCInt128::PseudoCCInt128(PseudoCC* rhs) : PseudoCC(function)
 {
-    valueFromUM = rhs->valueFromUM;
-    ColumnCommandInt128::duplicate(rhs);         
+    bigValueFromUM = rhs->bigValueFromUM;
+    // template ?
+    ColumnCommandInt128* src = dynamic_cast<ColumnCommandInt128*>(rhs);
+    ColumnCommandInt128* dst = dynamic_cast<ColumnCommandInt128*>(this);
+    idbassert(src && dst);
+    src->duplicate(dst);
 }
 
 /*

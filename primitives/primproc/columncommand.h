@@ -105,10 +105,10 @@ public:
     {
         return colType.compressionType;
     }
+    void duplicate(ColumnCommand*);
 
 protected:
     virtual void loadData();
-    void duplicate(ColumnCommand*);
 
     // we only care about the width and type fields.
     //On the PM the rest is uninitialized
@@ -206,7 +206,7 @@ class ColumnCommandInt64 : public ColumnCommand
 {
   public:
 //    using ColumnCommand::ColumnCommand;
-    ColumnCommandInt64() : ColumnCommand() { }; 
+    ColumnCommandInt64() : ColumnCommand() { };
     ColumnCommandInt64(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
 };
@@ -225,8 +225,8 @@ class ColumnCommandFabric
   public:
     ColumnCommandFabric() = default;
     static ColumnCommand* createCommand(messageqcpp::ByteStream& bs);
-    static ColumnCommand* duplicate(const ColumnCommandShPtr& rhs);
-    static ColumnCommand* duplicate(const ColumnCommand* rhs);
+    static ColumnCommand* duplicate(ColumnCommandShPtr& rhs);
+    static ColumnCommand* duplicate(ColumnCommand* rhs);
 };
 
 template<typename T>

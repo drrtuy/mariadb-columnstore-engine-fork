@@ -29,7 +29,7 @@ class PseudoCC : public ColumnCommand
 {
 public:
     PseudoCC();
-    PseudoCC(uint32_t aFunction) : function(aFunction) {}; 
+    PseudoCC(uint32_t aFunction) : function(aFunction) {};
     virtual ~PseudoCC();
     virtual SCommand duplicate();
     virtual void createCommand(messageqcpp::ByteStream&);
@@ -134,7 +134,7 @@ class PseudoCCInt64 : public ColumnCommandInt64, public PseudoCC
     using PseudoCC::PseudoCC;
     PseudoCCInt64(execplan::ColumnCommandDataType& colType,
                   const uint32_t aFunction,
-                  messageqcpp::ByteStream& bs) {};
+                  messageqcpp::ByteStream& bs) : ColumnCommandInt64(colType, bs) { };
     PseudoCCInt64(PseudoCC* rhs);
     void prep(int8_t outputType, bool absRids) { return ColumnCommandInt64::prep(outputType, absRids); };
 };
@@ -145,7 +145,7 @@ class PseudoCCInt128 : public ColumnCommandInt128, public PseudoCC
     using PseudoCC::PseudoCC;
     PseudoCCInt128(execplan::ColumnCommandDataType& colType,
                    const uint32_t aFunction,
-                   messageqcpp::ByteStream& bs) {};
+                   messageqcpp::ByteStream& bs) : ColumnCommandInt128(colType, bs) {};
     PseudoCCInt128(PseudoCC* rhs);
     void prep(int8_t outputType, bool absRids) { return ColumnCommandInt128::prep(outputType, absRids); };
 };
