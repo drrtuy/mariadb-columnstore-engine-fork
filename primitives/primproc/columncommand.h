@@ -70,7 +70,6 @@ public:
     void execute();
     void execute(int64_t* vals);	//used by RTSCommand to redirect values
     virtual void prep(int8_t outputType, bool absRids);
-    void _prep(int8_t outputType, bool absRids);
     void project();
     void projectIntoRowGroup(rowgroup::RowGroup& rg, uint32_t pos);
     void nextLBID();
@@ -108,7 +107,13 @@ public:
 
 protected:
     virtual void loadData();
+    template <int W>
+    void _loadDataTemplate();
+    void updateCPDataNarrow();
+    void updateCPDataWide();
+    void _issuePrimitive();
     void duplicate(ColumnCommand*);
+    void fillInPrimitiveMessageHeader(const int8_t outputType, const bool absRids);
 
     // we only care about the width and type fields.
     //On the PM the rest is uninitialized
@@ -120,7 +125,11 @@ protected:
     void _execute();
     void issuePrimitive();
     void processResult();
-    void process_OT_BOTH();
+    template<int W>
+    void _process_OT_BOTH();
+    template<int W>
+    void _process_OT_BOTH_wAbsRids();
+    virtual void process_OT_BOTH();
     void process_OT_RID();
     void process_OT_DATAVALUE();
     void process_OT_ROWGROUP();
@@ -181,41 +190,56 @@ using ColumnCommandShPtr = std::unique_ptr<ColumnCommand>;
 class ColumnCommandInt8 : public ColumnCommand
 {
   public:
+    static constexpr uint8_t size = 1;
     using ColumnCommand::ColumnCommand;
     ColumnCommandInt8(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
+    void loadData() override;
+    void process_OT_BOTH() override;
 };
 
 class ColumnCommandInt16 : public ColumnCommand
 {
   public:
+    static constexpr uint8_t size = 2;
     using ColumnCommand::ColumnCommand;
     ColumnCommandInt16(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
+    void loadData() override;
+    void process_OT_BOTH() override;
 };
 
 class ColumnCommandInt32 : public ColumnCommand
 {
   public:
+    static constexpr uint8_t size = 4;
     using ColumnCommand::ColumnCommand;
     ColumnCommandInt32(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
+    void loadData() override;
+    void process_OT_BOTH() override;
 };
 
 class ColumnCommandInt64 : public ColumnCommand
 {
   public:
+    static constexpr uint8_t size = 8;
     using ColumnCommand::ColumnCommand;
     ColumnCommandInt64(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
+    void loadData() override;
+    void process_OT_BOTH() override;
 };
 
 class ColumnCommandInt128 : public ColumnCommand
 {
   public:
+    static constexpr uint8_t size = 16;
     using ColumnCommand::ColumnCommand;
     ColumnCommandInt128(execplan::ColumnCommandDataType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
+    void loadData() override;
+    void process_OT_BOTH() override;
 };
 
 
