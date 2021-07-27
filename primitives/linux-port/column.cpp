@@ -51,6 +51,14 @@ using namespace execplan;
 
 namespace
 {
+using RID_T = uint16_t;  // Row index type, as used in rid arrays
+
+// Column filtering is dispatched 4-way based on the column type,
+// which defines implementation of comparison operations for the column values
+enum ENUM_KIND {KIND_DEFAULT,   // compared as signed integers
+                KIND_UNSIGNED,  // compared as unsigned integers
+                KIND_FLOAT,     // compared as floating-point numbers
+                KIND_TEXT};     // whitespace-trimmed and then compared as signed integers
 
 inline uint64_t order_swap(uint64_t x)
 {
@@ -87,6 +95,18 @@ void logIt(int mid, int arg1, const string& arg2 = string())
     logger.logErrorMessage(msg);
 }
 
+template<typename T, ENUM_KIND KIND>
+void filterColumnData(
+    NewColRequestHeader* in,
+    NewColResultHeader* out,
+    unsigned outSize,
+    unsigned* written,
+    uint16_t* ridArray,
+    int ridSize,                // Number of values in ridArray
+    int* srcArray16,
+    unsigned srcSize,
+    boost::shared_ptr<ParsedColumnFilter> parsedColumnFilter)
+{ }
 
 template<class T>
 inline bool colCompare_(const T& val1, const T& val2, uint8_t COP)
@@ -1548,6 +1568,151 @@ inline void p_Col_bin_ridArray(NewColRequestHeader* in,
 
 namespace primitives
 {
+template<typename T, int W>
+void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in,
+    NewColResultHeader* out,
+    unsigned outSize,
+    unsigned* written,
+    uint16_t* ridArray,
+    int ridSize,                // Number of values in ridArray
+    int* srcArray16,
+    unsigned srcSize)
+{
+    _scanAndFilterTypeDispatcher<T, W>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize);
+}
+
+template<typename T, int W,
+         typename std::enable_if<sizeof(T) == sizeof(float), T>::type* = nullptr>
+void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in,
+    NewColResultHeader* out,
+    unsigned outSize,
+    unsigned* written,
+    uint16_t* ridArray,
+    int ridSize,                // Number of values in ridArray
+    int* srcArray16,
+    unsigned srcSize)
+{
+    auto DataType = (execplan::CalpontSystemCatalog::ColDataType) in->colType;
+    if (DataType == execplan::CalpontSystemCatalog::FLOAT)
+    {
+        filterColumnData<T, KIND_FLOAT>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize, parsedColumnFilter);
+        return;
+    }
+    _scanAndFilterTypeDispatcher<T, W>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize);
+}
+
+template<typename T, int W,
+         typename std::enable_if<sizeof(T) == sizeof(double), T>::type* = nullptr>
+void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in,
+    NewColResultHeader* out,
+    unsigned outSize,
+    unsigned* written,
+    uint16_t* ridArray,
+    int ridSize,                // Number of values in ridArray
+    int* srcArray16,
+    unsigned srcSize)
+{
+    auto DataType = (execplan::CalpontSystemCatalog::ColDataType) in->colType;
+    if (DataType == execplan::CalpontSystemCatalog::DOUBLE)
+    {
+        filterColumnData<T, KIND_FLOAT>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize, parsedColumnFilter);
+        return; 
+    }
+    _scanAndFilterTypeDispatcher<T, W>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize);
+}
+
+template<typename T, int W>
+void PrimitiveProcessor::_scanAndFilterTypeDispatcher(NewColRequestHeader* in,
+    NewColResultHeader* out,
+    unsigned outSize,
+    unsigned* written,
+    uint16_t* ridArray,
+    int ridSize,                // Number of values in ridArray
+    int* srcArray16,
+    unsigned srcSize)
+{
+    using UT = typename datatypes::make_unsigned<T>;
+    auto DataType = (execplan::CalpontSystemCatalog::ColDataType) in->colType;
+    if (DataType == execplan::CalpontSystemCatalog::CHAR ||
+        DataType == execplan::CalpontSystemCatalog::VARCHAR ||
+        DataType == execplan::CalpontSystemCatalog::TEXT)
+    {
+        filterColumnData<T, KIND_TEXT>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize, parsedColumnFilter);
+        return;
+    }
+
+    if (datatypes::isUnsigned(DataType))
+    {
+        filterColumnData<UT, KIND_UNSIGNED>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize, parsedColumnFilter);
+        return;
+    }
+    filterColumnData<T, KIND_DEFAULT>(in, out, outSize, written, ridArray, ridSize, srcArray16, srcSize, parsedColumnFilter);
+}
+
+template<typename T>
+void PrimitiveProcessor::columnScanAndFilter(NewColRequestHeader* in, NewColResultHeader* out,
+                                             unsigned outSize, unsigned* written)
+{
+//WIP
+    auto markEvent = [&] (char eventChar)
+    {
+        if (fStatsPtr)
+            fStatsPtr->markEvent(in->LBID, pthread_self(), in->hdr.SessionID, eventChar);
+    };
+    constexpr int W = sizeof(T);
+
+    void *outp = static_cast<void*>(out);
+    memcpy(outp, in, sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
+    out->NVALS = 0;
+    out->LBID = in->LBID;
+    out->ism.Command = COL_RESULTS;
+    out->OutputType = in->OutputType;
+    out->RidFlags = 0;
+    *written = sizeof(NewColResultHeader);
+    unsigned itemsPerBlock = logicalBlockMode ? BLOCK_SIZE
+                                              : BLOCK_SIZE / W;
+
+    //...Initialize I/O counts;
+    out->CacheIO    = 0;
+    out->PhysicalIO = 0;
+
+#if 0
+
+    // short-circuit the actual block scan for testing
+    if (out->LBID >= 802816)
+    {
+        out->ValidMinMax = false;
+        out->Min = 0;
+        out->Max = 0;
+        return;
+    }
+
+#endif
+
+// WIP
+    markEvent('B');
+
+    // Prepare ridArray (the row index array)
+    uint16_t* ridArray = 0;
+    int ridSize = in->NVALS;                // Number of values in ridArray
+    if (ridSize > 0)
+    {
+        int filterSize = sizeof(uint8_t) + sizeof(uint8_t) + W;
+        ridArray = reinterpret_cast<uint16_t*>((uint8_t*)in + sizeof(NewColRequestHeader) + (in->NOPS * filterSize));
+
+        if (1 == in->sort )
+        {
+//WIP sort -> qsort
+            std::sort(ridArray, ridArray + ridSize);
+//WIP
+            markEvent('O');
+        }
+    }
+
+    scanAndFilterTypeDispatcher<T,W>(in, out, outSize, written, ridArray, ridSize, block, itemsPerBlock);
+//WIP
+    markEvent('C');
+}
 
 void PrimitiveProcessor::p_Col(NewColRequestHeader* in, NewColResultHeader* out,
                                unsigned outSize, unsigned* written)
@@ -1628,6 +1793,7 @@ void PrimitiveProcessor::p_Col(NewColRequestHeader* in, NewColResultHeader* out,
 #endif
 }
 
+#if 0
 boost::shared_ptr<ParsedColumnFilter> parseColumnFilter
 (const uint8_t* filterString, uint32_t colWidth, uint32_t colType, uint32_t filterCount,
  uint32_t BOP)
@@ -1643,6 +1809,7 @@ boost::shared_ptr<ParsedColumnFilter> parseColumnFilter
     ret.reset(new ParsedColumnFilter());
 
     ret->columnFilterMode = TWO_ARRAYS;
+// Diff for int128
     if (datatypes::isWideDecimalType(
         (CalpontSystemCatalog::ColDataType)colType, colWidth))
         ret->prestored_argVals128.reset(new int128_t[filterCount]);
@@ -1738,6 +1905,7 @@ boost::shared_ptr<ParsedColumnFilter> parseColumnFilter
                 case 8:
                     ret->prestored_argVals[argIndex] = *reinterpret_cast<const int64_t*>(args->val);
                     break;
+// Diff for int128
 
                 case 16:
                 {
@@ -1756,6 +1924,7 @@ boost::shared_ptr<ParsedColumnFilter> parseColumnFilter
     if (convertToSet)
     {
         ret->columnFilterMode = UNORDERED_SET;
+// Diff for int128
         if (datatypes::isWideDecimalType(
             (CalpontSystemCatalog::ColDataType)colType, colWidth))
         {
@@ -1779,6 +1948,7 @@ boost::shared_ptr<ParsedColumnFilter> parseColumnFilter
 
     return ret;
 }
+#endif
 
 } // namespace primitives
 // vim:ts=4 sw=4:

@@ -116,6 +116,8 @@ protected:
     void _issuePrimitive();
     void duplicate(ColumnCommand*);
     void fillInPrimitiveMessageHeader(const int8_t outputType, const bool absRids);
+    template<typename T>
+    void createColumnFilter();
 
     // we only care about the width and type fields.
     //On the PM the rest is uninitialized
@@ -202,6 +204,7 @@ class ColumnCommandInt8 : public ColumnCommand
 {
   public:
     static constexpr uint8_t size = 1;
+    using IntegralType = datatypes::WidthToSIntegralType<size>::type;
     ColumnCommandInt8() : ColumnCommand() { };
     ColumnCommandInt8(execplan::CalpontSystemCatalog::ColType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
@@ -215,6 +218,7 @@ class ColumnCommandInt16 : public ColumnCommand
 {
   public:
     static constexpr uint8_t size = 2;
+    using IntegralType = datatypes::WidthToSIntegralType<size>::type;
     ColumnCommandInt16() : ColumnCommand() { };
     ColumnCommandInt16(execplan::CalpontSystemCatalog::ColType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
@@ -228,6 +232,7 @@ class ColumnCommandInt32 : public ColumnCommand
 {
   public:
     static constexpr uint8_t size = 4;
+    using IntegralType = datatypes::WidthToSIntegralType<size>::type;
     ColumnCommandInt32() : ColumnCommand() { };
     ColumnCommandInt32(execplan::CalpontSystemCatalog::ColType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
@@ -241,6 +246,7 @@ class ColumnCommandInt64 : public ColumnCommand
 {
   public:
     static constexpr uint8_t size = 8;
+    using IntegralType = datatypes::WidthToSIntegralType<size>::type;
     ColumnCommandInt64() : ColumnCommand() { };
     ColumnCommandInt64(execplan::CalpontSystemCatalog::ColType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;
@@ -254,6 +260,7 @@ class ColumnCommandInt128 : public ColumnCommand
 {
   public:
     static constexpr uint8_t size = 16;
+    using IntegralType = datatypes::WidthToSIntegralType<size>::type;
     ColumnCommandInt128() : ColumnCommand() { };
     ColumnCommandInt128(execplan::CalpontSystemCatalog::ColType& colType, messageqcpp::ByteStream& bs);
     void prep(int8_t outputType, bool absRids) override;

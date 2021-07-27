@@ -559,14 +559,33 @@ void ColumnCommand::createCommand(ByteStream& bs)
     deserializeInlineVector(bs, lastLbid);
 
     Command::createCommand(bs);
+    switch (colType.colWidth)
+    {
+        case 1:
+            createColumnFilter<datatypes::WidthToSIntegralType<1>::type>();
+            break;
 
-    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                         colType.colDataType, filterCount, BOP);
+        case 2:
+            createColumnFilter<datatypes::WidthToSIntegralType<2>::type>();
+            break;
 
-    /* OR hack */
-    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                  colType.colDataType, 0, BOP);
+        case 4:
+            createColumnFilter<datatypes::WidthToSIntegralType<4>::type>();
+            break;
 
+        case 8:
+            createColumnFilter<datatypes::WidthToSIntegralType<8>::type>();
+            break;
+
+        case 16:
+            createColumnFilter<datatypes::WidthToSIntegralType<16>::type>();
+            break;
+
+        default:
+            throw NotImplementedExcept(std::string("ColumnCommand::createCommand does not support ")
+                                       + std::to_string(colType.colWidth)
+                                       + std::string(" byte width."));
+    }
 }
 
 void ColumnCommand::createCommand(execplan::CalpontSystemCatalog::ColType& aColType, ByteStream& bs)
@@ -1022,6 +1041,18 @@ ColumnCommand* ColumnCommandFabric::createCommand(messageqcpp::ByteStream& bs)
     return nullptr;
 }
 
+template<typename T>
+void ColumnCommand::createColumnFilter()
+{
+    parsedColumnFilter = primitives::_parseColumnFilter<T>(filterString.buf(),
+                                                           colType.colDataType,
+                                                           filterCount, BOP);
+    /* OR hack */
+    emptyFilter = primitives::_parseColumnFilter<T>(filterString.buf(),
+                                                    colType.colDataType,
+                                                    0, BOP);
+}
+
 ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommandUniquePtr& rhs)
 {
     if (LIKELY(typeid(*rhs) == typeid(ColumnCommandInt64)))
@@ -1064,12 +1095,7 @@ ColumnCommand* ColumnCommandFabric::duplicate(const ColumnCommandUniquePtr& rhs)
 ColumnCommandInt8::ColumnCommandInt8(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
-    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                     colType.colDataType, filterCount, BOP);
-
-    /* OR hack */
-    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                      colType.colDataType, 0, BOP);
+    createColumnFilter<IntegralType>();
 }
 
 void ColumnCommandInt8::prep(int8_t outputType, bool absRids)
@@ -1105,14 +1131,7 @@ void ColumnCommandInt8::projectResultRG(RowGroup& rg, uint32_t pos)
 ColumnCommandInt16::ColumnCommandInt16(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
-    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(),
-                                                       colType.colWidth,
-                                                       colType.colDataType,
-                                                       filterCount, BOP);
-    /* OR hack */
-    emptyFilter = primitives::parseColumnFilter(filterString.buf(),
-                                                colType.colWidth,
-                                                colType.colDataType, 0, BOP);
+    createColumnFilter<IntegralType>();
 }
 
 void ColumnCommandInt16::prep(int8_t outputType, bool absRids)
@@ -1148,12 +1167,7 @@ void ColumnCommandInt16::projectResultRG(RowGroup& rg, uint32_t pos)
 ColumnCommandInt32::ColumnCommandInt32(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
-    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                     colType.colDataType, filterCount, BOP);
-
-    /* OR hack */
-    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                      colType.colDataType, 0, BOP);
+    createColumnFilter<IntegralType>();
 }
 
 void ColumnCommandInt32::prep(int8_t outputType, bool absRids)
@@ -1189,12 +1203,7 @@ void ColumnCommandInt32::projectResultRG(RowGroup& rg, uint32_t pos)
 ColumnCommandInt64::ColumnCommandInt64(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
-    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                     colType.colDataType, filterCount, BOP);
-
-    /* OR hack */
-    emptyFilter = primitives::parseColumnFilter(filterString.buf(), colType.colWidth,
-                      colType.colDataType, 0, BOP);
+    createColumnFilter<IntegralType>();
 }
 
 void ColumnCommandInt64::prep(int8_t outputType, bool absRids)
@@ -1230,14 +1239,7 @@ void ColumnCommandInt64::projectResultRG(RowGroup& rg, uint32_t pos)
 ColumnCommandInt128::ColumnCommandInt128(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
-    parsedColumnFilter = primitives::parseColumnFilter(filterString.buf(),
-                                                       colType.colWidth,
-                                                       colType.colDataType,
-                                                       filterCount, BOP);
-    /* OR hack */
-    emptyFilter = primitives::parseColumnFilter(filterString.buf(),
-                                                colType.colWidth,
-                                                colType.colDataType, 0, BOP);
+    createColumnFilter<IntegralType>();
 }
 
 void ColumnCommandInt128::prep(int8_t outputType, bool absRids)
