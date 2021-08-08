@@ -249,7 +249,15 @@ void ColumnCommand::loadData()
 
 void ColumnCommand::issuePrimitive()
 {
+    loadData();
+
+    if (!suppressFilter)
+        bpp->pp.setParsedColumnFilter(parsedColumnFilter);
+    else
+        bpp->pp.setParsedColumnFilter(emptyFilter);
+
     _issuePrimitive();
+
     if (_isScan)
     {
         if (LIKELY(colType.isNarrow()))
@@ -262,14 +270,6 @@ void ColumnCommand::issuePrimitive()
 void ColumnCommand::_issuePrimitive()
 {
     uint32_t resultSize;
-
-    loadData();
-
-    if (!suppressFilter)
-        bpp->pp.setParsedColumnFilter(parsedColumnFilter);
-    else
-        bpp->pp.setParsedColumnFilter(emptyFilter);
-
     bpp->pp.p_Col(primMsg, outMsg, bpp->outMsgSize, (unsigned int*)&resultSize);
 } // _issuePrimitive()
 
@@ -1128,6 +1128,12 @@ void ColumnCommandInt8::projectResultRG(RowGroup& rg, uint32_t pos)
     _projectResultRG<size>(rg, pos);
 }
 
+void ColumnCommandInt8::_issuePrimitiveT()
+{
+    uint32_t resultSize;
+    bpp->getPrimitiveProcessor().columnScanAndFilter<IntegralType>(primMsg, outMsg, bpp->getOutMsgSize(), (unsigned int*)&resultSize);
+}
+
 ColumnCommandInt16::ColumnCommandInt16(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
@@ -1162,6 +1168,12 @@ void ColumnCommandInt16::process_OT_DATAVALUE()
 void ColumnCommandInt16::projectResultRG(RowGroup& rg, uint32_t pos)
 {
     _projectResultRG<size>(rg, pos);
+}
+
+void ColumnCommandInt16::_issuePrimitiveT()
+{
+    uint32_t resultSize;
+    bpp->getPrimitiveProcessor().columnScanAndFilter<IntegralType>(primMsg, outMsg, bpp->getOutMsgSize(), (unsigned int*)&resultSize);
 }
 
 ColumnCommandInt32::ColumnCommandInt32(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
@@ -1200,6 +1212,12 @@ void ColumnCommandInt32::projectResultRG(RowGroup& rg, uint32_t pos)
     _projectResultRG<size>(rg, pos);
 }
 
+void ColumnCommandInt32::_issuePrimitiveT()
+{
+    uint32_t resultSize;
+    bpp->getPrimitiveProcessor().columnScanAndFilter<IntegralType>(primMsg, outMsg, bpp->getOutMsgSize(), (unsigned int*)&resultSize);
+}
+
 ColumnCommandInt64::ColumnCommandInt64(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
@@ -1236,6 +1254,12 @@ void ColumnCommandInt64::projectResultRG(RowGroup& rg, uint32_t pos)
     _projectResultRG<size>(rg, pos);
 }
 
+void ColumnCommandInt64::_issuePrimitiveT()
+{
+    uint32_t resultSize;
+    bpp->getPrimitiveProcessor().columnScanAndFilter<IntegralType>(primMsg, outMsg, bpp->getOutMsgSize(), (unsigned int*)&resultSize);
+}
+
 ColumnCommandInt128::ColumnCommandInt128(execplan::CalpontSystemCatalog::ColType& aColType, messageqcpp::ByteStream& bs)
 {
     ColumnCommand::createCommand(aColType, bs);
@@ -1270,6 +1294,12 @@ void ColumnCommandInt128::process_OT_DATAVALUE()
 void ColumnCommandInt128::projectResultRG(RowGroup& rg, uint32_t pos)
 {
     _projectResultRG<size>(rg, pos);
+}
+
+void ColumnCommandInt128::_issuePrimitiveT()
+{
+    uint32_t resultSize;
+    bpp->getPrimitiveProcessor().columnScanAndFilter<IntegralType>(primMsg, outMsg, bpp->getOutMsgSize(), (unsigned int*)&resultSize);
 }
 
 }

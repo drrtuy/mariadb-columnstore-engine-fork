@@ -333,33 +333,37 @@ public:
     void p_Col(NewColRequestHeader* in, NewColResultHeader* out, unsigned outSize,
                unsigned* written);
 
-   template<typename T, int W>
-   void scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
-                                    unsigned outSize, unsigned* written, uint16_t* ridArray,
-                                    int ridSize, int* srcArray16, unsigned srcSize);
-
-    template<typename T, int W,
-         typename std::enable_if<sizeof(T) == sizeof(float), T>::type* = nullptr>
+    template<typename T,
+             typename std::enable_if<sizeof(T) == sizeof(int8_t) ||
+                                     sizeof(T) == sizeof(int16_t) ||
+                                     sizeof(T) == sizeof(int128_t), T>::type* = nullptr>
     void scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
-                                     unsigned outSize, unsigned* written, uint16_t* ridArray,
-                                     int ridSize, int* srcArray16, unsigned srcSize);
+                                    unsigned outSize, unsigned* written);
 
-    template<typename T, int W,
-         typename std::enable_if<sizeof(T) == sizeof(double), T>::type* = nullptr>
+    template<typename T,
+             typename std::enable_if<sizeof(T) == sizeof(int32_t), T>::type* = nullptr>
     void scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
-                                     unsigned outSize, unsigned* written, uint16_t* ridArray,
-                                     int ridSize, int* srcArray16, unsigned srcSize);
-
-    template<typename T, int W>
+                                     unsigned outSize, unsigned* written);
+    template<typename T,
+             typename std::enable_if<sizeof(T) == sizeof(int64_t), T>::type* = nullptr>
+    void scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
+                                     unsigned outSize, unsigned* written);
+    
+    template<typename T,
+             typename std::enable_if<sizeof(T) <= sizeof(int64_t), T>::type* = nullptr>
     void _scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
-                                    unsigned outSize, unsigned* written, uint16_t* ridArray,
-                                    int ridSize, int* srcArray16, unsigned srcSize);
+                                    unsigned outSize, unsigned* written);
 
+    template<typename T,
+             typename std::enable_if<sizeof(T) == sizeof(int128_t), T>::type* = nullptr>
+    void _scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
+                                    unsigned outSize, unsigned* written);
+ 
     template<typename T>
     void columnScanAndFilter(NewColRequestHeader* in, NewColResultHeader* out,
                              unsigned outSize, unsigned* written);
 
-    boost::shared_ptr<ParsedColumnFilter> parseColumnFilter(const uint8_t* filterString,
+        boost::shared_ptr<ParsedColumnFilter> parseColumnFilter(const uint8_t* filterString,
             uint32_t colWidth, uint32_t colType, uint32_t filterCount, uint32_t BOP);
     void setParsedColumnFilter(boost::shared_ptr<ParsedColumnFilter>);
 
@@ -418,6 +422,7 @@ private:
     friend class ::PrimTest;
 };
 
+// WIP
 boost::shared_ptr<ParsedColumnFilter> parseColumnFilter(const uint8_t* filterString,
         uint32_t colWidth, uint32_t colType, uint32_t filterCount, uint32_t BOP);
 
@@ -433,7 +438,7 @@ boost::shared_ptr<ParsedColumnFilter> _parseColumnFilter(
     uint32_t filterCount,           // Number of filter elements contained in filterString
     uint32_t BOP)                   // Operation (and/or/xor/none) that combines all filter elements
 {
-    using UT = typename datatypes::make_unsigned<T>::type;
+    using UT = typename std::conditional<std::is_unsigned<T>::value || datatypes::is_uint128_t<T>::value, T, typename datatypes::make_unsigned<T>::type>::type;
     const uint32_t WIDTH = sizeof(T);  // Sizeof of the column to be filtered
 
     boost::shared_ptr<ParsedColumnFilter> ret;  // Place for building the value to return
@@ -500,9 +505,8 @@ boost::shared_ptr<ParsedColumnFilter> _parseColumnFilter(
         for (uint32_t argIndex = 0; argIndex < filterCount; argIndex++)
         {
             auto cop = ret->prestored_cops[argIndex];
-// logical expression error comparing with the prev version
-            if (! ((BOP == BOP_OR  && cop == COMPARE_EQ) ||
-                   (BOP == BOP_AND && cop == COMPARE_NE)))
+            if (! ((BOP == BOP_OR  && cop != COMPARE_EQ) ||
+                   (BOP == BOP_AND && cop != COMPARE_NE)))
             {
                 goto skipConversion;
             }

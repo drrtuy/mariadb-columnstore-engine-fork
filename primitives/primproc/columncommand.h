@@ -108,12 +108,14 @@ public:
     }
 
 protected:
+    // WIP
     virtual void loadData();
     template <int W>
     void _loadData();
     void updateCPDataNarrow();
     void updateCPDataWide();
-    void _issuePrimitive();
+    virtual void _issuePrimitive();
+    virtual void _issuePrimitiveT() { };
     void duplicate(ColumnCommand*);
     void fillInPrimitiveMessageHeader(const int8_t outputType, const bool absRids);
     template<typename T>
@@ -212,6 +214,7 @@ class ColumnCommandInt8 : public ColumnCommand
     void process_OT_BOTH() override;
     void process_OT_DATAVALUE() override;
     void projectResultRG(rowgroup::RowGroup& rg, uint32_t pos) override;
+    void _issuePrimitiveT() override;
 };
 
 class ColumnCommandInt16 : public ColumnCommand
@@ -226,6 +229,7 @@ class ColumnCommandInt16 : public ColumnCommand
     void process_OT_BOTH() override;
     void process_OT_DATAVALUE() override;
     void projectResultRG(rowgroup::RowGroup& rg, uint32_t pos) override;
+    void _issuePrimitiveT() override;
 };
 
 class ColumnCommandInt32 : public ColumnCommand
@@ -240,6 +244,7 @@ class ColumnCommandInt32 : public ColumnCommand
     void process_OT_BOTH() override;
     void process_OT_DATAVALUE() override;
     void projectResultRG(rowgroup::RowGroup& rg, uint32_t pos) override;
+    void _issuePrimitiveT() override;
 };
 
 class ColumnCommandInt64 : public ColumnCommand
@@ -254,6 +259,7 @@ class ColumnCommandInt64 : public ColumnCommand
     void process_OT_BOTH() override;
     void process_OT_DATAVALUE() override;
     void projectResultRG(rowgroup::RowGroup& rg, uint32_t pos) override;
+    void _issuePrimitiveT() override;
 };
 
 class ColumnCommandInt128 : public ColumnCommand
@@ -268,6 +274,7 @@ class ColumnCommandInt128 : public ColumnCommand
     void process_OT_BOTH() override;
     void process_OT_DATAVALUE() override;
     void projectResultRG(rowgroup::RowGroup& rg, uint32_t pos) override;
+    void _issuePrimitiveT() override;
 };
 
 
