@@ -168,11 +168,12 @@ struct IntegralTypeToFilterSetType<int128_t>
 class ParsedColumnFilter
 {
   public:
-    static constexpr uint32_t noSetFilterThreshold = 8; 
+    using CopsType = uint8_t;
+    static constexpr uint32_t noSetFilterThreshold = 8;
     ColumnFilterMode columnFilterMode;
     boost::shared_array<int64_t> prestored_argVals;
     boost::shared_array<int128_t> prestored_argVals128;
-    boost::shared_array<uint8_t> prestored_cops;
+    boost::shared_array<CopsType> prestored_cops;
     boost::shared_array<uint8_t> prestored_rfs;
     boost::shared_ptr<prestored_set_t> prestored_set;
     boost::shared_ptr<prestored_set_t_128> prestored_set_128;
@@ -406,7 +407,7 @@ public:
              typename std::enable_if<sizeof(T) == sizeof(int64_t), T>::type* = nullptr>
     void scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
                                      unsigned outSize, unsigned* written);
-    
+
     template<typename T,
              typename std::enable_if<sizeof(T) <= sizeof(int64_t), T>::type* = nullptr>
     void _scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
@@ -416,7 +417,7 @@ public:
              typename std::enable_if<sizeof(T) == sizeof(int128_t), T>::type* = nullptr>
     void _scanAndFilterTypeDispatcher(NewColRequestHeader* in, NewColResultHeader* out,
                                     unsigned outSize, unsigned* written);
- 
+
     template<typename T>
     void columnScanAndFilter(NewColRequestHeader* in, NewColResultHeader* out,
                              unsigned outSize, unsigned* written);
@@ -442,7 +443,7 @@ public:
 //	void p_ColAggregate(const NewColAggRequestHeader *in, NewColAggResultHeader *out);
 
     void p_Dictionary(const DictInput* in, std::vector<uint8_t>* out,
-                      bool skipNulls, uint32_t charsetNumber, 
+                      bool skipNulls, uint32_t charsetNumber,
                       boost::shared_ptr<DictEqualityFilter> eqFilter,
                       uint8_t eqOp);
 
