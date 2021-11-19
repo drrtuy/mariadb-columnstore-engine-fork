@@ -26,27 +26,5 @@ echo '******************** Log Configuration  ********************' >> $OUT_FILE
 echo '' >> $OUT_FILE
 echo 'MariaDB ColumnStore System Log Configuration Data' >> $OUT_FILE
 echo '' >> $OUT_FILE
-configFileName=`mcsGetConfig Installation SystemLogConfigFile`
-echo 'System Logging Configuration File being used: '${configFileName} >> $OUT_FILE
-echo '' >> $OUT_FILE
-echo -e 'Module\tConfigured Log Levels' >> $OUT_FILE
-echo -e '------\t---------------------------------------' >> $OUT_FILE
-moduleConfig=''
-if  grep -q '/var/log/mariadb/columnstore/crit.log' ${configFileName}; then
-    moduleConfig=${moduleConfig}' CRITICAL'
-fi
-if  grep -q '/var/log/mariadb/columnstore/err.log' ${configFileName}; then
-    moduleConfig=${moduleConfig}' ERROR'
-fi
-if  grep -q '/var/log/mariadb/columnstore/warning.log' ${configFileName}; then
-    moduleConfig=${moduleConfig}' WARNING'
-fi
-if  grep -q '/var/log/mariadb/columnstore/info.log' ${configFileName}; then
-    moduleConfig=${moduleConfig}' INFO'
-fi
-if  grep -q '/var/log/mariadb/columnstore/debug.log' ${configFileName}; then
-    moduleConfig=${moduleConfig}' DEBUG'
-fi
-echo -e ${MODULE}'\t'${moduleConfig} >> $OUT_FILE
 exit 0
 

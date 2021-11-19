@@ -242,10 +242,9 @@ fi
 
 #determine lock file directory
 
-# Lock directory for root user
+# Lock directory for root user.
+# RN lockdir is only used in the legacy OAM postConfigure and should be removed
 lockdir='/var/lock/subsys'
-
-@ENGINE_BINDIR@/mcsSetConfig -d Installation LockFileDirectory $lockdir
 
 mkdir $lockdir >/dev/null 2>&1
 
