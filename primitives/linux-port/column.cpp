@@ -42,11 +42,98 @@ using namespace boost;
 #include "simd_sse.h"
 #include "utils/common/columnwidth.h"
 
+
 using namespace logging;
 using namespace dbbc;
 using namespace primitives;
 using namespace primitiveprocessor;
 using namespace execplan;
+
+#include "tensorflow/cc/ops/const_op.h" 
+#include "tensorflow/cc/client/client_session.h" 
+#include "tensorflow/cc/ops/standard_ops.h"
+#include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/graph/default_device.h"
+#include "tensorflow/core/graph/graph_def_builder.h"
+#include "tensorflow/core/lib/core/errors.h"
+#include "tensorflow/core/lib/core/stringpiece.h"
+#include "tensorflow/core/lib/core/threadpool.h"
+#include "tensorflow/core/lib/io/path.h"
+#include "tensorflow/core/lib/strings/stringprintf.h"
+#include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/platform/init_main.h"
+#include "tensorflow/core/platform/logging.h"
+#include "tensorflow/core/platform/types.h"
+#include "tensorflow/core/public/session.h"
+#include "tensorflow/core/util/command_line_flags.h"
+
+using namespace tensorflow;
+using namespace tensorflow::ops;
+namespace tf_first_appearence
+{
+void unused()
+{
+  auto scope = Scope::NewRootScope();
+#if 0
+  {
+    // we already know how to create Scalar
+    // which is a tensor of Rank 0
+    auto aScalar = Input(2);
+    std::cout << "Dimensions of a scalar - " << aScalar.tensor().shape().dims()
+              << std::endl;
+
+    // A tensor of Rank 1 is called a vector
+    auto aVector = Input({2, 3});
+    std::cout << "Dimensions of a vector - " << aVector.tensor().shape().dims()
+              << std::endl;
+
+    // A tensor of Rank 2 is called a matrix
+    auto aMatrix = Input({{2, 3}, {6, 5}});
+    std::cout << "Dimensions of a matrix - " << aMatrix.tensor().shape().dims()
+              << std::endl;
+
+    // A tensor of Rank 3 or more is not known by any special name tensor
+  }
+
+  {
+    // When building the ops you can specify the shape explicitly as well
+
+    // 2x2 matrix with all elements = 10
+    auto c1 = Const(scope, 10, /* shape */ {2, 2});
+
+    // [1 1] * [41; 1]
+    auto x = MatMul(scope, {{1, 1}}, {{41}, {1}});
+
+    ClientSession session(scope);
+
+    std::vector<Tensor> outputs;
+
+    auto status = session.Run({x}, &outputs);
+
+    TF_CHECK_OK(status);
+
+    std::cout << "Underlying Scalar value -> " << outputs[0].flat<int>()
+              << std::endl;
+
+    // [1 2 3 4] + 10
+    auto y = Add(scope, {1, 2, 3, 4}, 10);
+
+    status = session.Run({y}, &outputs);
+
+    TF_CHECK_OK(status);
+
+    std::cout << "Underlying vector value -> " << outputs[0].flat<int>()
+              << std::endl;
+  }
+#endif
+  {
+    auto input = Const(scope, Tensor(DataType::DT_UINT64, {}));
+    auto filter = Const(scope, Tensor(DataType::DT_UINT64, {}));
+    Conv2D(scope, input, filter, {1, 1, 1, 1}, "SAME");
+  }
+
+} // f
+}
 
 namespace
 {
@@ -1360,6 +1447,16 @@ inline SIMD_WRAPPER_TYPE simdDataLoadTemplate(VT& processor, const T* srcArray,
     return {result};
 }
 
+template<typename T, typename VT, bool HAS_INPUT_RIDS, int OUTPUT_TYPE,
+         ENUM_KIND KIND, typename FT, typename ST>
+void tensorFiltering(NewColRequestHeader* in, ColResultHeader* out,
+     const T* srcArray, const uint32_t srcSize, primitives::RIDType* ridArray,
+     const uint16_t ridSize, ParsedColumnFilter* parsedColumnFilter,
+     const bool validMinMax, const T emptyValue, const T nullValue,
+     T Min, T Max, const bool isNullValueMatches)
+{
+
+} 
 // This routine filters input block in a vectorized manner.
 // It supports all output types, all input types.
 // It doesn't support KIND==TEXT so upper layers filters this KIND out beforehand.
