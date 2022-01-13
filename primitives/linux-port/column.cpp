@@ -49,13 +49,16 @@ using namespace primitives;
 using namespace primitiveprocessor;
 using namespace execplan;
 
+#include "tensorflow/c/tf_tensor_internal.h"
 #include "tensorflow/cc/ops/const_op.h" 
 #include "tensorflow/cc/client/client_session.h" 
+#include "tensorflow/cc/ops/math_ops.h"
 #include "tensorflow/cc/ops/standard_ops.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/graph/default_device.h"
 #include "tensorflow/core/graph/graph_def_builder.h"
 #include "tensorflow/core/lib/core/errors.h"
+#include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/core/stringpiece.h"
 #include "tensorflow/core/lib/core/threadpool.h"
 #include "tensorflow/core/lib/io/path.h"
@@ -69,12 +72,16 @@ using namespace execplan;
 
 using namespace tensorflow;
 using namespace tensorflow::ops;
-namespace tf_first_appearence
+namespace tf = tensorflow;
+namespace tf_ops = tensorflow::ops;
+namespace mcs_tf
 {
-void unused()
-{
-  auto scope = Scope::NewRootScope();
+    static auto globTFScope = Scope::NewRootScope();
+    static tf::ClientSession globSession(mcs_tf::globTFScope);
 #if 0
+void dummy_func()
+{
+    static auto scope = Scope::NewRootScope();
   {
     // we already know how to create Scalar
     // which is a tensor of Rank 0
@@ -125,7 +132,6 @@ void unused()
     std::cout << "Underlying vector value -> " << outputs[0].flat<int>()
               << std::endl;
   }
-#endif
   {
     auto input = Const(scope, Tensor(DataType::DT_UINT64, {}));
     auto filter = Const(scope, Tensor(DataType::DT_UINT64, {}));
@@ -133,6 +139,7 @@ void unused()
   }
 
 } // f
+#endif
 }
 
 namespace
@@ -1417,6 +1424,44 @@ void scalarFiltering(NewColRequestHeader* in, ColResultHeader* out,
     }
 }
 
+template<typename T, ENUM_KIND KIND, typename FT, typename ST>
+void tensorizedFiltering(NewColRequestHeader* in, ColResultHeader* out,
+    const T* srcArray, const uint32_t srcSize, uint16_t* ridArray,
+    const uint16_t ridSize, ParsedColumnFilter* parsedColumnFilter,
+    const bool validMinMax, const T emptyValue, const T nullValue,
+    T Min, T Max, const bool isNullValueMatches)
+{
+    //T* srcArrayBuf = const_cast<T*>(srcArray);
+    //constexpr const uint8_t WIDTH = sizeof(T);
+    //tf::Tensor::DeleterCallback =
+    //auto tensor = tensorflow::Tensor(DataType::DT_UINT8,
+    //auto input = tensorflow::ops::Const(scope, Tensor(DataType::DT_UINT64, {}));
+    // type, shape, void*, buf_size, (deleter*), Status*
+    /*auto input = tf_exp_cc::Tensor::FromBuffer((TF_DataType)DT_UINT8,
+        {1, 1, BLOCK_SIZE, 1},
+        srcArray,
+        BLOCK_SIZE, // b/c we are at 1 byte length now
+        [](void*, size_t){},
+        &status);
+    TF_ManagedBuffer* tfManBuf = new TF_ManagedBuffer(srcArrayBuf, 8192, [](void*, size_t, void*){},
+        nullptr, // dealloc arg
+        true); // the inst owns mem
+    */
+    auto input = tf::Tensor(tf::DataType::DT_UINT8, {8192});
+    for (size_t i = 0; i < 8192; ++i)
+        input.flat<uint8_t>()(i) = srcArray[i];
+
+    auto filter = tf::Tensor(tf::DataType::DT_UINT8, {8192}); // Initializer
+    for (size_t i = 0; i < 8192; ++i)
+        input.flat<uint8_t>()(i) = joblist::UTINYINTEMPTYROW;
+
+    auto eq_op = tf_ops::Equal(mcs_tf::globTFScope, input, filter); 
+    std::vector<tf::Tensor> outputs;
+    TF_CHECK_OK(mcs_tf::globSession.Run({eq_op}, &outputs));
+
+    //std::cout << "Underlying Scalar value -> " << outputs[0].flat<bool>() << std::endl;
+}
+
 #if defined(__x86_64__ )
 template <typename VT, typename SIMD_WRAPPER_TYPE, bool HAS_INPUT_RIDS, typename T,
           typename std::enable_if<HAS_INPUT_RIDS == false, T>::type* = nullptr>
@@ -1816,7 +1861,14 @@ void filterColumnData(
 
 #if defined(__x86_64__ )
     // Don't use vectorized filtering for non-integer based data types wider than 16 bytes.
-    if (KIND < KIND_FLOAT && WIDTH < 16)
+    if (WIDTH == 1 && dataType == CalpontSystemCatalog::UTINYINT)
+    {
+        tensorizedFiltering<T, KIND, FT, ST>(in, out, srcArray, srcSize, ridArray, ridSize,
+                                             parsedColumnFilter.get(), validMinMax, emptyValue,
+                                             nullValue, Min, Max, isNullValueMatches);
+
+    }
+    else if (KIND < KIND_FLOAT && WIDTH < 16)
     {
         bool canUseFastFiltering = true;
         for (uint32_t i = 0; i < filterCount; ++i)

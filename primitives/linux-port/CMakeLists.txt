@@ -1,5 +1,11 @@
 
-include_directories( ${ENGINE_COMMON_INCLUDES} ../blockcache ../primproc /data/tensorflow/bazel-bin/tensorflow/include/ /data/tensorflow/bazel-bin/tensorflow/include/src /data/tensorflow/third_party/eigen3/ /usr/local/include/tensorflow/ )
+include_directories( ${ENGINE_COMMON_INCLUDES} ../blockcache
+    ../primproc 
+    /data/tensorflow/bazel-bin/tensorflow/include/
+    /data/tensorflow/bazel-bin/tensorflow/include/src
+    /data/tensorflow/third_party/eigen3/
+    /usr/local/include/tensorflow/
+    /data/tensorflow/ )
 
 ########### next target ###############
 

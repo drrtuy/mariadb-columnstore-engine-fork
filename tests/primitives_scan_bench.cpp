@@ -296,6 +296,22 @@ BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1ByteVectorizedCode)(benchma
 
 BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan1ByteVectorizedCode);
 
+/*
+BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1ByteTensorizedCode)(benchmark::State& state)
+{
+  for (auto _ : state)
+  {
+    constexpr const uint8_t W = 1;
+    state.PauseTiming();
+    inTestRunSetUp("col1block.cdf", W, SystemCatalog::UTINYINT, OT_DATAVALUE, args);
+    state.ResumeTiming();
+    runFilterBenchTemplated<W>();
+  }
+}
+
+BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan1ByteTensorizedCode);
+*/
+
 BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterVectorizedCode)(benchmark::State& state)
 {
   for (auto _ : state)

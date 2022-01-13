@@ -54,5 +54,19 @@ if (WITH_MICROBENCHMARKS) #AND (NOT CMAKE_BUILD_TYPE STREQUAL "debug"))
     target_include_directories(primitives_scan_bench PUBLIC ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE} )
     target_link_libraries(primitives_scan_bench ${ENGINE_LDFLAGS} ${MARIADB_CLIENT_LIBS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc benchmark::benchmark)
     install(TARGETS primitives_scan_bench DESTINATION ${ENGINE_BINDIR} COMPONENT columnstore-engine)
+
+    include_directories( ${ENGINE_COMMON_INCLUDES} ../blockcache
+        ../primproc 
+        /data/tensorflow/bazel-bin/tensorflow/include/
+        /data/tensorflow/bazel-bin/tensorflow/include/src
+        /data/tensorflow/third_party/eigen3/
+        /usr/local/include/tensorflow/
+        /data/tensorflow/ )
+
+    add_executable(primitives_tensor_scan_bench primitives_tensor_scan_bench.cpp)
+    target_include_directories(primitives_tensor_scan_bench PUBLIC ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE} )
+    target_link_libraries(primitives_tensor_scan_bench ${ENGINE_LDFLAGS} ${MARIADB_CLIENT_LIBS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc benchmark::benchmark tensorflow_cc tensorflow_framework)
+    install(TARGETS primitives_tensor_scan_bench DESTINATION ${ENGINE_BINDIR} COMPONENT columnstore-engine)
+
 endif()
 
