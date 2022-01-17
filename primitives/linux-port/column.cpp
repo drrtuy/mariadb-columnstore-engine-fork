@@ -74,11 +74,11 @@ using namespace tensorflow;
 using namespace tensorflow::ops;
 namespace tf = tensorflow;
 namespace tf_ops = tensorflow::ops;
+#if 0
 namespace mcs_tf
 {
     static auto globTFScope = Scope::NewRootScope();
     static tf::ClientSession globSession(mcs_tf::globTFScope);
-#if 0
 void dummy_func()
 {
     static auto scope = Scope::NewRootScope();
@@ -139,8 +139,8 @@ void dummy_func()
   }
 
 } // f
-#endif
 }
+#endif
 
 namespace
 {
@@ -1424,6 +1424,7 @@ void scalarFiltering(NewColRequestHeader* in, ColResultHeader* out,
     }
 }
 
+#if 0
 template<typename T, ENUM_KIND KIND, typename FT, typename ST>
 void tensorizedFiltering(NewColRequestHeader* in, ColResultHeader* out,
     const T* srcArray, const uint32_t srcSize, uint16_t* ridArray,
@@ -1461,6 +1462,7 @@ void tensorizedFiltering(NewColRequestHeader* in, ColResultHeader* out,
 
     //std::cout << "Underlying Scalar value -> " << outputs[0].flat<bool>() << std::endl;
 }
+#endif
 
 #if defined(__x86_64__ )
 template <typename VT, typename SIMD_WRAPPER_TYPE, bool HAS_INPUT_RIDS, typename T,
@@ -1492,16 +1494,7 @@ inline SIMD_WRAPPER_TYPE simdDataLoadTemplate(VT& processor, const T* srcArray,
     return {result};
 }
 
-template<typename T, typename VT, bool HAS_INPUT_RIDS, int OUTPUT_TYPE,
-         ENUM_KIND KIND, typename FT, typename ST>
-void tensorFiltering(NewColRequestHeader* in, ColResultHeader* out,
-     const T* srcArray, const uint32_t srcSize, primitives::RIDType* ridArray,
-     const uint16_t ridSize, ParsedColumnFilter* parsedColumnFilter,
-     const bool validMinMax, const T emptyValue, const T nullValue,
-     T Min, T Max, const bool isNullValueMatches)
-{
 
-} 
 // This routine filters input block in a vectorized manner.
 // It supports all output types, all input types.
 // It doesn't support KIND==TEXT so upper layers filters this KIND out beforehand.
@@ -1861,14 +1854,14 @@ void filterColumnData(
 
 #if defined(__x86_64__ )
     // Don't use vectorized filtering for non-integer based data types wider than 16 bytes.
-    if (WIDTH == 1 && dataType == CalpontSystemCatalog::UTINYINT)
+    /*if (WIDTH == 1 && dataType == CalpontSystemCatalog::UTINYINT)
     {
         tensorizedFiltering<T, KIND, FT, ST>(in, out, srcArray, srcSize, ridArray, ridSize,
                                              parsedColumnFilter.get(), validMinMax, emptyValue,
                                              nullValue, Min, Max, isNullValueMatches);
 
     }
-    else if (KIND < KIND_FLOAT && WIDTH < 16)
+    else*/ if (KIND < KIND_FLOAT && WIDTH < 16)
     {
         bool canUseFastFiltering = true;
         for (uint32_t i = 0; i < filterCount; ++i)
