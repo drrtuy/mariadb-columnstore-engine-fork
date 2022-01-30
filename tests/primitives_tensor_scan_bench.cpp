@@ -96,7 +96,6 @@ uint8_t* readBlockFromLiteralArray(const std::string& fileName, uint8_t* block)
 }
 
 int8_t* blockBuf = nullptr;
-const size_t ExtentRows = 200000000;
 
 class FilterBenchFixture : public benchmark::Fixture
 {
@@ -120,6 +119,7 @@ class FilterBenchFixture : public benchmark::Fixture
     out = reinterpret_cast<ColResultHeader*>(output);
     rids = reinterpret_cast<uint16_t*>(&in[1]);
     args = reinterpret_cast<ColArgs*>(&in[1]);
+    const size_t ExtentRows = 200000000;
     if (!blockBuf)
       blockBuf = createAndFillBuffer<int8_t>(ExtentRows);
   }
@@ -183,10 +183,9 @@ class FilterBenchFixture : public benchmark::Fixture
     }
     return buf;
   }
-
 };
 
-BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1ByteVectorizedCode)(benchmark::State& state)
+BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1ByteVectorized)(benchmark::State& state)
 {
   for (auto _ : state)
   {
@@ -204,9 +203,9 @@ BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1ByteVectorizedCode)(benchma
   }
 }
 
-BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan1ByteVectorizedCode)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
+BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan1ByteVectorized)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
 
-BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterTemplatedCode)(benchmark::State& state)
+BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterScalar)(benchmark::State& state)
 {
   for (auto _ : state)
   {
@@ -226,7 +225,67 @@ BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterTemplatedCode)(b
   }
 }
 
-BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterTemplatedCode)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
+BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterScalar)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
+
+BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan8Byte2FiltersVectorized)(benchmark::State& state)
+{
+  for (auto _ : state)
+  {
+    state.PauseTiming();
+    constexpr const uint8_t W = 1;
+    const size_t setSize = state.range(0);
+    setUp1EqFilter<W>();
+    inTestRunSetUp("col1block.cdf", W, SystemCatalog::BIGINT, OT_BOTH, args);
+    state.ResumeTiming();
+    for (size_t i = 0; i < setSize; i += BLOCK_SIZE / W)
+    {
+      pp.setBlockPtr(reinterpret_cast<int*>(blockBuf + i));
+      runFilterBenchTemplated<W>();
+    }
+
+//    runFilterBenchTemplated<W>();
+  }
+}
+
+BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan8Byte2FiltersVectorized)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
+
+TEST_F(ColumnScanFilterTest, ColumnScan8Bytes2EqFiltersRIDOutputBoth)
+{
+  constexpr const uint8_t W = 8;
+  using IntegralType = datatypes::WidthToSIntegralType<W>::type;
+  IntegralType tmp;
+  IntegralType* resultVal = getValuesArrayPosition<IntegralType>(getFirstValueArrayPosition(out), 0);
+  primitives::RIDType* resultRid = getRIDArrayPosition(getFirstRIDArrayPosition(out), 0);
+
+  in->colType.DataSize = W;
+  in->colType.DataType = SystemCatalog::INT;
+  in->OutputType = OT_BOTH;
+  in->NOPS = 2;
+  in->BOP = BOP_OR;
+  in->NVALS = 0;
+  
+  tmp = 10;
+  args->COP = COMPARE_LT;
+  memcpy(args->val, &tmp, in->colType.DataSize);
+  args = reinterpret_cast<ColArgs*>(&input[sizeof(NewColRequestHeader) +
+                                           sizeof(ColArgs) + in->colType.DataSize]);
+  args->COP = COMPARE_GT;
+  tmp = 1000;
+  memcpy(args->val, &tmp, in->colType.DataSize);
+
+  pp.setBlockPtr((int*) readBlockFromLiteralArray("col8block.cdf", block));
+  pp.columnScanAndFilter<IntegralType>(in, out);
+
+  ASSERT_EQ(out->NVALS, 33);
+
+  for (i = 0; i < out->NVALS; i++)
+  {
+      ASSERT_EQ(resultRid[i], (i < 10 ? i : i - 10 + 1001));
+      ASSERT_EQ(resultVal[i], (i < 10 ? i : i - 10 + 1001));
+  }
+  ASSERT_EQ(out->Max, __col8block_cdf_umax);
+  ASSERT_EQ(out->Min, __col8block_cdf_umin);
+}
 
 void simpleTenzorFilter(Tensor& x, Tensor& y, std::vector<Tensor>& r)
 {
