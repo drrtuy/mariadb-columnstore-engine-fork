@@ -131,7 +131,7 @@ class FilterBenchFixture : public benchmark::Fixture
   }
 
   void inTestRunSetUp(const std::string& dataName, const size_t dataSize,
-    const uint8_t dataType, const uint32_t outputType, ColArgs* args)
+    const uint8_t dataType, const uint32_t outputType)
   {
     in->colType = ColRequestHeaderDataType();
     in->colType.DataSize = dataSize;
@@ -141,6 +141,7 @@ class FilterBenchFixture : public benchmark::Fixture
     in->NVALS = 0;
     pp.setBlockPtr((int*) readBlockFromLiteralArray(dataName, block));
   }
+
   void runFilterBenchLegacy()
   {
     pp.p_Col(in, out, 4 * BLOCK_SIZE, &written);
@@ -163,7 +164,27 @@ class FilterBenchFixture : public benchmark::Fixture
     args->COP = COMPARE_EQ;
     memcpy(args->val, &tmp, W);
   }
-  
+
+  template<typename T>
+  void setUpNEqFilters(const T n, const T lowestFilterValue)
+  {
+    assert(n > 0);
+    ColArgs* localArgsPtr = args;
+    in->NOPS = n;
+    in->NVALS = 0;
+    in->BOP = BOP_OR;
+    size_t fixedColArgInitOffset = sizeof(NewColRequestHeader);
+    size_t nextColArgBytesOffset = sizeof(ColArgs) + in->colType.DataSize;
+    for (T i = 0; i < n; ++i)
+    {
+      localArgsPtr->COP = COMPARE_EQ;
+      T tmp = std::max(lowestFilterValue + i, std::numeric_limits<T>::max());
+      memcpy(localArgsPtr->val, &tmp, sizeof(T));
+      // (i * nextColArgBytesOffset) value can overflow
+      localArgsPtr = reinterpret_cast<ColArgs*>(&input[fixedColArgInitOffset + i * nextColArgBytesOffset]);
+    }
+  }
+
   template<typename T>
   T* createAndFillBuffer(const size_t size)
   {
@@ -193,7 +214,7 @@ BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1ByteVectorized)(benchmark::
     const size_t setSize = state.range(0);
     //using T = datatypes::WidthToSIntegralType<W>::type;
     state.PauseTiming();
-    inTestRunSetUp("col1block.cdf", W, SystemCatalog::TINYINT, OT_DATAVALUE, args);
+    inTestRunSetUp("col1block.cdf", W, SystemCatalog::TINYINT, OT_DATAVALUE);
     state.ResumeTiming();
     for (size_t i = 0; i < setSize; i += BLOCK_SIZE / W)
     {
@@ -213,7 +234,7 @@ BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterScalar)(benchmar
     constexpr const uint8_t W = 1;
     const size_t setSize = state.range(0);
     setUp1EqFilter<W>();
-    inTestRunSetUp("col1block.cdf", W, SystemCatalog::CHAR, OT_DATAVALUE, args);
+    inTestRunSetUp("col1block.cdf", W, SystemCatalog::CHAR, OT_DATAVALUE);
     state.ResumeTiming();
     for (size_t i = 0; i < setSize; i += BLOCK_SIZE / W)
     {
@@ -221,38 +242,38 @@ BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterScalar)(benchmar
       runFilterBenchTemplated<W>();
     }
 
-//    runFilterBenchTemplated<W>();
+  // runFilterBenchTemplated<W>();
   }
 }
 
 BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan1Byte1FilterScalar)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
 
-BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan8Byte2FiltersVectorized)(benchmark::State& state)
+BENCHMARK_DEFINE_F(FilterBenchFixture, BM_ColumnScan8Byte2FiltersOutputBothVectorized)(benchmark::State& state)
 {
   for (auto _ : state)
   {
     state.PauseTiming();
-    constexpr const uint8_t W = 1;
+    constexpr const uint8_t W = 8;
+    using T = datatypes::WidthToSIntegralType<W>::type;
     const size_t setSize = state.range(0);
-    setUp1EqFilter<W>();
-    inTestRunSetUp("col1block.cdf", W, SystemCatalog::BIGINT, OT_BOTH, args);
+    inTestRunSetUp("col8block.cdf", W, SystemCatalog::BIGINT, OT_BOTH);
+    setUpNEqFilters<T>(2, 20);
     state.ResumeTiming();
     for (size_t i = 0; i < setSize; i += BLOCK_SIZE / W)
     {
       pp.setBlockPtr(reinterpret_cast<int*>(blockBuf + i));
       runFilterBenchTemplated<W>();
     }
-
-//    runFilterBenchTemplated<W>();
   }
 }
 
-BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan8Byte2FiltersVectorized)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
+BENCHMARK_REGISTER_F(FilterBenchFixture, BM_ColumnScan8Byte2FiltersOutputBothVectorized)->Arg(1000000)->Arg(8000000)->Arg(30000000)->Arg(50000000)->Arg(75000000)->Arg(100000000);
 
+/*
 TEST_F(ColumnScanFilterTest, ColumnScan8Bytes2EqFiltersRIDOutputBoth)
 {
   constexpr const uint8_t W = 8;
-  using IntegralType = datatypes::WidthToSIntegralType<W>::type;
+   
   IntegralType tmp;
   IntegralType* resultVal = getValuesArrayPosition<IntegralType>(getFirstValueArrayPosition(out), 0);
   primitives::RIDType* resultRid = getRIDArrayPosition(getFirstRIDArrayPosition(out), 0);
@@ -286,7 +307,7 @@ TEST_F(ColumnScanFilterTest, ColumnScan8Bytes2EqFiltersRIDOutputBoth)
   ASSERT_EQ(out->Max, __col8block_cdf_umax);
   ASSERT_EQ(out->Min, __col8block_cdf_umin);
 }
-
+*/
 void simpleTenzorFilter(Tensor& x, Tensor& y, std::vector<Tensor>& r)
 {
 /*

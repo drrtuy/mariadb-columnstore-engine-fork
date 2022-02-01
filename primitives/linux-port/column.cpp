@@ -1705,7 +1705,7 @@ void vectorizedFiltering(NewColRequestHeader* in, ColResultHeader* out,
         out->Min = Min;
         out->Max = Max;
     }
-
+ 
     // process the tail. scalarFiltering changes out contents, e.g. Min/Max, NVALS, RIDs and values array
     // This tail also sets out::Min/Max, out::validMinMax if validMinMax is set.
     uint32_t processedSoFar = rid;
