@@ -207,6 +207,7 @@ bool LBIDList::GetMinMax(T& min, T& max, int64_t& seq, int64_t lbid,
 #ifdef DEBUG
         cout << "Added Mx/Mn to partitionVector" << endl;
 #endif
+        idblog("Added Mx/Mn to partitionVector");
         mmp = new MinMaxPartition();
         mmp->lbid = (int64_t)LBIDR.start;
         mmp->lbidmax = (int64_t)(LBIDR.start + LBIDR.size);
@@ -231,6 +232,8 @@ bool LBIDList::GetMinMax(T& min, T& max, int64_t& seq, int64_t lbid,
           }
         }
 
+        idblog("Added Mx/Mn to partitionVector, min " << std::hex << mmp->min << ", max " << mmp->max);
+        idblog("                              , col data type" << ((int)colDataType));
         mmp->isValid = retVal;
         mmp->blksScanned = 0;
         lbidPartitionVector.push_back(mmp);
@@ -338,8 +341,8 @@ int LBIDList::getMinMaxFromEntries(T& min, T& max, int32_t& seq, int64_t lbid,
 }
 
 template <typename T>
-void LBIDList::UpdateMinMax(T min, T max, int64_t lbid, const CalpontSystemCatalog::ColType& type,
-                            bool validData)
+void LBIDList::UpdateMinMax(T min, T max, int64_t lbid, bool dictScan,
+                            const CalpontSystemCatalog::ColType& type, bool validData)
 {
   MinMaxPartition* mmp = NULL;
 #ifdef DEBUG
@@ -372,24 +375,33 @@ void LBIDList::UpdateMinMax(T min, T max, int64_t lbid, const CalpontSystemCatal
 
       if (mmp->isValid == BRM::CP_INVALID)
       {
-        if (datatypes::isCharType(type.colDataType))
+        if (!dictScan && datatypes::isCharType(type.colDataType))
         {
+          idblog("LBID " << mmp->lbid << ": updating rrange for character values, min " << std::hex
+                         << ((int64_t)mmp->min) << ", max " << ((int64_t)mmp->max) << ", new min "
+                         << ((int64_t)min) << ", new max " << ((int64_t)max));
           datatypes::Charset cs(const_cast<CalpontSystemCatalog::ColType&>(type).getCharset());
           if (datatypes::TCharShort::strnncollsp(cs, min, mmp->min, type.colWidth) < 0 ||
-              mmp->min == numeric_limits<int64_t>::max())
+              mmp->min == numeric_limits<uint64_t>::max())
             mmp->min = min;
 
           if (datatypes::TCharShort::strnncollsp(cs, max, mmp->max, type.colWidth) > 0 ||
-              mmp->max == numeric_limits<int64_t>::min())
+              mmp->max == numeric_limits<uint64_t>::min())
             mmp->max = max;
+          idblog("LBID " << mmp->lbid << ": updated rrange for character values, min " << std::hex << mmp->min
+                         << ", max " << mmp->max);
         }
-        else if (datatypes::isUnsigned(type.colDataType))
+        else if (dictScan || datatypes::isUnsigned(type.colDataType))
         {
+          idblog("LBID " << mmp->lbid << ": updating rrange for unsigned values, min " << ((uint64_t)min)
+                         << ", max " << (((uint64_t)max)));
           if (static_cast<uint64_t>(min) < static_cast<uint64_t>(mmp->min))
             mmp->min = min;
 
           if (static_cast<uint64_t>(max) > static_cast<uint64_t>(mmp->max))
             mmp->max = max;
+          idblog("LBID " << mmp->lbid << ": updated rrange for unsigned values, min " << ((uint64_t)mmp->min)
+                         << ", max " << (((uint64_t)mmp->max)));
         }
         else
         {
@@ -464,6 +476,8 @@ void LBIDList::UpdateAllPartitionInfo(const execplan::CalpontSystemCatalog::ColT
         cpInfo.max = mmp->max;
         cpInfo.min = mmp->min;
       }
+      idblog("pushing cpinfo for LBID " << mmp->lbid << ", min " << std::hex << mmp->min << ", max "
+                                        << mmp->max);
       cpInfo.seqNum = (int32_t)mmp->seq;
       vCpInfo.push_back(cpInfo);
 
@@ -526,7 +540,7 @@ bool LBIDList::CasualPartitionDataType(const CalpontSystemCatalog::ColDataType t
 
     case CalpontSystemCatalog::VARCHAR:
     case CalpontSystemCatalog::BLOB:
-    case CalpontSystemCatalog::TEXT: return size < 8;
+    case CalpontSystemCatalog::TEXT: return size <= 8;
 
     case CalpontSystemCatalog::TINYINT:
     case CalpontSystemCatalog::SMALLINT:
@@ -695,15 +709,20 @@ bool LBIDList::checkRangeOverlap(T min, T max, T tmin, T tmax,
 
 bool LBIDList::CasualPartitionPredicate(const BRM::EMCasualPartition_t& cpRange,
                                         const messageqcpp::ByteStream* bs, const uint16_t NOPS,
-                                        const execplan::CalpontSystemCatalog::ColType& ct, const uint8_t BOP)
+                                        const execplan::CalpontSystemCatalog::ColType& ct, const uint8_t BOP,
+                                        bool isDict)
 {
   int length = bs->length(), pos = 0;
   const char* MsgDataPtr = (const char*)bs->buf();
   bool scan = true;
   int64_t value = 0;
   int128_t bigValue = 0;
-  bool bIsUnsigned = datatypes::isUnsigned(ct.colDataType);
-  bool bIsChar = datatypes::isCharType(ct.colDataType);
+  // this really is a sorta hack. We do not have means to discern between short char column and tokens
+  // using only ct.colDataType and width.
+  // But, command we test against, has this information in the "getIsDict()" method.
+  // So we change signedness and "characterness" based on whether we work with tokens' column or not.
+  bool bIsUnsigned = isDict || datatypes::isUnsigned(ct.colDataType);
+  bool bIsChar = !isDict && datatypes::isCharType(ct.colDataType);
 
   for (int i = 0; i < NOPS; i++)
   {
@@ -800,9 +819,15 @@ bool LBIDList::CasualPartitionPredicate(const BRM::EMCasualPartition_t& cpRange,
     {
       continue;
     }
-    else if (execplan::isNull(value, ct))  // This will work even if the data column is unsigned.
+    else
     {
-      continue;
+      idblog("checking null, is char " << ((int)bIsChar) << ", width " << ct.colWidth << std::hex
+                                       << ", value " << value);
+      if (execplan::isNull(value, ct))  // This will work even if the data column is unsigned.
+      {
+        idblog("is null");
+        continue;
+      }
     }
 
     if (bIsChar)
@@ -898,11 +923,11 @@ template bool LBIDList::GetMinMax<int64_t>(int64_t* min, int64_t* max, int64_t* 
                                            const tr1::unordered_map<int64_t, BRM::EMEntry>& entries,
                                            execplan::CalpontSystemCatalog::ColDataType colDataType);
 
-template void LBIDList::UpdateMinMax<int128_t>(int128_t min, int128_t max, int64_t lbid,
+template void LBIDList::UpdateMinMax<int128_t>(int128_t min, int128_t max, int64_t lbid, bool dictScan,
                                                const execplan::CalpontSystemCatalog::ColType& type,
                                                bool validData = true);
 
-template void LBIDList::UpdateMinMax<int64_t>(int64_t min, int64_t max, int64_t lbid,
+template void LBIDList::UpdateMinMax<int64_t>(int64_t min, int64_t max, int64_t lbid, bool dictScan,
                                               const execplan::CalpontSystemCatalog::ColType& type,
                                               bool validData = true);
 

@@ -290,6 +290,8 @@ void FunctionColumn::unserialize(messageqcpp::ByteStream& b)
   ReturnedColumn::unserialize(b);
   b >> fFunctionName;
 
+  idblog("unserializing '" << fFunctionName << "'.");
+
   b >> size;
 
   for (i = 0; i < size; i++)

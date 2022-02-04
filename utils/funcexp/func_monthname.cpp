@@ -45,8 +45,9 @@ CalpontSystemCatalog::ColType Func_monthname::operationType(FunctionParm& fp,
 string Func_monthname::getStrVal(rowgroup::Row& row, FunctionParm& parm, bool& isNull,
                                  CalpontSystemCatalog::ColType& op_ct)
 {
-  int32_t month = getIntVal(row, parm, isNull, op_ct);
+  int32_t month = getIntValInternal(row, parm, isNull, op_ct);
 
+  idblog("monthname: getStrVal: month is " << month);
   if (month == -1)
     return "";
 
@@ -74,17 +75,21 @@ int64_t Func_monthname::getTimestampIntVal(rowgroup::Row& row, FunctionParm& par
   return val;
 }
 
-int64_t Func_monthname::getIntVal(rowgroup::Row& row, FunctionParm& parm, bool& isNull,
-                                  CalpontSystemCatalog::ColType& op_ct)
+int64_t Func_monthname::getIntValInternal(rowgroup::Row& row, FunctionParm& parm, bool& isNull,
+                                          CalpontSystemCatalog::ColType& op_ct)
 {
   int64_t val = 0;
   dataconvert::DateTime aDateTime;
   dataconvert::Time aTime;
 
+  idblog("monthname: result should be " << ((int)op_ct.colDataType) << " type, width "
+                                        << ((int)op_ct.colWidth));
+  idblog("monthname: will go to " << ((int)parm[0]->data()->resultType().colDataType) << " type branch");
   switch (parm[0]->data()->resultType().colDataType)
   {
     case CalpontSystemCatalog::DATE:
       val = parm[0]->data()->getIntVal(row, isNull);
+      idblog("DATE branch, value " << val << " is null " << ((int)isNull));
       return (unsigned)((val >> 12) & 0xf);
 
     case CalpontSystemCatalog::DATETIME:
@@ -113,6 +118,7 @@ int64_t Func_monthname::getIntVal(rowgroup::Row& row, FunctionParm& parm, bool& 
     case CalpontSystemCatalog::CHAR:
     case CalpontSystemCatalog::TEXT:
     case CalpontSystemCatalog::VARCHAR:
+      idblog("monthname: CHAR branch");
       val = dataconvert::DataConvert::stringToDatetime(parm[0]->data()->getStrVal(row, isNull));
 
       if (val == -1)
@@ -132,6 +138,7 @@ int64_t Func_monthname::getIntVal(rowgroup::Row& row, FunctionParm& parm, bool& 
     case CalpontSystemCatalog::SMALLINT:
     case CalpontSystemCatalog::TINYINT:
     case CalpontSystemCatalog::INT:
+      idblog("monthname: *INT branch");
       val = dataconvert::DataConvert::intToDatetime(parm[0]->data()->getIntVal(row, isNull));
 
       if (val == -1)
@@ -165,10 +172,19 @@ int64_t Func_monthname::getIntVal(rowgroup::Row& row, FunctionParm& parm, bool& 
 
       break;
 
-    default: isNull = true; return -1;
+    default:
+      idblog("monthname: converting to NULL");
+      isNull = true;
+      return -1;
   }
 
   return -1;
+}
+
+int64_t Func_monthname::getIntVal(rowgroup::Row& row, FunctionParm& parm, bool& isNull,
+                                  execplan::CalpontSystemCatalog::ColType& op_ct)
+{
+  return 0;
 }
 
 double Func_monthname::getDoubleVal(rowgroup::Row& row, FunctionParm& parm, bool& isNull,
@@ -180,6 +196,10 @@ double Func_monthname::getDoubleVal(rowgroup::Row& row, FunctionParm& parm, bool
 execplan::IDB_Decimal Func_monthname::getDecimalVal(rowgroup::Row& row, FunctionParm& fp, bool& isNull,
                                                     execplan::CalpontSystemCatalog::ColType& op_ct)
 {
+#if 1
+  IDB_Decimal d;  // initialized to zero by default.
+  return d;
+#else
   IDB_Decimal d;
 
   if (fp[0]->data()->resultType().isWideDecimalType())
@@ -188,6 +208,7 @@ execplan::IDB_Decimal Func_monthname::getDecimalVal(rowgroup::Row& row, Function
     d.value = getIntVal(row, fp, isNull, op_ct);
   d.scale = 0;
   return d;
+#endif
 }
 
 }  // namespace funcexp

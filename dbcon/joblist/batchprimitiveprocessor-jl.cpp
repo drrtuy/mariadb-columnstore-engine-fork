@@ -152,6 +152,19 @@ void BatchPrimitiveProcessorJL::addFilterStep(const pDictionaryStep& step)
   cc->setBatchPrimitiveProcessor(this);
   cc->setQueryUuid(step.queryUuid());
   cc->setStepUuid(uuid);
+
+  if (filterSteps.size() > 0)
+  {
+    size_t stepsIndex = filterSteps.size() - 1;
+    SCommand prevCC = filterSteps[stepsIndex];
+    ColumnCommandJL* pcc = dynamic_cast<ColumnCommandJL*>(prevCC.get());
+    DictStepJL* ccc = dynamic_cast<DictStepJL*>(cc.get());
+    if (pcc && ccc)
+    {
+      filterSteps[stepsIndex].reset(
+          new ColumnCommandJL(*pcc, *ccc));  // column command will use same filters.
+    }
+  }
   filterSteps.push_back(cc);
   filterCount++;
   needStrValues = true;
@@ -439,14 +452,18 @@ void BatchPrimitiveProcessorJL::getElementTypes(ByteStream& in, vector<ElementTy
   {
     in >> tmp8;
     *validCPData = (tmp8 != 0);
+    idblog("deserializing at " << __LINE__);
 
     if (*validCPData)
     {
       in >> *lbid;
+
       in >> tmp64;
       *min = (int64_t)tmp64;
       in >> tmp64;
       *max = (int64_t)tmp64;
+      idblog("received range for LBID " << (*lbid) << ", min " << ((uint64_t)*min) << ", max "
+                                        << ((uint64_t)*max));
     }
     else
       in >> *lbid;
@@ -517,6 +534,7 @@ void BatchPrimitiveProcessorJL::getStringElementTypes(ByteStream& in, vector<Str
   {
     in >> tmp8;
     *validCPData = (tmp8 != 0);
+    idblog("deserializing at " << __LINE__);
 
     if (*validCPData)
     {
@@ -525,6 +543,8 @@ void BatchPrimitiveProcessorJL::getStringElementTypes(ByteStream& in, vector<Str
       *min = (int64_t)tmp64;
       in >> tmp64;
       *max = (int64_t)tmp64;
+      idblog("received range for LBID " << (*lbid) << ", min " << ((uint64_t)*min) << ", max "
+                                        << ((uint64_t)*max));
     }
     else
       in >> *lbid;
@@ -582,6 +602,7 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream& in, std::vect
   {
     in >> tmp8;
     *validCPData = (tmp8 != 0);
+    idblog("deserializing at " << __LINE__);
 
     if (*validCPData)
     {
@@ -590,6 +611,8 @@ void BatchPrimitiveProcessorJL::getTuples(messageqcpp::ByteStream& in, std::vect
       *min = (int64_t)tmp64;
       in >> tmp64;
       *max = (int64_t)tmp64;
+      idblog("received range for LBID " << (*lbid) << ", min " << ((uint64_t)*min) << ", max "
+                                        << ((uint64_t)*max));
     }
     else
       in >> *lbid;
@@ -712,8 +735,9 @@ bool BatchPrimitiveProcessorJL::countThisMsg(messageqcpp::ByteStream& in) const
     }
 
     if (data[offset] != 0)
-      offset += (data[offset + CP_FLAG_AND_LBID] * 2) + CP_FLAG_AND_LBID +
-                1;  // skip the CP data with wide min/max values (16/32 bytes each)
+      offset += (data[offset + CP_FLAG_AND_LBID + 1] * 2) + CP_FLAG_AND_LBID + 1 +
+                1;  // skip the CP data with wide min/max values (16/32 bytes each). we also skip
+                    // cpFromDictScan flag.
     else
       offset += CP_FLAG_AND_LBID;  // skip only the "valid CP data" & LBID bytes
   }
@@ -750,9 +774,10 @@ void BatchPrimitiveProcessorJL::deserializeAggregateResult(ByteStream* in, vecto
 }
 
 void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream& in, vector<RGData>* out, bool* validCPData,
-                                                uint64_t* lbid, int128_t* min, int128_t* max,
-                                                uint32_t* cachedIO, uint32_t* physIO, uint32_t* touchedBlocks,
-                                                bool* countThis, uint32_t threadID, bool* hasWideColumn,
+                                                uint64_t* lbid, bool* fromDictScan, int128_t* min,
+                                                int128_t* max, uint32_t* cachedIO, uint32_t* physIO,
+                                                uint32_t* touchedBlocks, bool* countThis, uint32_t threadID,
+                                                bool* hasWideColumn,
                                                 const execplan::CalpontSystemCatalog::ColType& colType) const
 {
   uint64_t tmp64;
@@ -784,10 +809,13 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream& in, vector<RGData>* 
   {
     in >> tmp8;
     *validCPData = (tmp8 != 0);
+    idblog("deserializing at " << __LINE__);
 
     if (*validCPData)
     {
       in >> *lbid;
+      in >> tmp8;
+      *fromDictScan = tmp8 != 0;
       in >> tmp8;
       *hasWideColumn = (tmp8 > utils::MAXLEGACYWIDTH);
       if (UNLIKELY(*hasWideColumn))
@@ -815,6 +843,8 @@ void BatchPrimitiveProcessorJL::getRowGroupData(ByteStream& in, vector<RGData>* 
         *min = static_cast<int128_t>(tmp64);
         in >> tmp64;
         *max = static_cast<int128_t>(tmp64);
+        idblog("received range for LBID " << (*lbid) << ", min " << ((uint64_t)*min) << ", max "
+                                          << ((uint64_t)*max));
       }
     }
     else

@@ -177,6 +177,29 @@ class Charset
     bool res = !mCharset->wildcmp(subject.str(), subject.end(), pattern.str(), pattern.end(), '\\', '_', '%');
     return neg ? !res : res;
   }
+  size_t strnxfrm(uchar* dst, size_t dstlen, uint nweights, const uchar* src, size_t srclen, uint flags)
+  {
+    if (mCharset->coll)
+    {
+      return mCharset->coll->strnxfrm(mCharset, dst, dstlen, nweights, src, srclen, flags);
+    }
+    else
+    {
+      // when collation is not specified, we use string as it is.
+      // this is more or less "safe" fallback, put here "just in case"
+      size_t i;
+      if (dstlen > nweights)
+      {
+        dstlen = nweights;
+      }
+      for (i = 0; i < dstlen; i++)
+      {
+        uint8_t ch = i < srclen ? src[i] : 0;
+        dst[i] = (char)ch;
+      }
+      return dstlen;
+    }
+  }
 };
 
 class CollationAwareHasher : public Charset

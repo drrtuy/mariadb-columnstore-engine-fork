@@ -46,6 +46,8 @@ extern uint32_t dictBufferSize;
 
 DictStep::DictStep() : Command(DICT_STEP), strValues(NULL), filterCount(0), bufferSize(0)
 {
+  fMinMax[0] = MAX_UBIGINT;
+  fMinMax[1] = MIN_UBIGINT;
 }
 
 DictStep::~DictStep()
@@ -65,6 +67,8 @@ DictStep& DictStep::operator=(const DictStep& d)
   eqOp = d.eqOp;
   filterCount = d.filterCount;
   charsetNumber = d.charsetNumber;
+  fMinMax[0] = d.fMinMax[0];
+  fMinMax[1] = d.fMinMax[1];
   return *this;
 }
 
@@ -147,8 +151,7 @@ void DictStep::issuePrimitive(bool isFilter)
     bpp->physIO += blocksRead;
     bpp->touchedBlocks++;
   }
-
-  bpp->pp.p_Dictionary(primMsg, &result, isFilter, charsetNumber, eqFilter, eqOp);
+  bpp->pp.p_Dictionary(primMsg, &result, isFilter, charsetNumber, eqFilter, eqOp, fMinMax);
 }
 
 void DictStep::copyResultToTmpSpace(OrderedToken* ot)
@@ -389,6 +392,14 @@ void DictStep::_execute()
     sort(&newRidList[0], &newRidList[inputRidCount], PosSorter());
     copyResultToFinalPosition(newRidList.get());
     copyRidsForFilterCmd();
+  }
+  if (fMinMax[0] <= fMinMax[1] && bpp->valuesLBID != 0)
+  {
+    bpp->validCPData = true;
+    bpp->cpDataFromDictScan = true;
+    bpp->lbidForCP = bpp->valuesLBID;
+    bpp->maxVal = fMinMax[1];
+    bpp->minVal = fMinMax[0];
   }
 
   // cout << "DS: /_execute()\n";

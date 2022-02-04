@@ -482,7 +482,11 @@ inline bool isUnsigned(const datatypes::SystemCatalog::ColDataType type)
     case datatypes::SystemCatalog::USMALLINT:
     case datatypes::SystemCatalog::UMEDINT:
     case datatypes::SystemCatalog::UINT:
-    case datatypes::SystemCatalog::UBIGINT: return true;
+    case datatypes::SystemCatalog::UBIGINT:
+    case datatypes::SystemCatalog::CHAR:
+    case datatypes::SystemCatalog::VARCHAR:
+    case datatypes::SystemCatalog::TEXT:
+    case datatypes::SystemCatalog::VARBINARY: return true;
 
     default: return false;
   }
@@ -2521,5 +2525,3 @@ class TypeHandlerTimestamp : public TypeHandlerTemporal
 };
 
 }  // end of namespace datatypes
-
-// vim:ts=2 sw=2:

@@ -48,14 +48,14 @@ ConstantColumn::ConstantColumn(const string& sql, TYPE type)
 {
   fResult.strVal = sql;
 
-  if (type == LITERAL && sql.length() < 9)
-  {
-    memcpy(tmp, sql.c_str(), sql.length());
-    memset(tmp + sql.length(), 0, 8);
-    fResult.uintVal = uint64ToStr(*((uint64_t*)tmp));
-    fResult.intVal = (int64_t)fResult.uintVal;
-  }
-  else
+  //    if (type == LITERAL && sql.length() < 9)
+  //    {
+  //        memcpy(tmp, sql.c_str(), sql.length());
+  //        memset(tmp + sql.length(), 0, 8);
+  //        fResult.uintVal = uint64ToStr(*((uint64_t*) tmp));
+  //        fResult.intVal = (int64_t)fResult.uintVal;
+  //    }
+  //    else
   {
     fResult.intVal = atoll(sql.c_str());
     fResult.uintVal = strtoull(sql.c_str(), NULL, 0);

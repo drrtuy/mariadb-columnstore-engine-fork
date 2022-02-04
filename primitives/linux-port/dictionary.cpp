@@ -31,6 +31,7 @@ using namespace std;
 #include "messageobj.h"
 #include "exceptclasses.h"
 #include "dataconvert.h"
+#include "string_prefixes.h"
 #include <sstream>
 
 using namespace logging;
@@ -392,7 +393,7 @@ void PrimitiveProcessor::nextSig(int NVALS, const PrimToken* tokens, p_DataValue
 
 void PrimitiveProcessor::p_Dictionary(const DictInput* in, vector<uint8_t>* out, bool skipNulls,
                                       uint32_t charsetNumber, boost::shared_ptr<DictEqualityFilter> eqFilter,
-                                      uint8_t eqOp)
+                                      uint8_t eqOp, uint64_t minMax[2])
 {
   PrimToken* outToken;
   const DictFilterElement* filter = 0;
@@ -437,6 +438,12 @@ void PrimitiveProcessor::p_Dictionary(const DictInput* in, vector<uint8_t>* out,
        sigptr.len != -1;
        nextSig(in->NVALS, in->tokens, &sigptr, in->OutputType, (in->InputFlags ? true : false), skipNulls))
   {
+    if (minMax)
+    {
+      uint64_t v = encodeStringPrefix_check_null(sigptr.data, sigptr.len, charsetNumber);
+      minMax[1] = minMax[1] < v ? v : minMax[1];
+      minMax[0] = minMax[0] > v ? v : minMax[0];
+    }
     // do aggregate processing
     if (in->OutputType & OT_AGGREGATE)
     {

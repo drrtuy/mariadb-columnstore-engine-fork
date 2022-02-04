@@ -184,6 +184,7 @@ uint8_t WE_DMLCommandProc::processSingleInsert(messageqcpp::ByteStream& bs, std:
         if (colStruct.tokenFlag)
         {
           dctnryStruct.dctnryOid = colType.ddn.dictOID;
+          dctnryStruct.fCharsetNumber = colType.charsetNumber;
           dctnryStruct.columnOid = colStruct.dataOid;
           dctnryStruct.fCompressionType = colType.compressionType;
           dctnryStruct.colWidth = colType.colWidth;
@@ -1040,6 +1041,7 @@ uint8_t WE_DMLCommandProc::processBatchInsert(messageqcpp::ByteStream& bs, std::
         if (colStruct.tokenFlag)
         {
           dctnryStruct.dctnryOid = colType.ddn.dictOID;
+          dctnryStruct.fCharsetNumber = colType.charsetNumber;
           dctnryStruct.columnOid = colStruct.dataOid;
           dctnryStruct.fCompressionType = colType.compressionType;
           dctnryStruct.colWidth = colType.colWidth;
@@ -1622,6 +1624,7 @@ uint8_t WE_DMLCommandProc::processBatchInsertBinary(messageqcpp::ByteStream& bs,
         if (colStruct.tokenFlag)
         {
           dctnryStruct.dctnryOid = colType.ddn.dictOID;
+          dctnryStruct.fCharsetNumber = colType.charsetNumber;
           dctnryStruct.columnOid = colStruct.dataOid;
           dctnryStruct.fCompressionType = colType.compressionType;
           dctnryStruct.colWidth = colType.colWidth;
@@ -2830,6 +2833,7 @@ uint8_t WE_DMLCommandProc::processUpdate(messageqcpp::ByteStream& bs, std::strin
       dctnryStruct.dctnryOid = colType.ddn.dictOID;
       dctnryStruct.columnOid = colStruct.dataOid;
       dctnryStruct.fCompressionType = colType.compressionType;
+      dctnryStruct.fCharsetNumber = colType.charsetNumber;
       dctnryStruct.colWidth = colType.colWidth;
 
       if (NO_ERROR != (error = fWEWrapper.openDctnry(txnId, dctnryStruct, false)))  // @bug 5572 HDFS tmp file
@@ -4450,6 +4454,7 @@ uint8_t WE_DMLCommandProc::processFixRows(messageqcpp::ByteStream& bs, std::stri
         colStruct.colWidth = 8;
         colStruct.tokenFlag = true;
         dctnryStruct.dctnryOid = colType.ddn.dictOID;
+        dctnryStruct.fCharsetNumber = colType.charsetNumber;
       }
       else
       {

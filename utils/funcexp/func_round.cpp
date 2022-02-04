@@ -41,6 +41,8 @@ using namespace logging;
 
 #include "funchelpers.h"
 
+#include "exceptclasses.h"
+
 namespace
 {
 using namespace funcexp;
@@ -112,6 +114,7 @@ int64_t Func_round::getIntVal(Row& row, FunctionParm& parm, bool& isNull,
 {
   IDB_Decimal x = getDecimalVal(row, parm, isNull, op_ct);
 
+  idblog("func_round: getIntVal");
   if (!op_ct.isWideDecimalType())
   {
     if (x.scale > 0)
@@ -136,7 +139,11 @@ int64_t Func_round::getIntVal(Row& row, FunctionParm& parm, bool& isNull,
 uint64_t Func_round::getUintVal(Row& row, FunctionParm& parm, bool& isNull,
                                 CalpontSystemCatalog::ColType& op_ct)
 {
+#if 1
+  return static_cast<uint64_t>(getIntVal(row, parm, isNull, op_ct));
+#else
   uint64_t x;
+  idblog("func_round: getUintVal");
   if (UNLIKELY(op_ct.colDataType == execplan::CalpontSystemCatalog::DATE))
   {
     IDB_Decimal d = getDecimalVal(row, parm, isNull, op_ct);
@@ -148,6 +155,7 @@ uint64_t Func_round::getUintVal(Row& row, FunctionParm& parm, bool& isNull,
   }
 
   return x;
+#endif
 }
 
 double Func_round::getDoubleVal(Row& row, FunctionParm& parm, bool& isNull,
@@ -219,9 +227,7 @@ double Func_round::getDoubleVal(Row& row, FunctionParm& parm, bool& isNull,
 long double Func_round::getLongDoubleVal(Row& row, FunctionParm& parm, bool& isNull,
                                          CalpontSystemCatalog::ColType& op_ct)
 {
-  if (execplan::CalpontSystemCatalog::LONGDOUBLE == op_ct.colDataType ||
-      execplan::CalpontSystemCatalog::DOUBLE == op_ct.colDataType ||
-      execplan::CalpontSystemCatalog::FLOAT == op_ct.colDataType)
+  if (execplan::CalpontSystemCatalog::LONGDOUBLE == op_ct.colDataType)
   {
     int64_t d = 0;
     long double p = 1;
@@ -434,10 +440,11 @@ IDB_Decimal Func_round::getDecimalVal(Row& row, FunctionParm& parm, bool& isNull
     {
       uint64_t x = parm[0]->data()->getUintVal(row, isNull);
 
-      if (x > (uint64_t)helpers::maxNumber_c[18])
-      {
-        x = helpers::maxNumber_c[18];
-      }
+      // why it is here at all???
+      // if (x > (uint64_t)helpers::maxNumber_c[18])
+      //{
+      //    x = helpers::maxNumber_c[18];
+      //}
 
       decimal.value = x;
       decimal.scale = 0;
