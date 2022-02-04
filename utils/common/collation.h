@@ -130,7 +130,7 @@ public:
     }
 };
 
-
+// using BufAndLength = std::pair<uchar, size_t>;
 // A reference to MariaDB CHARSET_INFO.
 
 class Charset
@@ -138,6 +138,7 @@ class Charset
 protected:
     const struct charset_info_st * mCharset;
 public:
+    static constexpr uint flags_ = MY_STRXFRM_PAD_WITH_SPACE | MY_STRXFRM_PAD_TO_MAXLEN;
     Charset(CHARSET_INFO & cs) :mCharset(&cs) { }
     Charset(CHARSET_INFO *cs)
        :mCharset(cs ? cs : &my_charset_bin)
@@ -185,6 +186,18 @@ public:
                                    pattern.str(), pattern.end(),
                                    '\\','_','%');
       return neg ? !res : res;
+    }
+
+    template<typename T>
+    T strnxfrm(const utils::ConstString &src) const
+      //uchar *dst, size_t dstlen, uint nweights,
+      //              const uchar *src, size_t srclen, uint flags) const
+    {
+      T ret = 0;
+      size_t len = mCharset->strnxfrm((char*)&ret, sizeof(T), sizeof(T),
+        (char*)src.str(), src.length(), flags_);
+      assert(len <= sizeof(T));
+      return ret;
     }
 };
 
