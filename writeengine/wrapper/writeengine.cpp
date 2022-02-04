@@ -6633,7 +6633,8 @@ int WriteEngineWrapper::markTxnExtentsAsInvalid(const TxnID txnid, bool erase)
       {
         for (auto lbid : spTxnLBIDRec->m_LBIDs)
         {
-          idblog("will mark LBID " << lbid << " as invalid");
+          std::string idblogArg = "will mark LBID " + std::to_string(lbid) + " as invalid";
+          idblog(idblogArg);
         }
       }
       rc = BRMWrapper::getInstance()->markExtentsInvalid(spTxnLBIDRec->m_LBIDs, spTxnLBIDRec->m_ColDataTypes);

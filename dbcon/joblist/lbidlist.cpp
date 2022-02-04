@@ -382,11 +382,13 @@ void LBIDList::UpdateMinMax(T min, T max, int64_t lbid, bool dictScan,
                          << ((int64_t)min) << ", new max " << ((int64_t)max));
           datatypes::Charset cs(const_cast<CalpontSystemCatalog::ColType&>(type).getCharset());
           if (datatypes::TCharShort::strnncollsp(cs, min, mmp->min, type.colWidth) < 0 ||
-              mmp->min == numeric_limits<uint64_t>::max())
+              // WIP
+              (uint64_t)mmp->min == numeric_limits<uint64_t>::max())
             mmp->min = min;
 
           if (datatypes::TCharShort::strnncollsp(cs, max, mmp->max, type.colWidth) > 0 ||
-              mmp->max == numeric_limits<uint64_t>::min())
+              // WIP
+              (uint64_t)mmp->max == numeric_limits<uint64_t>::min())
             mmp->max = max;
           idblog("LBID " << mmp->lbid << ": updated rrange for character values, min " << std::hex << mmp->min
                          << ", max " << mmp->max);

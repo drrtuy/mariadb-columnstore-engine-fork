@@ -1055,9 +1055,9 @@ class BatchPrimitive : public JobStep, public PrimitiveMsg, public DECEventListe
 struct _CPInfo
 {
   _CPInfo(int64_t MIN, int64_t MAX, uint64_t l, bool dictScan, bool val)
-   : min(MIN), max(MAX), LBID(l), dictScan(dictScan), valid(val){};
+   : min(MIN), max(MAX), LBID(l), valid(val), dictScan(dictScan) {};
   _CPInfo(int128_t BIGMIN, int128_t BIGMAX, uint64_t l, bool val)
-   : bigMin(BIGMIN), bigMax(BIGMAX), LBID(l), dictScan(false), valid(val){};
+   : bigMin(BIGMIN), bigMax(BIGMAX), LBID(l), valid(val), dictScan(false) {};
   union
   {
     int128_t bigMin;

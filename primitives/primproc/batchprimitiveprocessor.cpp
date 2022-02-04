@@ -115,9 +115,9 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor()
  , gotValues(false)
  , hasScan(false)
  , validCPData(false)
- , cpDataFromDictScan(false)
  , minVal(MAX64)
  , maxVal(MIN64)
+, cpDataFromDictScan(false)
  , lbidForCP(0)
  , hasWideColumnOut(false)
  , busyLoaderCount(0)
@@ -167,9 +167,9 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream& b, double prefetch,
  , gotValues(false)
  , hasScan(false)
  , validCPData(false)
- , cpDataFromDictScan(false)
  , minVal(MAX64)
  , maxVal(MIN64)
+ , cpDataFromDictScan(false)
  , lbidForCP(0)
  , hasWideColumnOut(false)
  , busyLoaderCount(0)
@@ -189,10 +189,9 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream& b, double prefetch,
  , sockIndex(0)
  , endOfJoinerRan(false)
  , processorThreads(_processorThreads)
- ,
  // processorThreads(32),
  // ptMask(processorThreads - 1),
- firstInstance(true)
+ , firstInstance(true)
  , valuesLBID(0)
 {
   // promote processorThreads to next power of 2.  also need to change the name to bucketCount or similar
