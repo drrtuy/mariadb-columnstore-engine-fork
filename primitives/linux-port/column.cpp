@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cmath>
 #include <functional>
+#include <type_traits>
 #ifndef _MSC_VER
 #include <pthread.h>
 #else
@@ -58,6 +59,55 @@ inline uint64_t order_swap(uint64_t x)
                  ((x << 8) & 0x000000FF00000000ULL) | ((x >> 8) & 0x00000000FF000000ULL) |
                  ((x >> 24) & 0x0000000000FF0000ULL) | ((x >> 40) & 0x000000000000FF00ULL) | (x << 56);
   return ret;
+}
+
+// Dummy template
+template<typename T,
+        typename std::enable_if<sizeof(T) >= sizeof(uint128_t), T>::type* = nullptr>
+inline T orderSwap(T x)
+{
+    return x;
+}
+
+template<typename T,
+        typename std::enable_if<sizeof(T) == sizeof(int64_t), T>::type* = nullptr>
+inline T orderSwap(T x)
+{
+    T ret = (x >> 56) |
+            ((x << 40) & 0x00FF000000000000ULL) |
+            ((x << 24) & 0x0000FF0000000000ULL) |
+            ((x << 8)  & 0x000000FF00000000ULL) |
+            ((x >> 8)  & 0x00000000FF000000ULL) |
+            ((x >> 24) & 0x0000000000FF0000ULL) |
+            ((x >> 40) & 0x000000000000FF00ULL) |
+            (x << 56);
+    return ret;
+}
+
+template<typename T,
+        typename std::enable_if<sizeof(T) == sizeof(int32_t), T>::type* = nullptr>
+inline T orderSwap(T x)
+{
+    T ret = (x >> 24) |
+            ((x << 8)  & 0x00FF0000U) |
+            ((x >> 8)  & 0x0000FF00U) |
+            (x << 24);
+    return ret;
+}
+
+template<typename T,
+        typename std::enable_if<sizeof(T) == sizeof(int16_t), T>::type* = nullptr>
+inline T orderSwap(T x)
+{
+    T ret = (x >> 8) | (x <<8);
+    return ret;
+}
+
+template<typename T,
+        typename std::enable_if<sizeof(T) == sizeof(uint8_t), T>::type* = nullptr>
+inline T orderSwap(T x)
+{
+    return x;
 }
 
 template <class T>
@@ -1187,7 +1237,7 @@ void scalarFiltering(
 #if defined(__x86_64__)
 template <typename VT, typename SIMD_WRAPPER_TYPE, bool HAS_INPUT_RIDS, typename T,
           typename std::enable_if<HAS_INPUT_RIDS == false, T>::type* = nullptr>
-inline SIMD_WRAPPER_TYPE simdDataLoadTemplate(VT& processor, const T* srcArray, const T* origSrcArray,
+inline SIMD_WRAPPER_TYPE simdDataLoad(VT& processor, const T* srcArray, const T* origSrcArray,
                                               const primitives::RIDType* ridArray, const uint16_t iter)
 {
   return {processor.loadFrom(reinterpret_cast<const char*>(srcArray))};
@@ -1197,7 +1247,7 @@ inline SIMD_WRAPPER_TYPE simdDataLoadTemplate(VT& processor, const T* srcArray, 
 // TODO Move the logic into simd namespace class methods and use intrinsics
 template <typename VT, typename SIMD_WRAPPER_TYPE, bool HAS_INPUT_RIDS, typename T,
           typename std::enable_if<HAS_INPUT_RIDS == true, T>::type* = nullptr>
-inline SIMD_WRAPPER_TYPE simdDataLoadTemplate(VT& processor, const T* srcArray, const T* origSrcArray,
+inline SIMD_WRAPPER_TYPE simdDataLoad(VT& processor, const T* srcArray, const T* origSrcArray,
                                               const primitives::RIDType* ridArray, const uint16_t iter)
 {
   constexpr const uint16_t WIDTH = sizeof(T);
@@ -1337,7 +1387,7 @@ void vectorizedFiltering(NewColRequestHeader* in, ColResultHeader* out, const T*
   {
     primitives::RIDType ridOffset = i * VECTOR_SIZE;
     assert(!HAS_INPUT_RIDS || (HAS_INPUT_RIDS && ridSize >= ridOffset));
-    dataVec = simdDataLoadTemplate<VT, SimdWrapperType, HAS_INPUT_RIDS, T>(simdProcessor, srcArray,
+    dataVec = simdDataLoad<VT, SimdWrapperType, HAS_INPUT_RIDS, T>(simdProcessor, srcArray,
                                                                            origSrcArray, ridArray, i)
                   .v;
     nonEmptyMask = simdProcessor.nullEmptyCmpNe(dataVec, emptyFilterArgVec);
