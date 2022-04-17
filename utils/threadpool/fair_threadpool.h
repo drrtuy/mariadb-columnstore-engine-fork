@@ -1,4 +1,4 @@
-/* Copyright (C) 2014 InfiniDB, Inc.
+/* Copyright (c) 2022 MariaDB Corporation
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -15,15 +15,7 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/***********************************************************************
- *   $Id: $
- *
- *
- ***********************************************************************/
-/** @file */
-
-#ifndef PRIORITYTHREADPOOL_H
-#define PRIORITYTHREADPOOL_H
+#pragma once
 
 #include <string>
 #include <iostream>
@@ -36,36 +28,48 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
 #include <atomic>
-#include "../winport/winport.h"
+#include <queue>
+#include <unordered_map>
+#include <list>
+#include <functional>
+
 #include "primitives/primproc/umsocketselector.h"
-#include "atomicops.h"
+#include "prioritythreadpool.h"
 
 namespace threadpool
 {
-class PriorityThreadPool
+class FairThreadPool
 {
  public:
-  class Functor
-  {
-   public:
-    virtual ~Functor(){};
-    // as of 12/3/13, all implementors return 0 and -1.  -1 will cause
-    // this thread pool to reschedule the job, 0 will throw it away on return.
-    virtual int operator()() = 0;
-  };
+  using Functor = PriorityThreadPool::Functor;
 
+  using TransactionIdxT = uint32_t;
   struct Job
   {
-    Job() : weight(1), priority(0), id(0)
+    Job() : weight_(1), priority_(0), id_(0)
     {
     }
-    boost::shared_ptr<Functor> functor;
-    uint32_t weight;
-    uint32_t priority;
-    uint32_t id;
-    uint32_t uniqueID;
-    uint32_t stepID;
-    primitiveprocessor::SP_UM_IOSOCK sock;
+    Job(const uint32_t uniqueID, const uint32_t stepID, const TransactionIdxT txnIdx,
+        const boost::shared_ptr<Functor>& functor, const primitiveprocessor::SP_UM_IOSOCK& sock,
+        const uint32_t weight = 0, const uint32_t priority = 0, const uint32_t id = 0)
+     : uniqueID_(uniqueID)
+     , stepID_(stepID)
+     , txnIdx_(txnIdx)
+     , functor_(functor)
+     , sock_(sock)
+     , weight_(weight)
+     , priority_(priority)
+     , id_(id)
+    {
+    }
+    uint32_t uniqueID_;
+    uint32_t stepID_;
+    TransactionIdxT txnIdx_;
+    boost::shared_ptr<Functor> functor_;
+    primitiveprocessor::SP_UM_IOSOCK sock_;
+    uint32_t weight_;
+    uint32_t priority_;
+    uint32_t id_;
   };
 
   enum Priority
@@ -86,9 +90,8 @@ class PriorityThreadPool
   /** @brief ctor
    */
 
-  PriorityThreadPool(uint targetWeightPerRun, uint highThreads, uint midThreads, uint lowThreads,
-                     uint id = 0);
-  virtual ~PriorityThreadPool();
+  FairThreadPool(uint targetWeightPerRun, uint highThreads, uint midThreads, uint lowThreads, uint id = 0);
+  virtual ~FairThreadPool();
 
   void removeJobs(uint32_t id);
   void addJob(const Job& job, bool useLock = true);
@@ -120,26 +123,26 @@ class PriorityThreadPool
  private:
   struct ThreadHelper
   {
-    ThreadHelper(PriorityThreadPool* impl, Priority queue) : ptp(impl), preferredQueue(queue)
+    ThreadHelper(FairThreadPool* impl, Priority queue) : ptp(impl), preferredQueue(queue)
     {
     }
     void operator()()
     {
       ptp->threadFcn(preferredQueue);
     }
-    PriorityThreadPool* ptp;
+    FairThreadPool* ptp;
     Priority preferredQueue;
   };
 
-  explicit PriorityThreadPool();
-  explicit PriorityThreadPool(const PriorityThreadPool&);
-  PriorityThreadPool& operator=(const PriorityThreadPool&);
+  explicit FairThreadPool();
+  explicit FairThreadPool(const FairThreadPool&);
+  FairThreadPool& operator=(const FairThreadPool&);
 
   Priority pickAQueue(Priority preference);
-  void threadFcn(const Priority preferredQueue) throw();
+  void threadFcn(const Priority preferredQueue);
   void sendErrorMsg(uint32_t id, uint32_t step, primitiveprocessor::SP_UM_IOSOCK sock);
 
-  std::list<Job> jobQueues[3];  // higher indexes = higher priority
+  std::list<Job> jobQueues[3];  // higher indexes = higher priority_
   uint32_t threadCounts[3];
   uint32_t defaultThreadCounts[3];
   boost::mutex mutex;
@@ -149,11 +152,27 @@ class PriorityThreadPool
   uint32_t weightPerRun;
   volatile uint id;  // prevent it from being optimized out
 
+  // WIP
+  using WeightT = uint32_t;
+  using WeightedTxnT = std::pair<WeightT, TransactionIdxT>;
+  using WeightedTxnVec = std::vector<WeightedTxnT>;
+  struct PrioQueueCmp
+  {
+    bool operator()(WeightedTxnT lhs, WeightedTxnT rhs)
+    {
+      return lhs.first < rhs.first;
+    }
+  };
+  using RunListT = std::vector<Job>;
+  using RescheduleVecType = std::vector<bool>;
+  using WeightedTxnPrioQueue = std::priority_queue<WeightedTxnT, WeightedTxnVec, PrioQueueCmp>;
+  using ThreadPoolJobsList = std::list<Job>;
+  using Txn2ThreadPoolJobsListMap = std::unordered_map<TransactionIdxT, ThreadPoolJobsList*>;
+  Txn2ThreadPoolJobsListMap txn2JobsListMap_;
+  WeightedTxnPrioQueue weightedTxnsQueue_;
   std::atomic<uint32_t> blockedThreads;
   std::atomic<uint32_t> extraThreads;
   bool stopExtra;
 };
 
 }  // namespace threadpool
-
-#endif  // PRIORITYTHREADPOOL_H
