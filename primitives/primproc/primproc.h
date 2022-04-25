@@ -35,6 +35,58 @@
 #include <map>
 
 #include "pp_logger.h"
+#include "service.h"
+
+class Opt
+{
+ public:
+  int m_debug;
+  bool m_fg;
+  Opt(int argc, char* argv[]) : m_debug(0), m_fg(false)
+  {
+    int c;
+
+    while ((c = getopt(argc, argv, "df")) != EOF)
+    {
+      switch (c)
+      {
+        case 'd': m_debug++; break;
+        case 'f': m_fg = true; break;
+        case '?':
+        default: break;
+      }
+    }
+  }
+};
+
+class ServicePrimProc : public Service, public Opt
+{
+ public:
+  ServicePrimProc(const Opt& opt) : Service("PrimProc"), Opt(opt)
+  {
+  }
+  void LogErrno() override
+  {
+    std::cerr << strerror(errno) << std::endl;
+  }
+  void ParentLogChildMessage(const std::string& str) override
+  {
+    std::cout << str << std::endl;
+  }
+  int Child() override;
+  int Run()
+  {
+    return m_fg ? Child() : RunForking();
+  }
+  std::atomic_flag& getStartupRaceFlag()
+  {
+    return startupRaceFlag_;
+  }
+
+ private:
+  // Since C++20 flag's init value is false.
+  std::atomic_flag startupRaceFlag_;
+};
 
 namespace primitiveprocessor
 {
@@ -111,4 +163,6 @@ const int MAX_BUFFER_SIZE = 32768 * 2;
 // extern logging::MessageLog ml1;
 // extern boost::mutex logLock;
 extern Logger* mlp;
+
+extern ServicePrimProc* globServicePrimProc;
 }  // namespace primitiveprocessor
