@@ -276,7 +276,7 @@ void ColumnCommand::_issuePrimitive()
   using IntegralType = typename datatypes::WidthToSIntegralType<W>::type;
   // Down the call stack the code presumes outMsg buffer has enough space to store
   // ColRequestHeader + uint16_t Rids[8192] + IntegralType[8192].
-  bpp->getPrimitiveProcessor().columnScanAndFilter<IntegralType>(primMsg, outMsg);
+  bpp->getPrimitiveProcessor().columnScanAndFilter<IntegralType>(primMsg, outMsg, tempBufPtr);
 }  // _issuePrimitive()
 
 void ColumnCommand::updateCPDataNarrow()
@@ -616,6 +616,7 @@ void ColumnCommand::fillInPrimitiveMessageHeader(const int8_t outputType, const 
 
   primMsg = (NewColRequestHeader*)inputMsg.get();
   outMsg = (ColResultHeader*)bpp->outputMsg.get();
+  tempBufPtr = bpp->tempBuf.get();
   makeAbsRids = absRids;
   primMsg->ism.Interleave = 0;
   primMsg->ism.Flags = 0;

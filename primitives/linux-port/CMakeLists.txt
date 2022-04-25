@@ -1,5 +1,5 @@
 
-include_directories( ${ENGINE_COMMON_INCLUDES} ../blockcache ../primproc)
+include_directories( ${ENGINE_COMMON_INCLUDES} ../blockcache ../primproc  /data/tvm/include /data/tvm/3rdparty/dlpack/include /data/tvm/3rdparty/dmlc-core/include)
 
 
 ########### next target ###############
@@ -10,6 +10,6 @@ add_library(processor STATIC ${processor_STAT_SRCS})
 
 add_dependencies(processor loggingcpp)
 
-target_link_libraries(processor ${NETSNMP_LIBRARIES})
+target_link_libraries(processor ${NETSNMP_LIBRARIES} tvm)
 
 INSTALL (TARGETS processor DESTINATION ${ENGINE_LIBDIR})

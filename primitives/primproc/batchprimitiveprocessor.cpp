@@ -918,7 +918,8 @@ void BatchPrimitiveProcessor::initProcessor()
     strValues.reset(new string[LOGICAL_BLOCK_RIDS]);
 
   outMsgSize = defaultBufferSize;
-  outputMsg.reset(reinterpret_cast<uint8_t*>(aligned_alloc(utils::MAXCOLUMNWIDTH, outMsgSize)));
+  outputMsg.reset(reinterpret_cast<uint8_t*>(aligned_alloc(64, outMsgSize)));
+  tempBuf.reset(reinterpret_cast<uint8_t*>(aligned_alloc(64, outMsgSize)));
 
   if (ot == ROW_GROUP)
   {

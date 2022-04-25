@@ -157,6 +157,7 @@ class ColumnCommand : public Command
   boost::scoped_array<uint8_t> inputMsg;
   NewColRequestHeader* primMsg;
   ColResultHeader* outMsg;
+  uint8_t* tempBufPtr;
 
   // the length of base prim msg, which is everything up to the
   // rid array for the pCol message

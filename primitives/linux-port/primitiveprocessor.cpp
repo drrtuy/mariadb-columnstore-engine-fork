@@ -29,6 +29,11 @@ using namespace std;
 
 #include "primitiveprocessor.h"
 
+namespace primitiveprocessor
+{
+  ServicePrimProc* globServicePrimProc = nullptr;
+}
+
 namespace primitives
 {
 PrimitiveProcessor::PrimitiveProcessor(int debugLevel)

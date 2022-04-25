@@ -229,8 +229,12 @@ class BatchPrimitiveProcessor
   uint16_t wideColumnsWidths;
 
   /* Common space for primitive data */
-  alignas(utils::MAXCOLUMNWIDTH) uint8_t blockData[BLOCK_SIZE * utils::MAXCOLUMNWIDTH];
+  alignas(64) uint8_t blockData[BLOCK_SIZE * utils::MAXCOLUMNWIDTH];
   boost::scoped_array<uint8_t> outputMsg;
+ public:
+  boost::scoped_array<uint8_t> tempBuf;
+ private:
+
   uint32_t outMsgSize;
 
   std::vector<SCommand> filterSteps;

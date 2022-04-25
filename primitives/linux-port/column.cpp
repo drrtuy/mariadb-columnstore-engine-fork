@@ -23,6 +23,8 @@
 #include <cmath>
 #include <functional>
 #include <type_traits>
+#include "blocksize.h"
+#include "joblisttypes.h"
 #ifndef _MSC_VER
 #include <pthread.h>
 #else
@@ -50,6 +52,11 @@ using namespace dbbc;
 using namespace primitives;
 using namespace primitiveprocessor;
 using namespace execplan;
+
+// WIP
+using namespace tvm;
+using namespace tvm::runtime;
+using namespace tvm::te;
 
 namespace
 {
@@ -1350,6 +1357,7 @@ void vectorizedFiltering(NewColRequestHeader* in, ColResultHeader* out, const T*
     filterSet = parsedColumnFilter->getFilterSet<ST>();
     filterRFs = parsedColumnFilter->prestored_rfs.get();
     filterCount = parsedColumnFilter->getFilterCount();
+
     if (iterNumber > 0)
     {
       copFunctorVec.reserve(filterCount);
@@ -1571,6 +1579,101 @@ void vectorizedFilteringDispatcher(NewColRequestHeader* in, ColResultHeader* out
     }
   }
 }
+
+// This routine dispatches template function calls to reduce branching.
+template <typename STORAGE_TYPE, ENUM_KIND KIND, typename FT, typename ST>
+void externalJITFrameworkFilter(NewColRequestHeader* in, ColResultHeader* out,
+  const STORAGE_TYPE* srcArray, const uint32_t srcSize, uint16_t* ridArray,
+  const uint16_t ridSize, ParsedColumnFilter* parsedColumnFilter,
+  const bool validMinMax, const STORAGE_TYPE emptyValue,
+  const STORAGE_TYPE nullValue, STORAGE_TYPE Min, STORAGE_TYPE Max,
+  const bool isNullValueMatches, uint8_t* tempBufPtr, PackedFunc* tvmFunc)
+{
+  size_t bitsUsed = 64;
+  // Lanes might affect SIMD used
+  int ndim = 1;
+  int dtype_code = kDLInt;
+  int dtype_bits = bitsUsed;
+  int dtype_lanes = 1;
+  int device_type = kDLCPU;
+  int device_id = 0;
+  int64_t shapeArr[1] = {BLOCK_SIZE/sizeof(STORAGE_TYPE)};
+
+  void* dstArray = reinterpret_cast<void*>(primitives::getFirstValueArrayPosition(out));
+  void* ridDstArray = reinterpret_cast<void*>(getFirstRIDArrayPosition(out));
+  void* absSrcArray = (void*)srcArray;
+
+  // Move this to filter?
+  DLDevice device {static_cast<DLDeviceType>(device_type), device_id};
+  DLDataType dtype {static_cast<uint8_t>(dtype_code), static_cast<uint8_t>(dtype_bits), static_cast<uint16_t>(dtype_lanes)};
+  DLTensor srcTensor;
+  srcTensor.device = device;
+  srcTensor.dtype = dtype;
+  srcTensor.byte_offset = 0;
+  srcTensor.ndim = ndim;
+  srcTensor.shape = shapeArr;
+  srcTensor.strides = nullptr;
+  srcTensor.data = absSrcArray;
+
+  DLTensor firstFilterOutTensor;
+  firstFilterOutTensor.device = device;
+  firstFilterOutTensor.dtype = dtype;
+  firstFilterOutTensor.byte_offset = 0;
+  firstFilterOutTensor.ndim = ndim;
+  firstFilterOutTensor.shape = shapeArr;
+  firstFilterOutTensor.strides = nullptr;
+  firstFilterOutTensor.data = tempBufPtr;
+
+  DLTensor secFilterOutTensor;
+  secFilterOutTensor.device = device;
+  secFilterOutTensor.dtype = dtype;
+  secFilterOutTensor.byte_offset = 0;
+  secFilterOutTensor.ndim = ndim;
+  secFilterOutTensor.shape = shapeArr;
+  secFilterOutTensor.strides = nullptr;
+  secFilterOutTensor.data = dstArray;
+
+  DLDataType dtype32 {static_cast<uint8_t>(dtype_code), static_cast<uint8_t>(32), static_cast<uint16_t>(dtype_lanes)};
+  DLTensor ridsOutTensor;
+  ridsOutTensor.device = device;
+  ridsOutTensor.dtype = dtype32;
+  ridsOutTensor.byte_offset = 0;
+  ridsOutTensor.ndim = ndim;
+  ridsOutTensor.shape = shapeArr;
+  ridsOutTensor.strides = nullptr;
+  ridsOutTensor.data = ridDstArray;
+
+  const FT* filterValues = nullptr;
+  if (parsedColumnFilter != nullptr)
+  {
+    filterValues = parsedColumnFilter->getFilterVals<FT>();
+    size_t filterCount = parsedColumnFilter->getFilterCount();
+    assert(filterCount == 2);
+  }
+
+  TVMValue emptyVar;
+  emptyVar.v_int64 = joblist::BIGINTEMPTYROW;
+  TVMValue firstFilterVar;
+  firstFilterVar.v_int64 = filterValues[0];
+  TVMValue secFilterVar;
+  secFilterVar.v_int64 = filterValues[1];
+  TVMArgValue emptyVarArg(emptyVar, kTVMArgInt);
+  TVMArgValue firstFilterVarArg{firstFilterVar, kTVMArgInt};
+  TVMArgValue secFilterVarArg{secFilterVar, kTVMArgInt};
+
+  bool hasPrimProc = (primitiveprocessor::globServicePrimProc);
+  tvm::runtime::PackedFunc vecFilterFunc = (tvmFunc) ? *tvmFunc : nullptr;
+  if (vecFilterFunc == nullptr && hasPrimProc)
+  {
+    Module& tvmModule = primitiveprocessor::globServicePrimProc->getFuncsCollection();
+    vecFilterFunc = tvmModule->GetFunction("int642filters", true);
+  }
+
+  if (vecFilterFunc == nullptr)
+    throw std::exception();
+  vecFilterFunc(&srcTensor, &firstFilterOutTensor, &secFilterOutTensor, &ridsOutTensor,
+    emptyVarArg, firstFilterVarArg, secFilterVarArg);
+}
 #endif
 
 // TBD Make changes in Command class ancestors to threat BPP::values as buffer.
@@ -1583,7 +1686,7 @@ template <typename T, ENUM_KIND KIND>
 void filterColumnData(NewColRequestHeader* in, ColResultHeader* out, uint16_t* ridArray,
                       const uint16_t ridSize,  // Number of values in ridArray
                       int* srcArray16, const uint32_t srcSize,
-                      boost::shared_ptr<ParsedColumnFilter> parsedColumnFilter)
+                      boost::shared_ptr<ParsedColumnFilter> parsedColumnFilter, uint8_t* tempBufPtr, PackedFunc* tvmFunc)
 {
   using FT = typename IntegralTypeToFilterType<T>::type;
   using ST = typename IntegralTypeToFilterSetType<T>::type;
@@ -1628,9 +1731,17 @@ void filterColumnData(NewColRequestHeader* in, ColResultHeader* out, uint16_t* r
   // all values w/o any filter(even empty values filter) applied.
 
 #if defined(__x86_64__)
+  if (WIDTH == 8 && KIND == KIND_DEFAULT && filterCount == 2 && in->BOP == BOP_OR)
+  {
+    externalJITFrameworkFilter<T, KIND, FT, ST>(in, out, srcArray, srcSize, ridArray, ridSize,
+      parsedColumnFilter.get(), validMinMax, emptyValue,
+      nullValue, Min, Max, isNullValueMatches, tempBufPtr, tvmFunc);
+    return;
+  }
+
   // Don't use vectorized filtering for text based data types.
   if (WIDTH < 16 &&
-    (KIND != KIND_TEXT || (KIND == KIND_TEXT && in->colType.strnxfrmIsValid()) ))
+    (KIND != KIND_TEXT || (KIND == KIND_TEXT && in->colType.strnxfrmIsValid())))
   {
     bool canUseFastFiltering = true;
     for (uint32_t i = 0; i < filterCount; ++i)
@@ -1685,7 +1796,7 @@ template <typename T,
 #else
           typename std::enable_if<sizeof(T) == sizeof(int32_t), T>::type* = nullptr>
 #endif
-void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out)
+void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc)
 {
   constexpr int W = sizeof(T);
   auto dataType = (execplan::CalpontSystemCatalog::ColDataType)in->colType.DataType;
@@ -1694,10 +1805,10 @@ void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, Co
     const uint16_t ridSize = in->NVALS;
     uint16_t* ridArray = in->getRIDArrayPtr(W);
     const uint32_t itemsPerBlock = logicalBlockMode ? BLOCK_SIZE : BLOCK_SIZE / W;
-    filterColumnData<T, KIND_FLOAT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
+    filterColumnData<T, KIND_FLOAT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter, tempBufPtr, tvmFunc);
     return;
   }
-  _scanAndFilterTypeDispatcher<T>(in, out);
+  _scanAndFilterTypeDispatcher<T>(in, out, tempBufPtr, tvmFunc);
 }
 
 template <typename T,
@@ -1710,7 +1821,7 @@ template <typename T,
 #else
           typename std::enable_if<sizeof(T) == sizeof(int64_t), T>::type* = nullptr>
 #endif
-void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out)
+void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc)
 {
   constexpr int W = sizeof(T);
   auto dataType = (execplan::CalpontSystemCatalog::ColDataType)in->colType.DataType;
@@ -1719,10 +1830,10 @@ void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, Co
     const uint16_t ridSize = in->NVALS;
     uint16_t* ridArray = in->getRIDArrayPtr(W);
     const uint32_t itemsPerBlock = logicalBlockMode ? BLOCK_SIZE : BLOCK_SIZE / W;
-    filterColumnData<T, KIND_FLOAT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
+    filterColumnData<T, KIND_FLOAT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter, tempBufPtr, tvmFunc);
     return;
   }
-  _scanAndFilterTypeDispatcher<T>(in, out);
+  _scanAndFilterTypeDispatcher<T>(in, out, tempBufPtr, tvmFunc);
 }
 
 template <typename T, typename std::enable_if<sizeof(T) == sizeof(int8_t) || sizeof(T) == sizeof(int16_t) ||
@@ -1738,9 +1849,9 @@ template <typename T, typename std::enable_if<sizeof(T) == sizeof(int8_t) || siz
                                                   sizeof(T) == sizeof(int128_t),
                                               T>::type* = nullptr>
 #endif
-void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out)
+void PrimitiveProcessor::scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc)
 {
-  _scanAndFilterTypeDispatcher<T>(in, out);
+  _scanAndFilterTypeDispatcher<T>(in, out, tempBufPtr, tvmFunc);
 }
 
 template <typename T,
@@ -1753,14 +1864,14 @@ template <typename T,
 #else
           typename std::enable_if<sizeof(T) == sizeof(int128_t), T>::type* = nullptr>
 #endif
-void PrimitiveProcessor::_scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out)
+void PrimitiveProcessor::_scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc)
 {
   constexpr int W = sizeof(T);
   const uint16_t ridSize = in->NVALS;
   uint16_t* ridArray = in->getRIDArrayPtr(W);
   const uint32_t itemsPerBlock = logicalBlockMode ? BLOCK_SIZE : BLOCK_SIZE / W;
 
-  filterColumnData<T, KIND_DEFAULT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
+  filterColumnData<T, KIND_DEFAULT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter, tempBufPtr, tvmFunc);
 }
 
 template <typename T,
@@ -1773,7 +1884,7 @@ template <typename T,
 #else
           typename std::enable_if<sizeof(T) <= sizeof(int64_t), T>::type* = nullptr>
 #endif
-void PrimitiveProcessor::_scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out)
+void PrimitiveProcessor::_scanAndFilterTypeDispatcher(NewColRequestHeader* in, ColResultHeader* out, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc)
 {
   constexpr int W = sizeof(T);
   using UT = typename std::conditional<std::is_unsigned<T>::value || datatypes::is_uint128_t<T>::value, T,
@@ -1788,22 +1899,22 @@ void PrimitiveProcessor::_scanAndFilterTypeDispatcher(NewColRequestHeader* in, C
        dataType == execplan::CalpontSystemCatalog::TEXT) &&
       !isDictTokenScan(in))
   {
-    filterColumnData<UT, KIND_TEXT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
+    filterColumnData<UT, KIND_TEXT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter, tempBufPtr, tvmFunc);
     return;
   }
 
   if (datatypes::isUnsigned(dataType))
   {
-    filterColumnData<UT, KIND_UNSIGNED>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
+    filterColumnData<UT, KIND_UNSIGNED>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter, tempBufPtr, tvmFunc);
     return;
   }
-  filterColumnData<T, KIND_DEFAULT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter);
+  filterColumnData<T, KIND_DEFAULT>(in, out, ridArray, ridSize, block, itemsPerBlock, parsedColumnFilter, tempBufPtr, tvmFunc);
 }
 
 // The entrypoint for block scanning and filtering.
 // The block is in in msg, out msg is used to store values|RIDs matched.
 template <typename T>
-void PrimitiveProcessor::columnScanAndFilter(NewColRequestHeader* in, ColResultHeader* out)
+void PrimitiveProcessor::columnScanAndFilter(NewColRequestHeader* in, ColResultHeader* out, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFuncArg)
 {
 #ifdef PRIM_DEBUG
   auto markEvent = [&](char eventChar)
@@ -1813,7 +1924,6 @@ void PrimitiveProcessor::columnScanAndFilter(NewColRequestHeader* in, ColResultH
   };
 #endif
   constexpr int W = sizeof(T);
-
   void* outp = static_cast<void*>(out);
   memcpy(outp, in, sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
   out->NVALS = 0;
@@ -1842,21 +1952,21 @@ void PrimitiveProcessor::columnScanAndFilter(NewColRequestHeader* in, ColResultH
 
   // Sort ridArray (the row index array) if there are RIDs with this in msg
   in->sortRIDArrayIfNeeded(W);
-  scanAndFilterTypeDispatcher<T>(in, out);
+  scanAndFilterTypeDispatcher<T>(in, out, tempBufPtr, tvmFuncArg);
 #ifdef PRIM_DEBUG
   markEvent('C');
 #endif
 }
 
 template void primitives::PrimitiveProcessor::columnScanAndFilter<int8_t>(NewColRequestHeader*,
-                                                                          ColResultHeader*);
+                                                                          ColResultHeader*, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc);
 template void primitives::PrimitiveProcessor::columnScanAndFilter<int16_t>(NewColRequestHeader*,
-                                                                           ColResultHeader*);
+                                                                           ColResultHeader*, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc);
 template void primitives::PrimitiveProcessor::columnScanAndFilter<int32_t>(NewColRequestHeader*,
-                                                                           ColResultHeader*);
+                                                                           ColResultHeader*, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc);
 template void primitives::PrimitiveProcessor::columnScanAndFilter<int64_t>(NewColRequestHeader*,
-                                                                           ColResultHeader*);
+                                                                           ColResultHeader*, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc);
 template void primitives::PrimitiveProcessor::columnScanAndFilter<int128_t>(NewColRequestHeader*,
-                                                                            ColResultHeader*);
+                                                                            ColResultHeader*, uint8_t* tempBufPtr, tvm::runtime::PackedFunc* tvmFunc);
 
 }  // namespace primitives
