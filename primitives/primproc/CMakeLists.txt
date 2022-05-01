@@ -29,7 +29,7 @@ set(PrimProc_SRCS
 add_executable(PrimProc ${PrimProc_SRCS})
 
 add_dependencies(PrimProc loggingcpp)
-target_include_directories(PrimProc PRIVATE ${Boost_INCLUDE_DIRS})
-target_link_libraries(PrimProc ${ENGINE_LDFLAGS} ${NETSNMP_LIBRARIES} ${MARIADB_CLIENT_LIBS} ${ENGINE_WRITE_LIBS} threadpool cacheutils dbbc processor)
+target_include_directories(PrimProc PRIVATE ${Boost_INCLUDE_DIRS} /data/tvm/include /data/tvm/3rdparty/dlpack/include /data/tvm/3rdparty/dmlc-core/include)
+target_link_libraries(PrimProc ${ENGINE_LDFLAGS} ${NETSNMP_LIBRARIES} ${MARIADB_CLIENT_LIBS} ${ENGINE_WRITE_LIBS} threadpool cacheutils dbbc processor tvm)
 
 install(TARGETS PrimProc DESTINATION ${ENGINE_BINDIR} COMPONENT columnstore-engine)

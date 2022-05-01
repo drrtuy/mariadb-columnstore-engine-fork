@@ -46,6 +46,24 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
 
+#include "dlpack/dlpack.h"
+#include "tvm/driver/driver_api.h"
+#include "tvm/ir/expr.h"
+#include "tvm/runtime/container/array.h"
+#include "tvm/runtime/container/shape_tuple.h"
+#include "tvm/runtime/data_type.h"
+#include "tvm/runtime/c_runtime_api.h"
+#include "tvm/runtime/logging.h"
+#include "tvm/target/target.h"
+#include <tvm/te/tensor.h>
+#include <tvm/te/schedule.h>
+#include <tvm/te/operation.h>
+
+// using namespace std;
+using namespace tvm;
+using namespace tvm::runtime;
+using namespace tvm::te;
+
 #include "primitivemsg.h"
 #include "calpontsystemcatalog.h"
 #include "stats.h"
@@ -467,6 +485,7 @@ class PrimitiveProcessor
   friend class ::PrimTest;
 };
 
+
 //
 // COMPILE A COLUMN FILTER
 //
@@ -479,6 +498,42 @@ boost::shared_ptr<ParsedColumnFilter> _parseColumnFilter(
     uint32_t filterCount,         // Number of filter elements contained in filterString
     uint32_t BOP)                 // Operation (and/or/xor/none) that combines all filter elements
 {
+  // [[maybe_unused]] auto& some = primitiveprocessor::globServicePrimProc->getStartupRaceFlag();
+  auto n = Var("n");
+  Array<PrimExpr> shape {n};
+  static const std::string targetStr{"llvm -mcpu=skylake-avx512"};
+  size_t bitsUsed = 64;
+
+  auto emptyVar = Var("emptyVar", DataType::Int(bitsUsed));
+  auto firstFilterVar = Var("firstFilterVar", DataType::Int(bitsUsed));
+  auto secFilterVar = Var("secFilterVar", DataType::Int(bitsUsed));
+  auto src = placeholder(shape, DataType::Int(bitsUsed), "src");
+  // IntImm(DataType::Int(bitsUsed) as an explicit type PrimExpr value
+  Tensor firstFilterOut = compute(src->shape, [&src, &firstFilterVar, &emptyVar](tvm::PrimExpr i) {
+    return if_then_else(src[i] == emptyVar, src[i], firstFilterVar);
+  });
+  Tensor secFilterOut = compute(src->shape, [&firstFilterOut, &secFilterVar, &emptyVar](tvm::PrimExpr i) {
+    return if_then_else(firstFilterOut[i] == secFilterVar, firstFilterOut[i], emptyVar);
+  });
+  Tensor ridsOut = compute(src->shape, [&secFilterOut, &emptyVar](tvm::PrimExpr i) {
+    return if_then_else(secFilterOut[i] == emptyVar, i, 8192);
+  });
+
+  // set schedule
+  Schedule s = create_schedule({firstFilterOut->op, secFilterOut->op, ridsOut->op});
+
+  // build a module
+  std::unordered_map<Tensor, Buffer> binds;
+  auto args = Array<ObjectRef>({src, firstFilterOut, secFilterOut, ridsOut, emptyVar,
+    firstFilterVar, secFilterVar});
+  auto lowered = LowerSchedule(s, args, "int642filters", binds);
+  // cerr << lowered << endl;
+
+  auto target = Target(targetStr);
+  auto targetHost = Target(targetStr);
+  [[maybe_unused]] auto vecFilterMod = build(lowered, target, targetHost);
+  [[maybe_unused]] auto vecFilterFunc = vecFilterMod->GetFunction("int642filters");
+
   using UT = typename std::conditional<std::is_unsigned<T>::value || datatypes::is_uint128_t<T>::value, T,
                                        typename datatypes::make_unsigned<T>::type>::type;
   const uint32_t WIDTH = sizeof(T);  // Sizeof of the column to be filtered

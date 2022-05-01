@@ -8,7 +8,7 @@ if (WITH_UNITTESTS)
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DBUILD_SHARED_LIBS=ON
     )
 
-    include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
+    include_directories(${EXTERNAL_INSTALL_LOCATION}/include /data/tvm/include /data/tvm/3rdparty/dlpack/include /data/tvm/3rdparty/dmlc-core/include)
     # lib64 for RPM-based distros
     link_directories(${EXTERNAL_INSTALL_LOCATION}/lib ${EXTERNAL_INSTALL_LOCATION}/lib64)
     set(GTEST_LIBRARIES gtest gtest_main pthread)
@@ -73,3 +73,10 @@ endif()
 #    install(TARGETS primitives_scan_bench DESTINATION ${ENGINE_BINDIR} COMPONENT columnstore-engine)
 #endif()
 
+# WIP
+find_package(benchmark REQUIRED)
+add_executable(tvm_fixed_params_scan tvm_fixed_params_scan.cpp)
+add_dependencies(tvm_fixed_params_scan googletest)
+target_link_libraries(tvm_fixed_params_scan ${ENGINE_LDFLAGS} ${MARIADB_CLIENT_LIBS}
+    ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc benchmark::benchmark tvm)
+install(TARGETS tvm_fixed_params_scan DESTINATION ${ENGINE_BINDIR} COMPONENT columnstore-engine)

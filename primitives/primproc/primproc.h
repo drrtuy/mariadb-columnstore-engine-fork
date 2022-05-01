@@ -37,6 +37,20 @@
 #include "pp_logger.h"
 #include "service.h"
 
+#include "dlpack/dlpack.h"
+#include "tvm/driver/driver_api.h"
+#include "tvm/ir/expr.h"
+#include "tvm/runtime/container/array.h"
+#include "tvm/runtime/container/shape_tuple.h"
+#include "tvm/runtime/data_type.h"
+#include "tvm/runtime/c_runtime_api.h"
+#include "tvm/runtime/logging.h"
+#include "tvm/runtime/module.h"
+#include "tvm/target/target.h"
+#include <tvm/te/tensor.h>
+#include <tvm/te/schedule.h>
+#include <tvm/te/operation.h>
+
 class Opt
 {
  public:
@@ -86,6 +100,7 @@ class ServicePrimProc : public Service, public Opt
  private:
   // Since C++20 flag's init value is false.
   std::atomic_flag startupRaceFlag_;
+  tvm::runtime::Module funcsCollection_;
 };
 
 namespace primitiveprocessor

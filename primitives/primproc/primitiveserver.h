@@ -38,8 +38,8 @@
 #include "threadpool.h"
 #include "../../utils/threadpool/prioritythreadpool.h"
 #include "messagequeue.h"
-#include "blockrequestprocessor.h"
 #include "batchprimitiveprocessor.h"
+#include "blockrequestprocessor.h"
 
 #include "service.h"
 
