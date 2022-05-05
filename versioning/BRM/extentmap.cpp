@@ -654,8 +654,6 @@ ExtentMapRBTree::iterator ExtentMap::findByLBID(const LBID_t lbid)
 
 int ExtentMap::_markInvalid(const LBID_t lbid, const execplan::CalpontSystemCatalog::ColDataType colDataType)
 {
-  LBID_t lastBlock;
-
   auto emIt = findByLBID(lbid);
   if (emIt == fExtentMapRBTree->end())
     throw logic_error("ExtentMap::markInvalid(): lbid isn't allocated");
@@ -792,7 +790,6 @@ int ExtentMap::setMaxMin(const LBID_t lbid, const int64_t max, const int64_t min
     }
 
 #endif
-    LBID_t lastBlock;
     int32_t curSequence;
 
 #ifdef BRM_DEBUG
@@ -1229,7 +1226,6 @@ int ExtentMap::getMaxMin(const LBID_t lbid, int64_t& max, int64_t& min, int32_t&
     max = numeric_limits<uint64_t>::max();
     min = 0;
     seqNum *= (-1);
-    LBID_t lastBlock;
     int isValid = CP_INVALID;
 
 #ifdef BRM_DEBUG
@@ -4241,6 +4237,22 @@ HWM_t ExtentMap::getLastHWM_DBroot(int OID, uint16_t dbRoot, uint32_t& partition
         throw invalid_argument(oss.str());
     }
 
+    // const auto lbids = fPExtMapIndexImpl_->find(dbRoot, OID);
+    // const auto emIdents = getEmIdentsByLbids(lbids);
+    // for (auto& emEntry : emIdents)
+    // {
+    //     if (((emEntry.status == EXTENTAVAILABLE) || (emEntry.status == EXTENTOUTOFSERVICE)) &&
+    //         ((emEntry.partitionNum > partitionNum) ||
+    //         ((emEntry.partitionNum == partitionNum) && (emEntry.blockOffset > lastExtent)) ||
+    //         ((emEntry.partitionNum == partitionNum) && (emEntry.blockOffset == lastExtent) && (emEntry.segmentNum >= segmentNum)))
+    //     {
+    //             lastExtent = emEntry.blockOffset;
+    //             partitionNum = emEntry.partitionNum;
+    //             segmentNum = emEntry.segmentNum;
+    //             lastIt = emIt;
+    //     }
+    // }
+
     for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
     {
         const auto& emEntry = emIt->second;
@@ -4772,28 +4784,48 @@ void ExtentMap::getExtents(int OID, vector<struct EMEntry>& entries,
 
     grabEMEntryTable(READ);
     grabEMIndex(READ);
-    entries.reserve(fExtentMapRBTree->size());
+    entries.reserve(1000);
 
-    if (incOutOfService)
+    DBRootVec dbRootVec(getAllDbRoots());
+
+    for (auto dbRoot: dbRootVec)
     {
-        for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
-             ++emIt)
+        const auto lbids = fPExtMapIndexImpl_->find(dbRoot, OID);
+        const auto emIdents = getEmIdentsByLbids(lbids);
+        for (auto& emEntry : emIdents)
         {
-            auto& emEntry = emIt->second;
-            if ((emEntry.fileID == OID))
+            if (incOutOfService)
+            {
                 entries.push_back(emEntry);
+            }
+            else
+            {
+                if (emEntry.status != EXTENTOUTOFSERVICE)
+                    entries.push_back(emEntry);
+            }
         }
     }
-    else
-    {
-        for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
-             ++emIt)
-        {
-            auto& emEntry = emIt->second;
-            if ((emEntry.fileID == OID) && (emEntry.status != EXTENTOUTOFSERVICE))
-                entries.push_back(emEntry);
-        }
-    }
+
+    // if (incOutOfService)
+    // {
+    //     for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
+    //          ++emIt)
+    //     {
+    //         auto& emEntry = emIt->second;
+    //         if (emEntry.fileID == OID)
+    //             entries.push_back(emEntry);
+    //     }
+    // }
+    // else
+    // {
+    //     for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
+    //          ++emIt)
+    //     {
+    //         auto& emEntry = emIt->second;
+    //         if ((emEntry.fileID == OID) && (emEntry.status != EXTENTOUTOFSERVICE))
+    //             entries.push_back(emEntry);
+    //     }
+    // }
 
     releaseEMIndex(READ);
     releaseEMEntryTable(READ);
@@ -5479,7 +5511,7 @@ void ExtentMap::lookup(OID_t OID, LBIDRange_v& ranges)
 
 #endif
 
-    LBIDRange tmp;
+    // LBIDRange tmp;
     ranges.clear();
 
     if (OID < 0)
@@ -5493,16 +5525,29 @@ void ExtentMap::lookup(OID_t OID, LBIDRange_v& ranges)
     grabEMEntryTable(READ);
     grabEMIndex(READ);
 
-    for (auto it = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); it != end; ++it)
+    DBRootVec dbRootVec(getAllDbRoots());
+
+    for (auto dbRoot: dbRootVec)
     {
-        const auto& emEntry = it->second;
-        if ((emEntry.fileID == OID) && (emEntry.status != EXTENTOUTOFSERVICE))
+        const auto lbids = fPExtMapIndexImpl_->find(dbRoot, OID);
+        const auto emIdents = getEmIdentsByLbids(lbids);
+        for (auto& emEntry : emIdents)
         {
-            tmp.start = emEntry.range.start;
-            tmp.size = emEntry.range.size * 1024;
-            ranges.push_back(tmp);
+            if (emEntry.status != EXTENTOUTOFSERVICE)
+                ranges.emplace_back(emEntry.range.start, emEntry.range.size * 1024);
         }
     }
+
+    // for (auto it = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); it != end; ++it)
+    // {
+    //     const auto& emEntry = it->second;
+    //     if ((emEntry.fileID == OID) && (emEntry.status != EXTENTOUTOFSERVICE))
+    //     {
+    //         tmp.start = emEntry.range.start;
+    //         tmp.size = emEntry.range.size * 1024;
+    //         ranges.push_back(tmp);
+    //     }
+    // }
 
     releaseEMIndex(READ);
     releaseEMEntryTable(READ);
