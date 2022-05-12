@@ -410,6 +410,7 @@ public:
     LBID_tFindResult search2ndLayer(OIDIndexContainerT& oids, const OID_t oid);
     LBID_tFindResult search3dLayer(PartitionIndexContainerT& partitions,
         const PartitionNumberT partitionNumber);
+    bool isDBRootEmpty(const DBRootT dbroot);
     // Delete functions.
     void deleteDbRoot(const DBRootT dbroot);
     void deleteOID(const DBRootT dbroot, const OID_t oid);

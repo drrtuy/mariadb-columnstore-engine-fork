@@ -512,6 +512,14 @@ LBID_tFindResult ExtentMapIndexImpl::search3dLayer(PartitionIndexContainerT& par
     return result;
 }
 
+bool ExtentMapIndexImpl::isDBRootEmpty(const DBRootT dbroot)
+{
+    ExtentMapIndex& extMapIndex = *get();
+    if (dbroot >= extMapIndex.size())
+        return true;
+    return extMapIndex[dbroot].empty();
+}
+
 void ExtentMapIndexImpl::deleteDbRoot(const DBRootT dbroot)
 {
     auto& extMapIndex = *get();
@@ -5178,27 +5186,27 @@ void ExtentMap::getExtentCount_dbroot(int OID, uint16_t dbroot, bool incOutOfSer
     grabEMEntryTable(READ);
     grabEMIndex(READ);
 
-    if (incOutOfService)
-    {
-        for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
-             ++emIt)
-        {
-            const auto& emEntry = emIt->second;
-            if ((emEntry.fileID == OID) && (emEntry.dbRoot == dbroot))
-                numExtents++;
-        }
-    }
-    else
-    {
-        for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
-             ++emIt)
-        {
-            const auto& emEntry = emIt->second;
-            if ((emEntry.fileID == OID) && (emEntry.dbRoot == dbroot) &&
-                (emEntry.status != EXTENTOUTOFSERVICE))
-                numExtents++;
-        }
-    }
+    // if (incOutOfService)
+    // {
+    //     for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
+    //          ++emIt)
+    //     {
+    //         const auto& emEntry = emIt->second;
+    //         if ((emEntry.fileID == OID) && (emEntry.dbRoot == dbroot))
+    //             numExtents++;
+    //     }
+    // }
+    // else
+    // {
+    //     for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end;
+    //          ++emIt)
+    //     {
+    //         const auto& emEntry = emIt->second;
+    //         if ((emEntry.fileID == OID) && (emEntry.dbRoot == dbroot) &&
+    //             (emEntry.status != EXTENTOUTOFSERVICE))
+    //             numExtents++;
+    //     }
+    // }
 
     const auto lbids = fPExtMapIndexImpl_->find(dbroot, OID);
     if (!incOutOfService)
@@ -5314,32 +5322,52 @@ void ExtentMap::deletePartition(const set<OID_t>& oids,
     std::set<LogicalPartition> foundPartitions;
     std::vector<ExtentMapRBTree::iterator> extents;
 
-    auto it = fExtentMapRBTree->begin();
-    auto end = fExtentMapRBTree->end();
-
-    while (it != end)
+    DBRootVec dbRootVec(getAllDbRoots());
+    // Not sure if we can trust partitionNum.dbroot or not
+    for (auto dbRoot: dbRootVec)
     {
-        const auto& emEntry = it->second;
-        LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
-
-        if ((partitionNums.find(lp) != partitionNums.end()))
+        for (auto oid: oids)
         {
-            auto id = oids.find(emEntry.fileID);
-            if (id != oids.end())
+            for (auto& partitionNum: partitionNums)
             {
-                foundPartitions.insert(lp);
-                it = deleteExtent(it);
+                const auto lbids = fPExtMapIndexImpl_->find(dbRoot, oid, partitionNum.pp);
+                auto emIdents = getEmIteratorsByLbids(lbids);
+                for (auto& emEntry : emIdents)
+                {
+                    LogicalPartition lp(emEntry->second.dbRoot, emEntry->second.partitionNum, emEntry->second.segmentNum);
+                    foundPartitions.insert(lp);
+                    emEntry = deleteExtent(emEntry);
+                }
             }
-            else
-            {
-                ++it;
-            }
-        }
-        else
-        {
-            ++it;
         }
     }
+
+    // auto it = fExtentMapRBTree->begin();
+    // auto end = fExtentMapRBTree->end();
+
+    // while (it != end)
+    // {
+    //     const auto& emEntry = it->second;
+    //     LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
+
+    //     if ((partitionNums.find(lp) != partitionNums.end()))
+    //     {
+    //         auto id = oids.find(emEntry.fileID);
+    //         if (id != oids.end())
+    //         {
+    //             foundPartitions.insert(lp);
+    //             it = deleteExtent(it);
+    //         }
+    //         else
+    //         {
+    //             ++it;
+    //         }
+    //     }
+    //     else
+    //     {
+    //         ++it;
+    //     }
+    // }
 
     if (foundPartitions.size() != partitionNums.size())
     {
@@ -5416,27 +5444,56 @@ void ExtentMap::markPartitionForDeletion(const set<OID_t>& oids, const set<Logic
     vector<ExtentMapRBTree::iterator> extents;
     bool partitionAlreadyDisabled = false;
 
-    // Identify not exists partition first. Then mark disable.
-    std::set<OID_t>::const_iterator it;
-    for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    DBRootVec dbRootVec(getAllDbRoots());
+    // It would be interesting to pick the smallest set(either oids or partitions) for the second loop.
+    for (auto dbRoot: dbRootVec)
     {
-        const auto& emEntry = emIt->second;
-        LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
-
-        if ((emEntry.range.size != 0) && (partitionNums.find(lp) != partitionNums.end()))
+        for (auto oid: oids)
         {
-            auto it = oids.find(emEntry.fileID);
-
-            if (it != oids.end())
+            for (auto& partitionNum: partitionNums)
             {
-                if (emEntry.status == EXTENTOUTOFSERVICE)
-                    partitionAlreadyDisabled = true;
-
-                foundPartitions.insert(lp);
-                extents.push_back(emIt);
+                const auto lbids = fPExtMapIndexImpl_->find(dbRoot, oid, partitionNum.pp);
+                auto emIters = getEmIteratorsByLbids(lbids);
+                for (auto& emIter : emIters)
+                {
+                    const auto& emEntry = emIter->second;
+                    if (emEntry.range.size == 0)
+                    {
+                        continue;
+                    }
+                    if (emEntry.status == EXTENTOUTOFSERVICE)
+                    {
+                        partitionAlreadyDisabled = true;
+                    }
+                    LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
+                    foundPartitions.insert(lp);
+                    extents.push_back(emIter);
+                }
             }
         }
     }
+
+    // // Identify not exists partition first. Then mark disable.
+    // std::set<OID_t>::const_iterator it;
+    // for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    // {
+    //     const auto& emEntry = emIt->second;
+    //     LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
+
+    //     if ((emEntry.range.size != 0) && (partitionNums.find(lp) != partitionNums.end()))
+    //     {
+    //         auto it = oids.find(emEntry.fileID);
+
+    //         if (it != oids.end())
+    //         {
+    //             if (emEntry.status == EXTENTOUTOFSERVICE)
+    //                 partitionAlreadyDisabled = true;
+
+    //             foundPartitions.insert(lp);
+    //             extents.push_back(emIt);
+    //         }
+    //     }
+    // }
 
     // really disable partitions
     for (uint32_t i = 0; i < extents.size(); i++)
@@ -5519,17 +5576,34 @@ void ExtentMap::markAllPartitionForDeletion(const set<OID_t>& oids)
     grabEMEntryTable(WRITE);
     grabEMIndex(WRITE);
 
-    for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    DBRootVec dbRootVec(getAllDbRoots());
+    // It would be interesting to pick the smallest set(either oids or partitions) for the second loop.
+    for (auto dbRoot: dbRootVec)
     {
-        auto& emEntry = emIt->second;
-        it = oids.find(emEntry.fileID);
-
-        if (it != oids.end())
+        for (auto oid: oids)
         {
-            makeUndoRecordRBTree(UndoRecordType::DEFAULT, emEntry);
-            emEntry.status = EXTENTOUTOFSERVICE;
+            const auto lbids = fPExtMapIndexImpl_->find(dbRoot, oid);
+            auto emIters = getEmIteratorsByLbids(lbids);
+            for (auto& emIter : emIters)
+            {
+                auto& emEntry = emIter->second;
+                makeUndoRecordRBTree(UndoRecordType::DEFAULT, emEntry);
+                emEntry.status = EXTENTOUTOFSERVICE;
+            }
         }
     }
+
+    // for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    // {
+    //     auto& emEntry = emIt->second;
+    //     it = oids.find(emEntry.fileID);
+
+    //     if (it != oids.end())
+    //     {
+    //         makeUndoRecordRBTree(UndoRecordType::DEFAULT, emEntry);
+    //         emEntry.status = EXTENTOUTOFSERVICE;
+    //     }
+    // }
 }
 
 //------------------------------------------------------------------------------
@@ -5566,7 +5640,7 @@ void ExtentMap::restorePartition(const set<OID_t>& oids,
     if (oids.size() == 0)
         return;
 
-    set<OID_t>::const_iterator it;
+    // set<OID_t>::const_iterator it;
     grabEMEntryTable(WRITE);
     grabEMIndex(WRITE);
 
@@ -5574,27 +5648,52 @@ void ExtentMap::restorePartition(const set<OID_t>& oids,
     set<LogicalPartition> foundPartitions;
     bool partitionAlreadyEnabled = false;
 
-    for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    DBRootVec dbRootVec(getAllDbRoots());
+    // It would be interesting to pick the smallest set(either oids or partitions) for the second loop.
+    for (auto dbRoot: dbRootVec)
     {
-        auto& emEntry = emIt->second;
-        LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
-
-        if (partitionNums.find(lp) != partitionNums.end())
+        for (auto oid: oids)
         {
-            it = oids.find(emEntry.fileID);
-
-            if (it != oids.end())
+            for (auto& partitionNum: partitionNums)
             {
-                if (emEntry.status == EXTENTAVAILABLE)
+                const auto lbids = fPExtMapIndexImpl_->find(dbRoot, oid, partitionNum.pp);
+                auto emIters = getEmIteratorsByLbids(lbids);
+                for (auto& emIter : emIters)
                 {
-                    partitionAlreadyEnabled = true;
+                    const auto& emEntry = emIter->second;
+                    if (emEntry.status == EXTENTAVAILABLE)
+                    {
+                        partitionAlreadyEnabled = true;
+                    }
+                    LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
+                    extents.push_back(emIter);
+                    foundPartitions.insert(lp);
                 }
-
-                extents.push_back(emIt);
-                foundPartitions.insert(lp);
             }
         }
     }
+
+    // for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    // {
+    //     auto& emEntry = emIt->second;
+    //     LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
+
+    //     if (partitionNums.find(lp) != partitionNums.end())
+    //     {
+    //         it = oids.find(emEntry.fileID);
+
+    //         if (it != oids.end())
+    //         {
+    //             if (emEntry.status == EXTENTAVAILABLE)
+    //             {
+    //                 partitionAlreadyEnabled = true;
+    //             }
+
+    //             extents.push_back(emIt);
+    //             foundPartitions.insert(lp);
+    //         }
+    //     }
+    // }
 
     if (foundPartitions.size() != partitionNums.size())
     {
@@ -5661,16 +5760,32 @@ void ExtentMap::getOutOfServicePartitions(OID_t oid, set<LogicalPartition>& part
     grabEMEntryTable(READ);
     grabEMIndex(READ);
 
-    for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    DBRootVec dbRootVec(getAllDbRoots());
+    // It would be interesting to pick the smallest set(either oids or partitions) for the second loop.
+    for (auto dbRoot: dbRootVec)
     {
-        const auto& emEntry = emIt->second;
-        if ((emEntry.fileID == oid) && (emEntry.status == EXTENTOUTOFSERVICE))
+        const auto lbids = fPExtMapIndexImpl_->find(dbRoot, oid);
+        const auto emEntries = getEmIdentsByLbids(lbids);
+        for (const auto& emEntry : emEntries)
         {
-            // need to be logical partition number
-            LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
-            partitionNums.insert(lp);
+            if (emEntry.status == EXTENTOUTOFSERVICE)
+            {
+                LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
+                partitionNums.insert(lp);
+            }
         }
     }
+
+    // for (auto emIt = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); emIt != end; ++emIt)
+    // {
+    //     const auto& emEntry = emIt->second;
+    //     if ((emEntry.fileID == oid) && (emEntry.status == EXTENTOUTOFSERVICE))
+    //     {
+    //         // need to be logical partition number
+    //         LogicalPartition lp(emEntry.dbRoot, emEntry.partitionNum, emEntry.segmentNum);
+    //         partitionNums.insert(lp);
+    //     }
+    // }
 
     releaseEMIndex(READ);
     releaseEMEntryTable(READ);
@@ -5728,7 +5843,6 @@ bool ExtentMap::isDBRootEmpty(uint16_t dbroot)
 
 #endif
 
-    bool bEmpty = true;
     grabEMEntryTable(READ);
     grabEMIndex(READ);
 
@@ -5738,14 +5852,16 @@ bool ExtentMap::isDBRootEmpty(uint16_t dbroot)
             "ExtentMap::isDBRootEmpty() shared memory not loaded");
     }
 
-    for (auto it = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); it != end; ++it)
-    {
-        if (it->second.dbRoot == dbroot)
-        {
-            bEmpty = false;
-            break;
-        }
-    }
+    bool bEmpty = fPExtMapIndexImpl_->isDBRootEmpty(dbroot);
+
+    // for (auto it = fExtentMapRBTree->begin(), end = fExtentMapRBTree->end(); it != end; ++it)
+    // {
+    //     if (it->second.dbRoot == dbroot)
+    //     {
+    //         bEmpty = false;
+    //         break;
+    //     }
+    // }
 
     releaseEMIndex(READ);
     releaseEMEntryTable(READ);
