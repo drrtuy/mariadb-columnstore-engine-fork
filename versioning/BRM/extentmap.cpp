@@ -5440,7 +5440,7 @@ void ExtentMap::getSysCatDBRoot(OID_t oid, uint16_t& dbRoot)
 
 #endif
 
-    // bool bFound = false;
+    bool bFound = false;
     grabEMEntryTable(READ);
     grabEMIndex(READ);
 
@@ -5455,17 +5455,23 @@ void ExtentMap::getSysCatDBRoot(OID_t oid, uint16_t& dbRoot)
     //     }
     // }
 
-    const auto lbids = fPExtMapIndexImpl_->find(dbRoot, oid);
-    if (!lbids.empty())
+    DBRootVec dbRootVec(getAllDbRoots());
+    for (auto localDbRoot: dbRootVec)
     {
-        auto emIt = findByLBID(lbids[0]);
-        dbRoot = emIt->second.dbRoot;
+        const auto lbids = fPExtMapIndexImpl_->find(localDbRoot, oid);
+        if (!lbids.empty())
+        {
+            auto emIt = findByLBID(lbids[0]);
+            dbRoot = emIt->second.dbRoot;
+            bFound = true;
+            break;
+        }
     }
 
     releaseEMIndex(READ);
     releaseEMEntryTable(READ);
 
-    if (lbids.empty())
+    if (!bFound)
     {
         ostringstream oss;
         oss << "ExtentMap::getSysCatDBRoot(): OID not found: " << oid;
