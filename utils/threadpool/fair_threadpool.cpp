@@ -15,12 +15,6 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
-/***********************************************************************
- *   $Id: threadpool.cpp 553 2008-02-27 17:51:16Z rdempsey $
- *
- *
- ***********************************************************************/
-
 #include <stdexcept>
 #include <unistd.h>
 #include <exception>
@@ -230,20 +224,25 @@ void FairThreadPool::threadFcn(const Priority preferredQueue)
       if (weightedTxnsQueue_.empty())
       {
         newJob.wait(lk);
-        continue;
+        continue; // just go on w/o re-taking the lock
       }
 
       WeightedTxnT weightedTxn = weightedTxnsQueue_.top();
       auto txnAndJobListPair = txn2JobsListMap_.find(weightedTxn.second);
-      // The second is impossible condition IMHO
       // Looking for non-empty jobsList in a loop
       // Waiting on cond_var if PQ is empty(no jobs in this thread pool)
       while (txnAndJobListPair == txn2JobsListMap_.end() || txnAndJobListPair->second->empty())
       {
+        if (txnAndJobListPair != txn2JobsListMap_.end()) // JobList is empty
+        {
+          ThreadPoolJobsList* txnJobsList = txnAndJobListPair->second;
+          delete txnJobsList;
+          txn2JobsListMap_.erase(txnAndJobListPair->first);
+        }
         weightedTxnsQueue_.pop();
         if (weightedTxnsQueue_.empty())
         {
-          newJob.wait(lk);
+          newJob.wait(lk); // might need a lock here
         }
         weightedTxn = weightedTxnsQueue_.top();
         txnAndJobListPair = txn2JobsListMap_.find(weightedTxn.second);
@@ -268,7 +267,7 @@ void FairThreadPool::threadFcn(const Priority preferredQueue)
         // WIP
         // What to do when the Job has been rescheduled. Clean it up or save and remove if it had been
         // finished
-        cleanUpTxnId = true;
+        cleanUpTxnId = true; // might be useless. Remove empty JobList on the next loop iteration
         // delete jobsList;
       }
       // jobQueues[queue].pop_front();
@@ -304,6 +303,7 @@ void FairThreadPool::threadFcn(const Priority preferredQueue)
       // if (rescheduleCount > 0)
       if (rescheduleJob)
       {
+        cleanUpTxnId = false; // we re-add the job back into the processing
         lk.lock();
 
         // for (i = 0; i < runList.size(); i++)
@@ -317,7 +317,6 @@ void FairThreadPool::threadFcn(const Priority preferredQueue)
 
         lk.unlock();
       }
-
       // runList.clear();
     }
   }
