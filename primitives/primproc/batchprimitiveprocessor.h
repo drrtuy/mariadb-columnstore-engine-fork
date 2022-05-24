@@ -138,6 +138,11 @@ class BatchPrimitiveProcessor
     fBusy = b;
   }
 
+  size_t getWeight() const
+  {
+    return weight_;
+  }
+
   uint16_t FilterCount() const
   {
     return filterCount;
@@ -433,6 +438,7 @@ class BatchPrimitiveProcessor
   uint processorThreads;
   uint ptMask;
   bool firstInstance;
+  uint32_t weight_;
 
   static const uint64_t maxResultCount = 1048576;  // 2^20
 

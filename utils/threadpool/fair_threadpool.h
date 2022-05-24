@@ -39,6 +39,12 @@
 
 namespace threadpool
 {
+// The idea of this thread pool is to run morsel jobs(primitive job) is to equaly distribute CPU time
+// b/w multiple parallel queries(thread maps morsel to query using txnId). Query(txnId) has its weight
+// stored in PriorityQueue that thread increases before run another morsel for the query. When query is
+// done(ThreadPoolJobsList is empty) it is removed from PQ and the Map(txn to ThreadPoolJobsList).
+// I tested multiple morsels per one loop iteration in ::threadFcn. This approach reduces CPU consumption
+// and increases query timings.
 class FairThreadPool
 {
  public:

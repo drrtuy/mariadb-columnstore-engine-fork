@@ -48,7 +48,7 @@
 
 namespace primitiveprocessor
 {
-class BPPSeeder : public threadpool::PriorityThreadPool::Functor
+class BPPSeeder : public threadpool::FairThreadPool::Functor
 {
  public:
   BPPSeeder(const messageqcpp::SBS&, const SP_UM_MUTEX& wLock, const SP_UM_IOSOCK& ios, const int pmThreads,
@@ -71,6 +71,11 @@ class BPPSeeder : public threadpool::PriorityThreadPool::Functor
   uint32_t priority()
   {
     return _priority;
+  }
+  size_t getWeight() const
+  {
+    assert(bpp);
+    return bpp->getWeight();
   }
 
  private:

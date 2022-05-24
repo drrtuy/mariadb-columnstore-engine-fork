@@ -138,6 +138,7 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor()
  , processorThreads(0)
  , ptMask(0)
  , firstInstance(false)
+ , weight_(0)
 {
   pp.setLogicalBlockMode(true);
   pp.setBlockPtr((int*)blockData);
@@ -189,7 +190,8 @@ BatchPrimitiveProcessor::BatchPrimitiveProcessor(ByteStream& b, double prefetch,
  ,
  // processorThreads(32),
  // ptMask(processorThreads - 1),
- firstInstance(true)
+ firstInstance(true),
+ weight_(0)
 {
   // promote processorThreads to next power of 2.  also need to change the name to bucketCount or similar
   processorThreads = nextPowOf2(processorThreads);
@@ -539,6 +541,7 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream& bs, const SP_UM_MUTEX& w, con
 
   // skip the header, sessionID, stepID, uniqueID, and priority
   bs.advance(sizeof(ISMPacketHeader) + 16);
+  bs >> weight_;
   bs >> dbRoot;
   bs >> count;
   bs >> ridCount;
