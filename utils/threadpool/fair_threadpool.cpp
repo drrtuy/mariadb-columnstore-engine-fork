@@ -55,7 +55,7 @@ FairThreadPool::~FairThreadPool()
 void FairThreadPool::addJob(const Job& job, bool useLock)
 {
   boost::thread* newThread;
-  std::unique_lock<std::mutex> lk(mutex, std::defer_lock_t());
+  boost::mutex::scoped_lock lk(mutex, boost::defer_lock_t());
 
   if (useLock)
     lk.lock();
@@ -83,27 +83,39 @@ void FairThreadPool::addJob(const Job& job, bool useLock)
     stopExtra = true;
   }
 
+  WeightT currentTopWeight = 0;
+  if (!weightedTxnsQueue_.empty())
+  {
+    currentTopWeight = weightedTxnsQueue_.top().first;
+  }
   auto jobsListMapIter = txn2JobsListMap_.find(job.txnIdx_);
   if (jobsListMapIter == txn2JobsListMap_.end())
   {
     ThreadPoolJobsList* jobsList = new ThreadPoolJobsList;
     jobsList->push_back(job);
     txn2JobsListMap_[job.txnIdx_] = jobsList;
-    WeightT currentTopWeight = weightedTxnsQueue_.empty() ? 0 : weightedTxnsQueue_.top().first;
     weightedTxnsQueue_.push({currentTopWeight, job.txnIdx_});
   }
   else
   {
+    if (jobsListMapIter->second->empty())
+    {
+      weightedTxnsQueue_.push({currentTopWeight, job.txnIdx_});
+    }
     jobsListMapIter->second->push_back(job);
   }
 
   if (useLock)
+  {
+    // std::cout << "FairThreadPool::addJob queue size " << weightedTxnsQueue_.size() << std::endl;
     newJob.notify_one();
+    // std::cout << "FairThreadPool::addJob notified all " << std::endl;
+  }
 }
 
 void FairThreadPool::removeJobs(uint32_t id)
 {
-  std::unique_lock<std::mutex> lk(mutex);
+  boost::mutex::scoped_lock lk(mutex);
 
   for (auto& txnJobsMapPair : txn2JobsListMap_)
   {
@@ -144,19 +156,25 @@ void FairThreadPool::threadFcn(const PriorityThreadPool::Priority preferredQueue
     while (!_stop)
     {
       runList.clear(); // remove the job
-      std::unique_lock<std::mutex> lk(mutex);
+      boost::mutex::scoped_lock lk(mutex);
+
+      // std::cout << "threadFcn after the lock " << std::endl;
 
       if (preferredQueue == PriorityThreadPool::Priority::EXTRA && stopExtra)
       {
+        // std::cout << "threadFcn existing the threadFcn b/c it is extra " << std::endl;
         --extraThreads;
         return;
       }
+      // std::cout << " before the empty queue check queue size " << weightedTxnsQueue_.size() << std::endl;
 
       if (weightedTxnsQueue_.empty())
       {
         newJob.wait(lk);
+        // std::cout << "threadFcn woke up on CV call " << std::endl;
         continue; // just go on w/o re-taking the lock
       }
+      // std::cout << "threadFcn running " << std::endl;
 
       WeightedTxnT weightedTxn = weightedTxnsQueue_.top();
       auto txnAndJobListPair = txn2JobsListMap_.find(weightedTxn.second);
@@ -205,6 +223,7 @@ void FairThreadPool::threadFcn(const PriorityThreadPool::Priority preferredQueue
       lk.unlock();
 
       running = true;
+      // std::cout << "threadFcn running " << runList[0].txnIdx_ << std::endl;
       rescheduleJob = (*(runList[0].functor_))();
       running = false;
 

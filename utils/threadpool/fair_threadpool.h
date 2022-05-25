@@ -139,8 +139,8 @@ class FairThreadPool
 
   uint32_t threadCounts;
   uint32_t defaultThreadCounts;
-  std::mutex mutex;
-  std::condition_variable newJob;
+  boost::mutex mutex;
+  boost::condition_variable newJob;
   boost::thread_group threads;
   bool _stop;
   uint32_t weightPerRun;
