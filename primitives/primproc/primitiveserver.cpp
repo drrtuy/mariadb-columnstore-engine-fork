@@ -2146,7 +2146,7 @@ struct ReadThread
                   fPrimitiveServerPtr->PTTrace()));
                 BPPSeeder* bpps = dynamic_cast<BPPSeeder*>(functor.get());
                 id = bpps->getID();
-                weight = ismHdr->Size + bpps->getWeight();
+                weight = ismHdr->Size;
                 priority = bpps->priority();
                 const uint8_t* buf = bs->buf();
                 const uint32_t pos = sizeof(ISMPacketHeader) - 2;
@@ -2155,18 +2155,7 @@ struct ReadThread
                 uniqueID = *((uint32_t*)&buf[pos + 10]);
                 isSyscat = bpps->isSysCat();
               }
-
-              // auto functor = boost::shared_ptr<DictScanJob>(new DictScanJob(outIos, bs, writeLock));
-              // const uint32_t id = hdr->Hdr.UniqueID;
-              // const uint32_t weight = LOGICAL_BLOCK_RIDS;
-              // const uint32_t priority = hdr->Hdr.Priority;
-              // const uint8_t* buf = bs->buf();
-              // const uint32_t pos = sizeof(ISMPacketHeader) - 2;
-              // const uint32_t txnId = *((uint32_t*)&buf[pos + 2]);
-              // const uint32_t stepID = *((uint32_t*)&buf[pos + 6]);
-              // const uint32_t uniqueID = *((uint32_t*)&buf[pos + 10]);
               FairThreadPool::Job job(uniqueID, stepID, txnId, functor, outIos, weight, priority, id);
-
 
               if (isSyscat)
               {
@@ -2180,54 +2169,6 @@ struct ReadThread
               break;
             }
 
-            // case BATCH_PRIMITIVE_RUN:
-            // {
-            //   if (bRotateDest)
-            //   {
-            //     if (!pUmSocketSelector->nextIOSocket(fIos, outIos, writeLock))
-            //     {
-            //       // If we ever fall into this part of the
-            //       // code we have a "bug" of some sort.
-            //       // See handleUmSockSelErr() for more info.
-            //       // We reset ios and mutex to defaults.
-            //       handleUmSockSelErr(string("BPR cmd"));
-            //       outIos = outIosDefault;
-            //       writeLock = writeLockDefault;
-            //       pUmSocketSelector->delConnection(fIos);
-            //       bRotateDest = false;
-            //     }
-            //   }
-
-            //   /* Decide whether this is a syscat call and run
-            //   right away instead of queueing */
-            //   boost::shared_ptr<BPPSeeder> bpps(new BPPSeeder(bs, writeLock, outIos,
-            //                                                   fPrimitiveServerPtr->ProcessorThreads(),
-            //                                                   fPrimitiveServerPtr->PTTrace()));
-            //   const uint32_t id = bpps->getID();
-            //   const uint32_t weight = ismHdr->Size;
-            //   const uint32_t priority = bpps->priority();
-            //   const uint8_t* buf = bs->buf();
-            //   uint32_t pos = sizeof(ISMPacketHeader) - 2;
-            //   const uint32_t txnId = *((uint32_t*)&buf[pos + 2]);
-            //   const uint32_t stepID = *((uint32_t*)&buf[pos + 6]);
-            //   const uint32_t  uniqueID = *((uint32_t*)&buf[pos + 10]);
-            //   FairThreadPool::Job job(uniqueID, stepID, txnId, bpps, outIos, weight, priority, id);
-
-            //   if (bpps->isSysCat())
-            //   {
-            //     // boost::thread t(*bpps);
-            //     // using already-existing threads may cut latency
-            //     // if it's changed back to running in an independent thread
-            //     // change the issyscat() checks in BPPSeeder as well
-            //     OOBPool->addJob(job);
-            //   }
-            //   else
-            //   {
-            //     procPoolPtr->addJob(job);
-            //   }
-
-            //   break;
-            // }
 
             case BATCH_PRIMITIVE_ACK:
             {

@@ -521,8 +521,6 @@ void BatchPrimitiveProcessor::initBPP(ByteStream& bs)
     }
   }
 
-  // The weight is used by a thread pool algo
-  recalculateBPPWeight();
   initProcessor();
 }
 
@@ -543,6 +541,7 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream& bs, const SP_UM_MUTEX& w, con
 
   // skip the header, sessionID, stepID, uniqueID, and priority
   bs.advance(sizeof(ISMPacketHeader) + 16);
+  bs >> weight_;
   bs >> dbRoot;
   bs >> count;
   bs >> ridCount;
@@ -593,8 +592,6 @@ void BatchPrimitiveProcessor::resetBPP(ByteStream& bs, const SP_UM_MUTEX& w, con
   memset(relLBID.get(), 0, sizeof(uint64_t) * (projectCount + 1));
   memset(asyncLoaded.get(), 0, sizeof(bool) * (projectCount + 1));
 
-  // The weight is used by a thread pool algo
-  recalculateBPPWeight();
   buildVSSCache(count);
 #ifdef __FreeBSD__
   pthread_mutex_unlock(&objLock);
