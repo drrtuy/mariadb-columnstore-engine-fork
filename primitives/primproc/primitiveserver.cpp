@@ -2146,7 +2146,7 @@ struct ReadThread
                   fPrimitiveServerPtr->PTTrace()));
                 BPPSeeder* bpps = dynamic_cast<BPPSeeder*>(functor.get());
                 id = bpps->getID();
-                weight = ismHdr->Size;
+                weight = ismHdr->Size + bpps->getWeight();
                 priority = bpps->priority();
                 const uint8_t* buf = bs->buf();
                 const uint32_t pos = sizeof(ISMPacketHeader) - 2;

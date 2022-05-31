@@ -72,6 +72,11 @@ class BPPSeeder : public threadpool::FairThreadPool::Functor
   {
     return _priority;
   }
+  size_t getWeight() const
+  {
+    assert(bpp);
+    return bpp->getWeight();
+  }
 
  private:
   BPPSeeder();

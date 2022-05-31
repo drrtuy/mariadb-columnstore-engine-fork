@@ -138,6 +138,11 @@ class BatchPrimitiveProcessor
     fBusy = b;
   }
 
+  size_t getWeight() const
+  {
+    return weight_;
+  }
+
   uint16_t FilterCount() const
   {
     return filterCount;
@@ -205,6 +210,27 @@ class BatchPrimitiveProcessor
 
   void asyncLoadProjectColumns();
   void writeErrorMsg(const std::string& error, uint16_t errCode, bool logIt = true, bool critical = true);
+  void recalculateBPPWeight()
+  {
+    weight_ = 0;
+    if (fe1)
+      weight_ += perColumnFE1Weight_;
+
+    if (fe2)
+      weight_ += perColumnFE2Weight_;
+
+    if (doJoin)
+      weight_ += joinWeight_;
+
+    if (filterCount)
+      weight_ += perColumnFilteringWeight_ * filterCount;
+
+    if (projectCount)
+      weight_ += perColumnProjectWeight_ * projectCount;
+
+    if (fAggregator)
+      weight_ += aggregationWeight_;
+  }
 
   BPSOutputType ot;
 
@@ -433,6 +459,13 @@ class BatchPrimitiveProcessor
   uint processorThreads;
   uint ptMask;
   bool firstInstance;
+  const size_t perColumnProjectWeight_ = 10;
+  const size_t perColumnFilteringWeight_ = 10;
+  const size_t perColumnFE1Weight_ = 10;
+  const size_t perColumnFE2Weight_ = 10;
+  const size_t joinWeight_ = 500;
+  const size_t aggregationWeight_ = 500;
+  size_t weight_;
 
   static const uint64_t maxResultCount = 1048576;  // 2^20
 
