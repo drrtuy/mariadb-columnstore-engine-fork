@@ -88,24 +88,24 @@ void FairThreadPool::addJob_(const Job& job, bool useLock)
     stopExtra = true;
   }
 
-  WeightT currentTopWeight = 0;
-  if (!weightedTxnsQueue_.empty())
-  {
-    currentTopWeight = weightedTxnsQueue_.top().first;
-  }
+  // WeightT currentTopWeight = 0;
+  // if (!weightedTxnsQueue_.empty())
+  // {
+  //   currentTopWeight = weightedTxnsQueue_.top().first;
+  // }
   auto jobsListMapIter = txn2JobsListMap_.find(job.txnIdx_);
   if (jobsListMapIter == txn2JobsListMap_.end())
   {
     ThreadPoolJobsList* jobsList = new ThreadPoolJobsList;
     jobsList->push_back(job);
     txn2JobsListMap_[job.txnIdx_] = jobsList;
-    weightedTxnsQueue_.push({currentTopWeight, job.txnIdx_});
+    weightedTxnsQueue_.push({job.weight_, job.txnIdx_});
   }
   else
   {
     if (jobsListMapIter->second->empty())
     {
-      weightedTxnsQueue_.push({currentTopWeight, job.txnIdx_});
+      weightedTxnsQueue_.push({job.weight_, job.txnIdx_});
     }
     jobsListMapIter->second->push_back(job);
   }
@@ -150,7 +150,8 @@ void FairThreadPool::threadFcn(const PriorityThreadPool::Priority preferredQueue
   RunListT runList; // This is a vector to allow to grab multiple jobs
   RescheduleVecType reschedule;
   bool running = false;
-  bool rescheduleJob = false;
+  size_t rescheduleCount = 0;
+  std::vector<bool> rescheduleJobs;
 
   try
   {
@@ -165,13 +166,18 @@ void FairThreadPool::threadFcn(const PriorityThreadPool::Priority preferredQueue
         return;
       }
 
+      // std::cout << "threadFcn before empty check" << std::endl;
       if (weightedTxnsQueue_.empty())
       {
+        // std::cout << "threadFcn before empty check waiting now" << std::endl;
         newJob.wait(lk);
         continue; // just go on w/o re-taking the lock
       }
+      // std::cout << "threadFcn before after empty check" << std::endl;
 
       WeightedTxnT weightedTxn = weightedTxnsQueue_.top();
+      // std::cout << "threadFcn pick txn " << weightedTxn.second << " with prio " << weightedTxn.first << std::endl;
+
       auto txnAndJobListPair = txn2JobsListMap_.find(weightedTxn.second);
       // Looking for non-empty jobsList in a loop
       // Waiting on cond_var if PQ is empty(no jobs in this thread pool)
@@ -185,16 +191,18 @@ void FairThreadPool::threadFcn(const PriorityThreadPool::Priority preferredQueue
           txn2JobsListMap_.erase(txnAndJobListPair->first);
         }
         weightedTxnsQueue_.pop();
-        if (weightedTxnsQueue_.empty()) // remove the empty
+        if (weightedTxnsQueue_.empty())
         {
           break;
         }
         weightedTxn = weightedTxnsQueue_.top();
         txnAndJobListPair = txn2JobsListMap_.find(weightedTxn.second);
       }
+      // std::cout << "threadFcn after empty loop " << std::endl;
 
       if (weightedTxnsQueue_.empty())
       {
+        // std::cout << "threadFcn after empty loop waiting now" << std::endl;
         newJob.wait(lk); // might need a lock here
         continue;
       }
@@ -204,30 +212,62 @@ void FairThreadPool::threadFcn(const PriorityThreadPool::Priority preferredQueue
       weightedTxnsQueue_.pop();
       TransactionIdxT txnIdx = txnAndJobListPair->first;
       ThreadPoolJobsList* jobsList = txnAndJobListPair->second;
-      // Job& job = jobsList->front();
-      runList.push_back(jobsList->front());
-
-      jobsList->pop_front();
+      uint32_t jobsCounter = 0;
+      size_t totalWeight = 0;
+      while (!jobsList->empty() && jobsCounter < 3)
+      {
+        totalWeight += jobsList->front().weight_;
+        runList.push_back(jobsList->front());
+        jobsList->pop_front();
+        ++jobsCounter;
+      }
+      // WIP
+      //jobsList->pop_front();
+      // std::cout << "threadFcn runList size " << runList.size() << std::endl;
       // Add the jobList back into the PQ adding some weight to it
       // Current algo doesn't reduce total txn weight if the job is rescheduled.
       if (!jobsList->empty())
       {
-        weightedTxnsQueue_.push({weightedTxn.first + runList[0].weight_, txnIdx});
+        weightedTxnsQueue_.push({weightedTxn.first + totalWeight, txnIdx});
       }
 
       lk.unlock();
 
-      running = true;
-      rescheduleJob = (*(runList[0].functor_))();
-      running = false;
+      rescheduleJobs.resize(runList.size(), false);
+      rescheduleCount = 0;
+      for (size_t i = 0; !_stop && i < runList.size(); ++i)
+      {
+        running = true;
+        // std::cout << "threadFcn running txn " << runList[i].txnIdx_ << std::endl;
+        rescheduleJobs[i] = (*(runList[i].functor_))();
+        if (rescheduleJobs[i])
+          ++rescheduleCount;
+        running = false;
+      }
 
       utils::setThreadName("Idle");
+      // if (rescheduleCount == runList.size())
+      //   usleep(1000);
 
-      if (rescheduleJob)
+      if (rescheduleCount)
       {
+        // std::cout << "threadFcn reschedule count " << rescheduleCount << std::endl;
         lk.lock();
-        addJob_(runList[0], false);
-        newJob.notify_one();
+        size_t rescheduleId = 0;
+        for (auto& jobToReschedule: runList)
+        {
+          if (rescheduleJobs[rescheduleId])
+            addJob_(jobToReschedule, false);
+          ++rescheduleId;
+        }
+        if (rescheduleCount > 1)
+        {
+          newJob.notify_all();
+        }
+        else
+        {
+          newJob.notify_one();
+        }
         lk.unlock();
       }
     }

@@ -2058,10 +2058,12 @@ struct ReadThread
               const uint32_t uniqueID = *((uint32_t*)&buf[pos + 10]);
               const uint32_t weight = 1;
               const uint32_t priority = 0;
+
               uint32_t id = 0;
               boost::shared_ptr<FairThreadPool::Functor> functor;
               if (ismHdr->Command == DICT_CREATE_EQUALITY_FILTER)
               {
+                // std::cout << "ReadThread::operator DICT_CREATE_EQUALITY_FILTER txnId " << txnId << " weight " << weight << std::endl;
                 functor.reset(new CreateEqualityFilter(bs));
               }
               else if (ismHdr->Command == DICT_DESTROY_EQUALITY_FILTER)
@@ -2070,19 +2072,23 @@ struct ReadThread
               }
               else if (ismHdr->Command == BATCH_PRIMITIVE_CREATE)
               {
+                // std::cout << "ReadThread::operator BATCH_PRIMITIVE_CREATE txnId " << txnId << " weight " << weight << std::endl;
                 functor.reset(new BPPHandler::Create(fBPPHandler, bs));
               }
               else if (ismHdr->Command == BATCH_PRIMITIVE_ADD_JOINER)
               {
+                // std::cout << "ReadThread::operator BATCH_PRIMITIVE_ADD_JOINER txnId " << txnId << " weight " << weight << std::endl;
                 functor.reset(new BPPHandler::AddJoiner(fBPPHandler, bs));
               }
               else if (ismHdr->Command == BATCH_PRIMITIVE_END_JOINER)
               {
+                // std::cout << "ReadThread::operator BATCH_PRIMITIVE_END_JOINER txnId " << txnId << " weight " << weight << std::endl;
                 id = fBPPHandler->getUniqueID(bs, ismHdr->Command);
                 functor.reset(new BPPHandler::LastJoiner(fBPPHandler, bs));
               }
               else if (ismHdr->Command == BATCH_PRIMITIVE_DESTROY)
               {
+                // std::cout << "ReadThread::operator BATCH_PRIMITIVE_DESTROY txnId " << txnId << " weight " << weight << std::endl;
                 functor.reset(new BPPHandler::Destroy(fBPPHandler, bs));
               }
               else if (ismHdr->Command == BATCH_PRIMITIVE_ABORT)
@@ -2138,6 +2144,7 @@ struct ReadThread
                 stepID = *((uint32_t*)&buf[pos + 6]);
                 uniqueID = *((uint32_t*)&buf[pos + 10]);
                 isSyscat = hdr->flags & IS_SYSCAT;
+                // std::cout << "ReadThread::operator DICT_TOKEN_BY_SCAN_COMPARE txnId " << txnId << " weight " << weight << std::endl;
               }
               else if (ismHdr->Command == BATCH_PRIMITIVE_RUN)
               {
@@ -2146,14 +2153,15 @@ struct ReadThread
                   fPrimitiveServerPtr->PTTrace()));
                 BPPSeeder* bpps = dynamic_cast<BPPSeeder*>(functor.get());
                 id = bpps->getID();
-                weight = ismHdr->Size;
                 priority = bpps->priority();
                 const uint8_t* buf = bs->buf();
                 const uint32_t pos = sizeof(ISMPacketHeader) - 2;
                 txnId = *((uint32_t*)&buf[pos + 2]);
                 stepID = *((uint32_t*)&buf[pos + 6]);
                 uniqueID = *((uint32_t*)&buf[pos + 10]);
+                weight = ismHdr->Size + *((uint32_t*)&buf[pos + 18]);
                 isSyscat = bpps->isSysCat();
+                // std::cout << "ReadThread::operator BATCH_PRIMITIVE_RUN txnId " << txnId << " weight " << weight << std::endl;
               }
               FairThreadPool::Job job(uniqueID, stepID, txnId, functor, outIos, weight, priority, id);
 
