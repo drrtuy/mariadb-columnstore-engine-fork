@@ -2146,13 +2146,13 @@ struct ReadThread
                   fPrimitiveServerPtr->PTTrace()));
                 BPPSeeder* bpps = dynamic_cast<BPPSeeder*>(functor.get());
                 id = bpps->getID();
-                weight = ismHdr->Size;
                 priority = bpps->priority();
                 const uint8_t* buf = bs->buf();
                 const uint32_t pos = sizeof(ISMPacketHeader) - 2;
                 txnId = *((uint32_t*)&buf[pos + 2]);
                 stepID = *((uint32_t*)&buf[pos + 6]);
                 uniqueID = *((uint32_t*)&buf[pos + 10]);
+                weight = ismHdr->Size + *((uint32_t*)&buf[pos + 18]);
                 isSyscat = bpps->isSysCat();
               }
               FairThreadPool::Job job(uniqueID, stepID, txnId, functor, outIos, weight, priority, id);
@@ -2168,7 +2168,6 @@ struct ReadThread
 
               break;
             }
-
 
             case BATCH_PRIMITIVE_ACK:
             {

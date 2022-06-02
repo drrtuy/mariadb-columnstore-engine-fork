@@ -1253,7 +1253,8 @@ void BatchPrimitiveProcessorJL::runBPP(ByteStream& bs, uint32_t pmNum)
   bs << _priority;
 
   // The weight is used by PrimProc thread pool algo
-  bs << calculateBPPWeight();
+  uint32_t weight = calculateBPPWeight();
+  bs << weight;
 
   bs << dbRoot;
   bs << count;

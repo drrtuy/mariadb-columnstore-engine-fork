@@ -88,24 +88,24 @@ void FairThreadPool::addJob_(const Job& job, bool useLock)
     stopExtra = true;
   }
 
-  WeightT currentTopWeight = 0;
-  if (!weightedTxnsQueue_.empty())
-  {
-    currentTopWeight = weightedTxnsQueue_.top().first;
-  }
+  // WeightT currentTopWeight = 0;
+  // if (!weightedTxnsQueue_.empty())
+  // {
+  //   currentTopWeight = weightedTxnsQueue_.top().first;
+  // }
   auto jobsListMapIter = txn2JobsListMap_.find(job.txnIdx_);
   if (jobsListMapIter == txn2JobsListMap_.end())
   {
     ThreadPoolJobsList* jobsList = new ThreadPoolJobsList;
     jobsList->push_back(job);
     txn2JobsListMap_[job.txnIdx_] = jobsList;
-    weightedTxnsQueue_.push({currentTopWeight, job.txnIdx_});
+    weightedTxnsQueue_.push({job.weight_, job.txnIdx_});
   }
   else
   {
     if (jobsListMapIter->second->empty())
     {
-      weightedTxnsQueue_.push({currentTopWeight, job.txnIdx_});
+      weightedTxnsQueue_.push({job.weight_, job.txnIdx_});
     }
     jobsListMapIter->second->push_back(job);
   }
@@ -225,6 +225,7 @@ void FairThreadPool::threadFcn(const PriorityThreadPool::Priority preferredQueue
 
       if (rescheduleJob)
       {
+        usleep(500);
         lk.lock();
         addJob_(runList[0], false);
         newJob.notify_one();
