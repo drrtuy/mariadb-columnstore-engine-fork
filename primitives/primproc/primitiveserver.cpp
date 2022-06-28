@@ -90,6 +90,8 @@ using namespace idbdatafile;
 
 using namespace threadpool;
 
+#include "serviceexemgr.h"
+
 #include "threadnaming.h"
 
 #include "atomicops.h"
@@ -1057,6 +1059,7 @@ class DictScanJob : public threadpool::PriorityThreadPool::Functor
   virtual ~DictScanJob();
 
   void write(const ByteStream&);
+  // void write(messageqcpp::SBS& sbs);
   int operator()();
   void catchHandler(const std::string& ex, uint32_t id, uint16_t code = logging::primitiveServerErr);
   void sendErrorMsg(uint32_t id, uint16_t code);
@@ -1078,10 +1081,15 @@ DictScanJob::~DictScanJob()
 {
 }
 
-void DictScanJob::write(const ByteStream& bs)
+// void DictScanJob::write(messageqcpp::SBS& sbs)
+void DictScanJob::write(const messageqcpp::ByteStream& sbs)
 {
+  // [[maybe_unused]] joblist::DistributedEngineComm* exeMgrDecPtr = exemgr::globServiceExeMgr->getDec();
+  // exeMgrDecPtr->addDataToOutput(sbs);
+  // return;
   boost::mutex::scoped_lock lk(*fWriteLock);
-  fIos->write(bs);
+  // fIos->write(*sbs);
+  fIos->write(sbs);
 }
 
 int DictScanJob::operator()()
@@ -1097,6 +1105,7 @@ int DictScanJob::operator()()
 
   boost::shared_ptr<DictEqualityFilter> eqFilter;
   ByteStream results(output_buf_size);
+  // messageqcpp::SBS results(new messageqcpp::ByteStream(output_buf_size));
   TokenByScanRequestHeader* cmd;
   PrimitiveProcessor pproc(gDebugLevel);
   TokenByScanResultHeader* output;
@@ -1200,9 +1209,10 @@ void DictScanJob::sendErrorMsg(uint32_t id, uint16_t code)
   ism.Status = code;
   ph.UniqueID = id;
 
-  ByteStream msg(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
-  msg.append((uint8_t*)&ism, sizeof(ism));
-  msg.append((uint8_t*)&ph, sizeof(ph));
+  // ByteStream msg(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
+  messageqcpp::SBS msg(new messageqcpp::ByteStream(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader)));
+  msg->append((uint8_t*)&ism, sizeof(ism));
+  msg->append((uint8_t*)&ph, sizeof(ph));
 
   write(msg);
 }
@@ -1999,7 +2009,8 @@ struct ReadThread
           idbassert(bs->length() >= sizeof(ISMPacketHeader));
 
           const ISMPacketHeader* ismHdr = reinterpret_cast<const ISMPacketHeader*>(bs->buf());
-
+          uint64_t someVal = ismHdr->Command;
+          std::cout << " PP read thread Command " << someVal << std::endl;
           /* This switch is for the OOB commands */
           switch (ismHdr->Command)
           {

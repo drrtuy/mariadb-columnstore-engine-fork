@@ -195,8 +195,10 @@ int BPPSeeder::operator()()
 
           //				if (!isSysCat())
           return -1;
-          //				else {   // syscat queries aren't run by a threadpool, can't reschedule those
-          //jobs 					usleep(1000); 					goto retry;
+          //				else {   // syscat queries aren't run by a threadpool, can't
+          // reschedule those jobs 					usleep(1000);
+          // goto
+          // retry;
           //				}
         }
 

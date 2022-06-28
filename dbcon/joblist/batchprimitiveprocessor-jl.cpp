@@ -1016,7 +1016,7 @@ string BatchPrimitiveProcessorJL::toString() const
  * (projection count)x serialized Commands
  */
 
-void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
+void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs, bool isExeMgrDEC) const
 {
   ISMPacketHeader ism;
   uint32_t i;
@@ -1031,6 +1031,8 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
   bs << (messageqcpp::ByteStream::quadbyte)stepID;
   bs << uniqueID;
   bs << versionInfo;
+  uint8_t pushToDecQueue = (isExeMgrDEC) ? 1 : 0;
+  bs << pushToDecQueue;
 
   if (needStrValues)
     flags |= NEED_STR_VALUES;
@@ -1243,7 +1245,7 @@ void BatchPrimitiveProcessorJL::createBPP(ByteStream& bs) const
  * (projection count)x run msgs for projection Commands
  */
 
-void BatchPrimitiveProcessorJL::runBPP(ByteStream& bs, uint32_t pmNum)
+void BatchPrimitiveProcessorJL::runBPP(ByteStream& bs, uint32_t pmNum, bool isExeMgrDEC)
 {
   ISMPacketHeader ism;
   uint32_t i;
@@ -1276,6 +1278,8 @@ void BatchPrimitiveProcessorJL::runBPP(ByteStream& bs, uint32_t pmNum)
 
   bs << dbRoot;
   bs << count;
+  uint8_t pushToDecQueue = (isExeMgrDEC) ? 1 : 0;
+  bs << pushToDecQueue;
 
   if (_hasScan)
     idbassert(ridCount == 0);

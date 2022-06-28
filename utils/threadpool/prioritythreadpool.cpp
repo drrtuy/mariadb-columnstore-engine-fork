@@ -212,6 +212,8 @@ void PriorityThreadPool::threadFcn(const Priority preferredQueue) throw()
       {
         reschedule[i] = false;
         running = true;
+        // std::cout << " TP running uniqueID " << runList[i].uniqueID << "  " << runList[i].stepID <<
+        // std::endl;
         reschedule[i] = (*(runList[i].functor))();
         running = false;
 

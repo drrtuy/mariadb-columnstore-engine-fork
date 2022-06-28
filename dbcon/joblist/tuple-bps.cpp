@@ -1047,12 +1047,13 @@ void TupleBPS::storeCasualPartitionInfo(const bool estimateRowCounts)
       const EMEntry& extent = colCmd->getExtents()[idx];
 
       /* If any column filter eliminates an extent, it doesn't get scanned */
-      scanFlags[idx] = scanFlags[idx] && (extent.colWid <= utils::MAXCOLUMNWIDTH) &&  // XXX: change to named constant.
-                       (ignoreCP || extent.partition.cprange.isValid != BRM::CP_VALID ||
-                        colCmd->getColType().colWidth != extent.colWid ||
-                        lbidListVec[i]->CasualPartitionPredicate(
-                            extent.partition.cprange, &(colCmd->getFilterString()), colCmd->getFilterCount(),
-                            colCmd->getColType(), colCmd->getBOP(), colCmd->getIsDict()));
+      scanFlags[idx] =
+          scanFlags[idx] && (extent.colWid <= utils::MAXCOLUMNWIDTH) &&  // XXX: change to named constant.
+          (ignoreCP || extent.partition.cprange.isValid != BRM::CP_VALID ||
+           colCmd->getColType().colWidth != extent.colWid ||
+           lbidListVec[i]->CasualPartitionPredicate(extent.partition.cprange, &(colCmd->getFilterString()),
+                                                    colCmd->getFilterCount(), colCmd->getColType(),
+                                                    colCmd->getBOP(), colCmd->getIsDict()));
     }
   }
 
@@ -1405,7 +1406,7 @@ void TupleBPS::run()
   {
     fDec->addDECEventListener(this);
     fBPP->priority(priority());
-    fBPP->createBPP(bs);
+    fBPP->createBPP(bs, fDec->isExeMgrDEC());
     fDec->write(uniqueID, bs);
     BPPIsAllocated = true;
 
@@ -2032,7 +2033,7 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
 #endif
 
     startingLBID = scannedExtents[i].range.start;
-
+    bool isExeMgrDEC = fDec->isExeMgrDEC();
     while (blocksToScan > 0)
     {
       uint32_t blocksThisJob = min(blocksToScan, blocksPerJob);
@@ -2040,7 +2041,7 @@ void TupleBPS::makeJobs(vector<Job>* jobs)
       fBPP->setLBID(startingLBID, scannedExtents[i]);
       fBPP->setCount(blocksThisJob);
       bs.reset(new ByteStream());
-      fBPP->runBPP(*bs, (*dbRootConnectionMap)[scannedExtents[i].dbRoot]);
+      fBPP->runBPP(*bs, (*dbRootConnectionMap)[scannedExtents[i].dbRoot], isExeMgrDEC);
       jobs->push_back(
           Job(scannedExtents[i].dbRoot, (*dbRootConnectionMap)[scannedExtents[i].dbRoot], blocksThisJob, bs));
       blocksToScan -= blocksThisJob;
@@ -2102,6 +2103,7 @@ void TupleBPS::processByteStreamVector(vector<boost::shared_ptr<messageqcpp::Byt
   for (uint32_t i = begin; i < end; ++i)
   {
     messageqcpp::ByteStream* bs = bsv[i].get();
+    // std::cout << "processByteStreamVector() bs->length() " << bs->length() << std::endl;
 
     // @bug 488. when PrimProc node is down. error out
     // An error condition.  We are not going to do anymore.
@@ -2316,6 +2318,7 @@ void TupleBPS::processByteStreamVector(vector<boost::shared_ptr<messageqcpp::Byt
 
 void TupleBPS::receiveMultiPrimitiveMessages()
 {
+  // std::cout << "TupleBPS::receiveMultiPrimitiveMessages begin " << std::endl;
   AnyDataListSPtr dl = fOutputJobStepAssociation.outAt(0);
   RowGroupDL* dlp = (fDelivery ? deliveryDL.get() : dl->rowGroupDL());
 
@@ -2357,6 +2360,7 @@ void TupleBPS::receiveMultiPrimitiveMessages()
 
       bool flowControlOn;
       fDec->read_some(uniqueID, fNumThreads, bsv, &flowControlOn);
+      // std::cout << "receiveMultiPrimitiveMessages bsv.size() " << bsv.size() << std::endl;
       size = bsv.size();
 
       // @bug 4562
@@ -2373,7 +2377,12 @@ void TupleBPS::receiveMultiPrimitiveMessages()
       for (uint32_t z = 0; z < size; z++)
       {
         if (bsv[z]->length() > 0 && fBPP->countThisMsg(*(bsv[z])))
+        {
+          // std::cout << "receiveMultiPrimitiveMessages bsv z " << z << " bsv[z]->length() " <<
+          // bsv[z]->length()
+          //           << std::endl;
           ++msgsRecvd;
+        }
       }
 
       //@Bug 1424,1298
@@ -2881,7 +2890,7 @@ void TupleBPS::newPMOnline(uint32_t connectionNumber)
 {
   ByteStream bs;
 
-  fBPP->createBPP(bs);
+  fBPP->createBPP(bs, fDec->isExeMgrDEC());
 
   try
   {

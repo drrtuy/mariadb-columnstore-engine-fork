@@ -433,6 +433,7 @@ class BatchPrimitiveProcessor
   uint ptMask;
   bool firstInstance;
   uint64_t valuesLBID;
+  bool pushToDecQueue_;
 
   static const uint64_t maxResultCount = 1048576;  // 2^20
 
