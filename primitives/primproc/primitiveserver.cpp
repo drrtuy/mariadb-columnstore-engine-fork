@@ -1059,7 +1059,7 @@ class DictScanJob : public threadpool::FairThreadPool::Functor
   DictScanJob(SP_UM_IOSOCK ios, SBS bs, SP_UM_MUTEX writeLock);
   virtual ~DictScanJob();
 
-  void write(const ByteStream&);
+  void write(const SBS&);
   int operator()();
   void catchHandler(const std::string& ex, uint32_t id, uint16_t code = logging::primitiveServerErr);
   void sendErrorMsg(uint32_t id, uint16_t code);
@@ -1081,17 +1081,31 @@ DictScanJob::~DictScanJob()
 {
 }
 
-void DictScanJob::write(const ByteStream& bs)
+// void DictScanJob::write(const ByteStream& bs)
+// {
+//   boost::mutex::scoped_lock lk(*fWriteLock);
+//   fIos->write(bs);
+// }
+void DictScanJob::write(const SBS& sbs)
 {
+  // Here is the fast path for local EM to PM interacction. PM puts into the
+  // input EM DEC queue directly.
+  // !sock has a 'same host connection' semantics here.
+  if (!fIos)
+  {
+    auto* exeMgrDecPtr = exemgr::globServiceExeMgr->getDec();
+    exeMgrDecPtr->addDataToOutput(sbs);
+    return;
+  }
   boost::mutex::scoped_lock lk(*fWriteLock);
-  fIos->write(bs);
+  fIos->write(*sbs);
 }
 
 int DictScanJob::operator()()
 {
   utils::setThreadName("PPDictScanJob");
   uint8_t data[DATA_BLOCK_SIZE];
-  uint32_t output_buf_size = MAX_BUFFER_SIZE;
+  uint32_t output_buf_size = 1024;
   uint32_t session;
   uint32_t uniqueId = 0;
   bool wasBlockInCache = false;
@@ -1099,7 +1113,6 @@ int DictScanJob::operator()()
   uint16_t runCount;
 
   boost::shared_ptr<DictEqualityFilter> eqFilter;
-  ByteStream results(output_buf_size);
   TokenByScanRequestHeader* cmd;
   PrimitiveProcessor pproc(gDebugLevel);
   TokenByScanResultHeader* output;
@@ -1118,7 +1131,6 @@ int DictScanJob::operator()()
     session = cmd->Hdr.SessionID;
     uniqueId = cmd->Hdr.UniqueID;
     runCount = cmd->Count;
-    output = (TokenByScanResultHeader*)results.getInputPtr();
 #ifdef VALGRIND
     memset(output, 0, sizeof(TokenByScanResultHeader));
 #endif
@@ -1149,6 +1161,9 @@ int DictScanJob::operator()()
 
     for (uint16_t i = 0; i < runCount; ++i)
     {
+      SBS results(new ByteStream(output_buf_size));
+      output = (TokenByScanResultHeader*)results->getInputPtr();
+
       loadBlock(cmd->LBID, verInfo, cmd->Hdr.TransactionID, cmd->CompType, data, &wasBlockInCache,
                 &blocksRead, fLBIDTraceOn, session);
       pproc.setBlockPtr((int*)data);
@@ -1159,9 +1174,8 @@ int DictScanJob::operator()()
       else
         output->PhysicalIO += blocksRead;
 
-      results.advanceInputPtr(output->NBYTES);
+      results->advanceInputPtr(output->NBYTES);
       write(results);
-      results.restart();
       cmd->LBID++;
     }
 
@@ -1203,9 +1217,9 @@ void DictScanJob::sendErrorMsg(uint32_t id, uint16_t code)
   ism.Status = code;
   ph.UniqueID = id;
 
-  ByteStream msg(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader));
-  msg.append((uint8_t*)&ism, sizeof(ism));
-  msg.append((uint8_t*)&ph, sizeof(ph));
+  SBS msg(new ByteStream(sizeof(ISMPacketHeader) + sizeof(PrimitiveHeader)));
+  msg->append((uint8_t*)&ism, sizeof(ism));
+  msg->append((uint8_t*)&ph, sizeof(ph));
 
   write(msg);
 }

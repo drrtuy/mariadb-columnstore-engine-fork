@@ -805,8 +805,7 @@ class pDictionaryScan : public JobStep
   void startPrimitiveThread();
   void startAggregationThread();
   void initializeConfigParms();
-  void sendAPrimitiveMessage(messageqcpp::ByteStream& primMsg, BRM::LBID_t msgLbidStart,
-                             uint32_t msgLbidCount, uint16_t dbroot);
+  void sendAPrimitiveMessage(BRM::LBID_t msgLbidStart, uint32_t msgLbidCount, uint16_t dbroot);
   void formatMiniStats();
 
   DistributedEngineComm* fDec;
