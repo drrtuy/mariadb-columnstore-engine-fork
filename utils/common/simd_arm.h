@@ -22,7 +22,7 @@
 #include <cstdint>
 #include <type_traits>
 #ifdef __OPTIMIZE__
-#define MCS_FORCE_INLINE __attribute__((__always_inline__)) inline
+#define MCS_FORCE_INLINE __attribute__((__always_inline__)) 
 #else
 #define MCS_FORCE_INLINE inline
 #endif
@@ -239,30 +239,7 @@ struct StorageToFiltering<T, KIND, typename std::enable_if<KIND != KIND_FLOAT>::
 {
   using type = T;
 };
-template <typename MT>
-MCS_FORCE_INLINE MT BIT128_AND(MT l, MT r)
-{
-  if constexpr (std::is_same_v<MT, uint8x16_t>)
-    return vandq_u8(l, r);
-  else if constexpr (std::is_same_v<MT, uint16x8_t>)
-    return vandq_u16(l, r);
-  else if constexpr (std::is_same_v<MT, uint32x4_t>)
-    return vandq_u32(l, r);
-  else if constexpr (std::is_same_v<MT, uint64x2_t>)
-    return vandq_u64(l, r);
-}
-template <typename MT>
-MCS_FORCE_INLINE MT BIT128_OR(MT l, MT r)
-{
-  if constexpr (std::is_same_v<MT, uint8x16_t>)
-    return vorrq_u8(l, r);
-  else if constexpr (std::is_same_v<MT, uint16x8_t>)
-    return vorrq_u16(l, r);
-  else if constexpr (std::is_same_v<MT, uint32x4_t>)
-    return vorrq_u32(l, r);
-  else if constexpr (std::is_same_v<MT, uint64x2_t>)
-    return vorrq_u64(l, r);
-}
+
 template <typename VT, typename T, typename ENABLE = void>
 class SimdFilterProcessor;
 

@@ -34,8 +34,8 @@
 #endif
 
 using namespace std;
-
-template <typename T>
+#if defined(__x86_64__)
+  template <typename T>
 class SimdProcessorTypedTest : public testing::Test {
 public:
   using IntegralType = T;
@@ -487,3 +487,4 @@ TEST(SimdProcessorTest, Float32)
   EXPECT_EQ(proc.cmpLt(lhs, rhs), expect);
   EXPECT_EQ(proc.cmpGe(lhs, rhs), (simd::MT)~expect);
 }
+#endif
