@@ -1791,7 +1791,8 @@ void vectorizedFiltering_(NewColRequestHeader* in, ColResultHeader* out, const T
       swapedOrderDataVec =
           simdSwapedOrderDataLoad<KIND, VT, SimdWrapperType, T>(typeHolder, simdProcessor, dataVec).v;
     if constexpr (IS_AUX_COLUMN)
-      nonEmptyMask = getNonEmptyMaskAux<MT>(nonEmptyMaskAux, i);
+      //'>0' let element "0xFF" to "0xFF...FF" for u16/32/64int... because of blend 
+      nonEmptyMask = getNonEmptyMaskAux<MT>(nonEmptyMaskAux, i)>0;
     else
       nonEmptyMask = dataVec!=emptyFilterArgVec;
 
