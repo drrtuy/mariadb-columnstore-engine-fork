@@ -27,7 +27,6 @@ enum ENUM_KIND
   KIND_TEXT
 };  // whitespace-trimmed and then compared as signed integers
 
-
 #if defined(__x86_64__)
 
 #include <cstdint>
@@ -54,6 +53,8 @@ using vi128f_t = __m128;
 using vi128d_t = __m128d;
 using int128_t = __int128;
 using MT = uint16_t;
+using MaskType = vi128_t;
+
 // These ugly wrappers are used to allow to use __m128* as template class parameter argument
 struct vi128_wr
 {
@@ -117,22 +118,21 @@ struct StorageToFiltering<T, KIND, typename std::enable_if<KIND != KIND_FLOAT>::
 };
 
 template <int i0, int i1, int i2, int i3>
-static inline vi128_t constant4i() {
-    static const union {
-        int     i[4];
-        vi128_t xmm;
-    } u = {{i0,i1,i2,i3}};
-    return u.xmm;
+static inline vi128_t constant4i()
+{
+  static const union
+  {
+    int i[4];
+    vi128_t xmm;
+  } u = {{i0, i1, i2, i3}};
+  return u.xmm;
 }
 
-static inline vi128_t bitMaskToByteMask16(MT m) {
+static inline vi128_t bitMaskToByteMask16(MT m)
+{
   vi128_t sel = _mm_set1_epi64x(0x8040201008040201);
   return _mm_cmpeq_epi8(
-    _mm_and_si128(
-      _mm_shuffle_epi8(_mm_cvtsi32_si128(m),
-        _mm_set_epi64x(0x0101010101010101, 0)),
-      sel),
-    sel);
+      _mm_and_si128(_mm_shuffle_epi8(_mm_cvtsi32_si128(m), _mm_set_epi64x(0x0101010101010101, 0)), sel), sel);
 }
 
 template <typename VT, typename T, typename ENABLE = void>
@@ -155,6 +155,7 @@ class SimdFilterProcessor<
   using SimdType = vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -173,49 +174,49 @@ class SimdFilterProcessor<
     return _mm_loadu_si128(reinterpret_cast<const SimdType*>(from));
   }
 
-  MCS_FORCE_INLINE MT cmpDummy(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpDummy(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return MaskType{0x0, 0x0};
   }
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
     return cmpDummy(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
     return cmpDummy(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
     return cmpDummy(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
     return cmpDummy(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
     return cmpDummy(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
     return cmpDummy(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);  // ????
   }
 
   // misc
@@ -274,6 +275,14 @@ class SimdFilterProcessor<
   {
     return reinterpret_cast<SimdType>(std::max(reinterpret_cast<int128_t>(x), reinterpret_cast<int128_t>(y)));
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename T>
@@ -290,6 +299,7 @@ class SimdFilterProcessor<
   using SimdType = simd::vi128d_t;
   using StorageSimdType = simd::vi128_t;
   using StorageType = typename datatypes::WidthToSIntegralType<sizeof(T)>::type;
+  using MaskType = vi128_t;
   using StorageVecProcType = SimdFilterProcessor<simd::vi128_wr, StorageType>;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
@@ -314,44 +324,44 @@ class SimdFilterProcessor<
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpeq_pd(x, y));
+    return (MaskType)_mm_cmpeq_pd(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpge_pd(x, y));
+    return (MaskType)_mm_cmpge_pd(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpgt_pd(x, y));
+    return (MaskType)_mm_cmpgt_pd(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmple_pd(x, y));
+    return (MaskType)_mm_cmple_pd(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmplt_pd(x, y));
+    return (MaskType)_mm_cmplt_pd(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpneq_pd(x, y));
+    return (MaskType)_mm_cmpneq_pd(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
   }
 
   // misc
@@ -413,6 +423,14 @@ class SimdFilterProcessor<
   {
     return _mm_and_pd(x, y);
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename T>
@@ -428,6 +446,7 @@ class SimdFilterProcessor<
   using SimdType = vi128f_t;
   using StorageSimdType = simd::vi128_t;
   using StorageType = typename datatypes::WidthToSIntegralType<sizeof(T)>::type;
+  using MaskType = vi128_t;
   using StorageVecProcType = SimdFilterProcessor<simd::vi128_wr, StorageType>;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
@@ -452,44 +471,44 @@ class SimdFilterProcessor<
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpeq_ps(x, y));
+    return (MaskType)_mm_cmpeq_ps(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpge_ps(x, y));
+    return (MaskType)_mm_cmpge_ps(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpgt_ps(x, y));
+    return (MaskType)_mm_cmpgt_ps(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmple_ps(x, y));
+    return (MaskType)_mm_cmple_ps(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmplt_ps(x, y));
+    return (MaskType)_mm_cmplt_ps(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8((StorageSimdType)_mm_cmpneq_ps(x, y));
+    return (MaskType)_mm_cmpneq_ps(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
   }
 
   // misc
@@ -552,12 +571,21 @@ class SimdFilterProcessor<
   {
     return _mm_and_ps(x, y);
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename CHECK_T>
-class SimdFilterProcessor<VT, CHECK_T,
-                          typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int64_t>::value &&
-                                                  !std::is_same<CHECK_T, double>::value>::type>
+class SimdFilterProcessor<
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int64_t>::value &&
+                            !std::is_same<CHECK_T, double>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -567,6 +595,7 @@ class SimdFilterProcessor<VT, CHECK_T,
   using SimdType = vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -588,44 +617,44 @@ class SimdFilterProcessor<VT, CHECK_T,
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_or_si128(_mm_cmpgt_epi64(x, y), _mm_cmpeq_epi64(x, y)));
+    return _mm_or_si128(_mm_cmpgt_epi64(x, y), _mm_cmpeq_epi64(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y) const
   {
-    return _mm_movemask_epi8(_mm_cmpgt_epi64(x, y));
+    return _mm_cmpgt_epi64(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi64(x, y));
+    return _mm_cmpeq_epi64(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return cmpGt(x, y) ^ 0xFFFF;
+    return cmpGt(x, y) ^ loadValue(0xFFFFFFFFFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
     return cmpNe(x, y) ^ cmpGt(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi64(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi64(x, y) ^ loadValue(0xFFFFFFFFFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFFFFFFFFFFFFFFFF);
   }
 
   // misc
@@ -641,7 +670,7 @@ class SimdFilterProcessor<VT, CHECK_T,
 
   MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
   {
-    return cmpNe(x, y);
+    return d(x, y);
   }
 
   MCS_FORCE_INLINE MT nullEmptyCmpEq(SimdType x, SimdType y)
@@ -677,19 +706,28 @@ class SimdFilterProcessor<VT, CHECK_T,
 
   MCS_FORCE_INLINE SimdType min(SimdType x, SimdType y) const
   {
-    return blend(x, y, cmpGtSimdType(x,y));
+    return blend(x, y, cmpGt(x, y));
   }
 
   MCS_FORCE_INLINE SimdType max(SimdType x, SimdType y) const
   {
-    return blend(x, y, cmpGtSimdType(y,x));
+    return blend(x, y, cmpGt(y, x));
+  }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
   }
 };
 
 template <typename VT, typename CHECK_T>
-class SimdFilterProcessor<VT, CHECK_T,
-                          typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, uint64_t>::value &&
-                                                  !std::is_same<CHECK_T, double>::value>::type>
+class SimdFilterProcessor<
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, uint64_t>::value &&
+                            !std::is_same<CHECK_T, double>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -699,6 +737,7 @@ class SimdFilterProcessor<VT, CHECK_T,
   using SimdType = vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -720,47 +759,47 @@ class SimdFilterProcessor<VT, CHECK_T,
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return cmpGt(y, x) ^ 0xFFFF;
+    return cmpGt(y, x) ^ loadValue(0xFFFFFFFFFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y) const
   {
-    SimdType signVec = constant4i<0,(int32_t)0x80000000,0,(int32_t)0x80000000>();
+    SimdType signVec = constant4i<0, (int32_t)0x80000000, 0, (int32_t)0x80000000>();
     SimdType xFlip = _mm_xor_si128(x, signVec);
     SimdType yFlip = _mm_xor_si128(y, signVec);
-    return _mm_movemask_epi8(_mm_cmpgt_epi64(xFlip, yFlip));
+    return _mm_cmpgt_epi64(xFlip, yFlip);
   }
 
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi64(x, y));
+    return _mm_cmpeq_epi64(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return cmpGt(x, y) ^ 0xFFFF;
+    return cmpGt(x, y) ^ loadValue(0xFFFFFFFFFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
     return cmpGt(y, x);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi64(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi64(x, y) ^ loadValue(0xFFFFFFFFFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFFFFFFFFFFFFFFFF);
   }
 
   // misc
@@ -807,27 +846,36 @@ class SimdFilterProcessor<VT, CHECK_T,
 
   MCS_FORCE_INLINE SimdType cmpGtSimdType(SimdType x, SimdType y) const
   {
-    SimdType signVec = constant4i<0,(int32_t)0x80000000,0,(int32_t)0x80000000>();
+    SimdType signVec = constant4i<0, (int32_t)0x80000000, 0, (int32_t)0x80000000>();
     SimdType xFlip = _mm_xor_si128(x, signVec);
     SimdType yFlip = _mm_xor_si128(y, signVec);
     return _mm_cmpgt_epi64(xFlip, yFlip);
   }
 
-  MCS_FORCE_INLINE SimdType min(SimdType x, SimdType y) const
+  MCS_FORCE_INLINE SimdType min(SimdType x, SimdType y)
   {
-    return blend(x, y, cmpGtSimdType(x,y));
+    return blend(x, y, cmpGt(x, y));
   }
 
   MCS_FORCE_INLINE SimdType max(SimdType x, SimdType y) const
   {
-    return blend(x, y, cmpGtSimdType(y,x));
+    return blend(x, y, cmpGt(y, x));
+  }
+  MCS_FORCE_INLINE MaskType falseMask() const
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask() const
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
   }
 };
 
 template <typename VT, typename CHECK_T>
-class SimdFilterProcessor<VT, CHECK_T,
-                          typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int32_t>::value &&
-                                                  !std::is_same<CHECK_T, float>::value>::type>
+class SimdFilterProcessor<
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int32_t>::value &&
+                            !std::is_same<CHECK_T, float>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -837,6 +885,7 @@ class SimdFilterProcessor<VT, CHECK_T,
   using SimdType = vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -858,44 +907,44 @@ class SimdFilterProcessor<VT, CHECK_T,
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi32(x, y));
+    return _mm_cmpeq_epi32(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return cmpLt(x, y) ^ 0xFFFF;
+    return cmpLt(x, y) ^ loadValue(0xFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpgt_epi32(x, y));
+    return _mm_cmpgt_epi32(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return cmpGt(x, y) ^ 0xFFFF;
+    return cmpGt(x, y) ^ loadValue(0xFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmplt_epi32(x, y));
+    return _mm_cmplt_epi32(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi32(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi32(x, y) ^ loadValue(0xFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFFFF);
   }
 
   // misc
@@ -954,12 +1003,21 @@ class SimdFilterProcessor<VT, CHECK_T,
   {
     return _mm_max_epi32(x, y);
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename CHECK_T>
-class SimdFilterProcessor<VT, CHECK_T,
-                          typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, uint32_t>::value &&
-                                                  !std::is_same<CHECK_T, float>::value>::type>
+class SimdFilterProcessor<
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, uint32_t>::value &&
+                            !std::is_same<CHECK_T, float>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -969,6 +1027,7 @@ class SimdFilterProcessor<VT, CHECK_T,
   using SimdType = vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -990,47 +1049,48 @@ class SimdFilterProcessor<VT, CHECK_T,
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi32(x, y));
+    return _mm_cmpeq_epi32(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return cmpGt(y, x) ^ 0xFFFF;
+    return cmpGt(y, x) ^ loadValue(0xFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    SimdType signVec = constant4i<(int32_t)0x80000000,(int32_t)0x80000000,(int32_t)0x80000000,(int32_t)0x80000000>();
+    SimdType signVec =
+        constant4i<(int32_t)0x80000000, (int32_t)0x80000000, (int32_t)0x80000000, (int32_t)0x80000000>();
     SimdType xFlip = _mm_xor_si128(x, signVec);
     SimdType yFlip = _mm_xor_si128(y, signVec);
-    return _mm_movemask_epi8(_mm_cmpgt_epi32(xFlip, yFlip));
+    return _mm_cmpgt_epi32(xFlip, yFlip);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return cmpGt(x, y) ^ 0xFFFF;
+    return cmpGt(x, y) ^ loadValue(0xFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
     return cmpGt(y, x);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi32(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi32(x, y) ^ loadValue(0xFFFFFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFFFFFFFF);
   }
 
   // misc
@@ -1077,7 +1137,8 @@ class SimdFilterProcessor<VT, CHECK_T,
 
   MCS_FORCE_INLINE SimdType cmpGtSimdType(SimdType x, SimdType y) const
   {
-    SimdType signVec = constant4i<(int32_t)0x80000000,(int32_t)0x80000000,(int32_t)0x80000000,(int32_t)0x80000000>();
+    SimdType signVec =
+        constant4i<(int32_t)0x80000000, (int32_t)0x80000000, (int32_t)0x80000000, (int32_t)0x80000000>();
     SimdType xFlip = _mm_xor_si128(x, signVec);
     SimdType yFlip = _mm_xor_si128(y, signVec);
     return _mm_cmpgt_epi32(xFlip, yFlip);
@@ -1092,11 +1153,20 @@ class SimdFilterProcessor<VT, CHECK_T,
   {
     return _mm_max_epu32(x, y);
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename CHECK_T>
 class SimdFilterProcessor<
-    VT, CHECK_T, typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int16_t>::value>::type>
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int16_t>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -1106,6 +1176,7 @@ class SimdFilterProcessor<
   using SimdType = simd::vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -1127,44 +1198,44 @@ class SimdFilterProcessor<
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi16(x, y));
+    return _mm_cmpeq_epi16(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return cmpLt(x, y) ^ 0xFFFF;
+    return cmpLt(x, y) ^ loadValue(0xFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpgt_epi16(x, y));
+    return _mm_cmpgt_epi16(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return cmpGt(x, y) ^ 0xFFFF;
+    return cmpGt(x, y) ^ loadValue(0xFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmplt_epi16(x, y));
+    return _mm_cmplt_epi16(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi16(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi16(x, y) ^ loadValue(0xFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFFFF);
   }
 
   // misc
@@ -1223,11 +1294,20 @@ class SimdFilterProcessor<
   {
     return _mm_max_epi16(x, y);
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename CHECK_T>
-class SimdFilterProcessor<
-    VT, CHECK_T, typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, uint16_t>::value>::type>
+class SimdFilterProcessor<VT, CHECK_T,
+                          typename std::enable_if<std::is_same<VT, vi128_wr>::value &&
+                                                  std::is_same<CHECK_T, uint16_t>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -1237,6 +1317,7 @@ class SimdFilterProcessor<
   using SimdType = simd::vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -1258,45 +1339,65 @@ class SimdFilterProcessor<
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi16(x, y));
+    return _mm_cmpeq_epi16(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    SimdType maxOfTwo = _mm_max_epu16(x, y); // max(x, y), unsigned
-    return _mm_movemask_epi8(_mm_cmpeq_epi16(x, maxOfTwo));
+    SimdType maxOfTwo = _mm_max_epu16(x, y);  // max(x, y), unsigned
+    return _mm_cmpeq_epi16(x, maxOfTwo);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  // MCS_FORCE_INLINE MaskType cmpGE(SimdType x, SimdType y)
+  // {
+  //   SimdType maxOfTwo = _mm_max_epu16(x, y);  // max(x, y), unsigned
+  //   return _mm_cmpeq_epi16(x, maxOfTwo);
+  // }
+
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    return cmpGe(y, x) ^ 0xFFFF;
+    return cmpGe(y, x) ^ loadValue(0xFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
     return cmpGe(y, x);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  // MCS_FORCE_INLINE MaskType cmpLE(SimdType x, SimdType y)
+  // {
+  //   return cmpGE(y, x);
+  // }
+
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
-    return cmpGe(x, y) ^ 0xFFFF;
+    // auto a = cmpGe(x, y);
+    // uint64_t* aRef = (uint64_t*)&a;
+    // auto b = loadValue(0xFF);
+    // uint64_t* bRef = (uint64_t*)&b;
+    // auto c = cmpGe(x, y) ^ loadValue(0xFF);
+    // uint64_t* cRef = (uint64_t*)&c;
+    // std::cout << " cmpLt cmpGe " << std::hex << aRef[0] << " " << aRef[1] << " loadValue " << bRef[0] << "
+    // "
+    //           << bRef[1] << " result " << cRef[0] << " " << cRef[1] << std::endl;
+    return cmpGe(x, y) ^ loadValue(0xFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi16(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi16(x, y) ^ loadValue(0xFFFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFFFF);
   }
 
   // misc
@@ -1358,11 +1459,20 @@ class SimdFilterProcessor<
   {
     return _mm_max_epu16(x, y);
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename CHECK_T>
 class SimdFilterProcessor<
-    VT, CHECK_T, typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int8_t>::value>::type>
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, int8_t>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -1372,6 +1482,7 @@ class SimdFilterProcessor<
   using SimdType = vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -1393,44 +1504,44 @@ class SimdFilterProcessor<
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(x, y));
+    return _mm_cmpeq_epi8(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    return cmpLt(x, y) ^ 0xFFFF;
+    return cmpLt(x, y) ^ loadValue(0xFF);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpgt_epi8(x, y));
+    return _mm_cmpgt_epi8(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
-    return cmpGt(x, y) ^ 0xFFFF;
+    return cmpGt(x, y) ^ loadValue(0xFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmplt_epi8(x, y));
+    return _mm_cmplt_epi8(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi8(x, y) ^ loadValue(0xFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFF);
   }
 
   // permute
@@ -1496,11 +1607,20 @@ class SimdFilterProcessor<
   {
     return _mm_max_epi8(x, y);
   }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
+  }
 };
 
 template <typename VT, typename CHECK_T>
 class SimdFilterProcessor<
-    VT, CHECK_T, typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, uint8_t>::value>::type>
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, vi128_wr>::value && std::is_same<CHECK_T, uint8_t>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
@@ -1510,6 +1630,7 @@ class SimdFilterProcessor<
   using SimdType = vi128_t;
   using FilterType = T;
   using StorageType = T;
+  using MaskType = vi128_t;
   // Mask calculation for int and float types differs.
   // See corresponding intrinsics algos for details.
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
@@ -1531,45 +1652,45 @@ class SimdFilterProcessor<
   }
 
   // Compare
-  MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpEq(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(x, y));
+    return _mm_cmpeq_epi8(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGe(SimdType x, SimdType y)
   {
-    SimdType maxOfTwo = _mm_max_epu8(x, y); // max(x, y), unsigned
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(x, maxOfTwo));
+    SimdType maxOfTwo = _mm_max_epu8(x, y);  // max(x, y), unsigned
+    return _mm_cmpeq_epi8(x, maxOfTwo);
   }
 
-  MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpGt(SimdType x, SimdType y)
   {
-    return cmpGe(y, x) ^ 0xFFFF;
+    return cmpGe(y, x) ^ loadValue(0xFF);
   }
 
-  MCS_FORCE_INLINE MT cmpLe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLe(SimdType x, SimdType y)
   {
     return cmpGe(y, x);
   }
 
-  MCS_FORCE_INLINE MT cmpLt(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpLt(SimdType x, SimdType y)
   {
-    return cmpGe(x, y) ^ 0xFFFF;
+    return cmpGe(x, y) ^ loadValue(0xFF);
   }
 
-  MCS_FORCE_INLINE MT cmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpNe(SimdType x, SimdType y)
   {
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(x, y)) ^ 0xFFFF;
+    return _mm_cmpeq_epi8(x, y) ^ loadValue(0xFF);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysFalse(SimdType x, SimdType y)
   {
-    return 0;
+    return MaskType{0x0, 0x0};
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MaskType cmpAlwaysTrue(SimdType x, SimdType y)
   {
-    return 0xFFFF;
+    return loadValue(0xFF);
   }
 
   // permute
@@ -1637,6 +1758,14 @@ class SimdFilterProcessor<
   MCS_FORCE_INLINE SimdType max(SimdType x, SimdType y) const
   {
     return _mm_max_epu8(x, y);
+  }
+  MCS_FORCE_INLINE MaskType falseMask()
+  {
+    return MaskType{0x0, 0x0};
+  }
+  MCS_FORCE_INLINE MaskType trueMask()
+  {
+    return _mm_set_epi64x(0xFFFFFFFFFFFFFFFFLL, 0xFFFFFFFFFFFFFFFFLL);
   }
 };
 
