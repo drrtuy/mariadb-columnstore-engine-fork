@@ -34,7 +34,7 @@ using float32_t = float;
 #endif
 
 using namespace std;
-#if defined(__x86_64__)
+#if defined(__x86_64__) || __aarch64__
 template <typename T>
 class SimdProcessorTypedTest : public testing::Test
 {
@@ -59,10 +59,11 @@ TYPED_TEST_SUITE(SimdProcessorTypedTest, SimdProcessor128TypedTestTypes);
 
 TYPED_TEST(SimdProcessorTypedTest, SimdFilterProcessor_simd128)
 {
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
-
   using Proc = typename SimdProcessorTypedTest<TypeParam>::Proc;
+
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
+
   using SimdType = typename Proc::SimdType;
   Proc proc;
   const typename Proc::MaskType allTrue = proc.trueMask();
@@ -152,8 +153,8 @@ TEST(SimdProcessorTest, Int8)
   using Proc = typename SimdProcessorTypedTest<IntegralType>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize;
   using SimdType = typename Proc::SimdType;
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   Proc proc;
   const typename Proc::MaskType allTrue = proc.trueMask();
@@ -221,8 +222,8 @@ TEST(SimdProcessorTest, Uint8)
   using Proc = typename SimdProcessorTypedTest<IntegralType>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
   using SimdType = typename Proc::SimdType;
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
 
   using Proc = typename SimdProcessorTypedTest<uint8_t>::Proc;
@@ -261,8 +262,8 @@ TEST(SimdProcessorTest, Int16)
   IntegralType maxlr[8]{0, 105, 2, 35, 24, 13, 8, 200};
   using Proc = typename SimdProcessorTypedTest<int16_t>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   using SimdType = typename Proc::SimdType;
   Proc proc;
@@ -289,7 +290,6 @@ TEST(SimdProcessorTest, Int16)
   EXPECT_TRUE(cmpEqFunctor(proc.cmpLt(lhs, rhs), expectLt));
   EXPECT_TRUE(cmpEqFunctor(proc.cmpGe(lhs, rhs), ~expectLt));
 }
-
 TEST(SimdProcessorTest, Uint16)
 {
   using IntegralType = uint16_t;
@@ -300,8 +300,8 @@ TEST(SimdProcessorTest, Uint16)
 
   using Proc = typename SimdProcessorTypedTest<int16_t>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   using SimdType = typename Proc::SimdType;
   Proc proc;
@@ -375,8 +375,8 @@ TEST(SimdProcessorTest, Uint32)
   IntegralType maxlr[8]{2, 1002, 80555, 514};
   using Proc = typename SimdProcessorTypedTest<uint32_t>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   using SimdType = typename Proc::SimdType;
   Proc proc;
@@ -412,8 +412,8 @@ TEST(SimdProcessorTest, Int64)
   IntegralType maxlr[8]{0, 122020};
   using Proc = typename SimdProcessorTypedTest<int64_t>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   using SimdType = typename Proc::SimdType;
   Proc proc;
@@ -449,8 +449,8 @@ TEST(SimdProcessorTest, Uint64)
   IntegralType maxlr[8]{822, 1002};
   using Proc = typename SimdProcessorTypedTest<uint64_t>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   using SimdType = typename Proc::SimdType;
   Proc proc;
@@ -486,8 +486,8 @@ TEST(SimdProcessorTest, Float64)
   IntegralType maxlr[8]{2.9, 12.5620};
   using Proc = typename SimdProcessorTypedTest<IntegralType>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   using SimdType = typename Proc::SimdType;
   Proc proc;
@@ -523,8 +523,8 @@ TEST(SimdProcessorTest, Float32)
   IntegralType maxlr[8]{82, 102, -5.6, 9.5};
   using Proc = typename SimdProcessorTypedTest<IntegralType>::Proc;
   constexpr const size_t VecSize = Proc::vecByteSize / sizeof(IntegralType);
-  auto cmpEqFunctor = [](simd::MaskType left, simd::MaskType right)
-  { return !memcmp((void*)(&left), (void*)(&right), sizeof(simd::MaskType)); };
+  auto cmpEqFunctor = [](typename Proc::MaskType left, typename Proc::MaskType right)
+  { return !memcmp((void*)(&left), (void*)(&right), sizeof(typename Proc::MaskType)); };
   auto bitMaskProducer = bitMaskProducerT<IntegralType, Proc::MaskType, VecSize>;
   using SimdType = typename Proc::SimdType;
   Proc proc;

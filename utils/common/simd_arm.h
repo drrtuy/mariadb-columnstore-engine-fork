@@ -22,30 +22,29 @@
 #include <cstdint>
 #include <type_traits>
 #ifdef __OPTIMIZE__
-#define MCS_FORCE_INLINE __attribute__((__always_inline__)) 
+#define MCS_FORCE_INLINE __attribute__((__always_inline__))
 #else
 #define MCS_FORCE_INLINE inline
 #endif
 
 #include "mcs_datatype.h"
 
-
 namespace simd
 {
 // the type is decided by the basic type
-using vi1_t =int8x16_t;
-using vi2_t =int16x8_t;
-using vi4_t =int32x4_t;
-using vi8_t =int64x2_t;
-using vi1u_t =uint8x16_t;
-using vi2u_t =uint16x8_t;
-using vi4u_t =uint32x4_t;
-using vi8u_t =uint64x2_t;
+using vi1_t = int8x16_t;
+using vi2_t = int16x8_t;
+using vi4_t = int32x4_t;
+using vi8_t = int64x2_t;
+using vi1u_t = uint8x16_t;
+using vi2u_t = uint16x8_t;
+using vi4u_t = uint32x4_t;
+using vi8u_t = uint64x2_t;
 using vi128f_t = float32x4_t;
 using vi128d_t = float64x2_t;
 using int128_t = __int128;
-using MaskSimdType=vi1u_t;
-//wrapper types
+using MaskSimdType = vi1u_t;
+// wrapper types
 struct vi1_wr
 {
   int8x16_t v;
@@ -92,35 +91,35 @@ struct vi128d_wr
   float64x2_t v;
 };
 
-template<int W>
+template <int W>
 struct WidthToSVecWrapperType;
 
 template <>
 struct WidthToSVecWrapperType<1>
 {
-    using Vectype=int8x16_t;
-    using WrapperType=struct vi1_wr;
+  using Vectype = int8x16_t;
+  using WrapperType = struct vi1_wr;
 };
 
 template <>
 struct WidthToSVecWrapperType<2>
 {
   using Vectype = int16x8_t;
-  using WrapperType=struct vi2_wr;
+  using WrapperType = struct vi2_wr;
 };
 
 template <>
 struct WidthToSVecWrapperType<4>
 {
   using Vectype = int32x4_t;
-  using WrapperType=struct vi4_wr;
+  using WrapperType = struct vi4_wr;
 };
 
 template <>
 struct WidthToSVecWrapperType<8>
 {
   using Vectype = int64x2_t;
-  using WrapperType=struct vi8_wr;
+  using WrapperType = struct vi8_wr;
 };
 template <>
 struct WidthToSVecWrapperType<16>
@@ -159,17 +158,17 @@ struct WidthToVecWrapperType<8>
   using WrapperType = struct viu8_wr;
 };
 
-//We get the simd and wrapper type of basic type by TypeToVecWrapperType.
-template <typename T, typename ENABLE=void>
+// We get the simd and wrapper type of basic type by TypeToVecWrapperType.
+template <typename T, typename ENABLE = void>
 struct TypeToVecWrapperType;
 
 template <typename T>
-struct TypeToVecWrapperType<T, typename std::enable_if<std::is_same<T,__int128>::value>::type>
+struct TypeToVecWrapperType<T, typename std::enable_if<std::is_same<T, __int128>::value>::type>
  : WidthToSVecWrapperType<sizeof(__int128)>
 {
 };
 template <typename T>
-struct TypeToVecWrapperType<T, typename std::enable_if<std::is_same_v<float,T>>::type>
+struct TypeToVecWrapperType<T, typename std::enable_if<std::is_same_v<float, T>>::type>
 {
   using Vectype = vi128f_t;
   using WrapperType = vi128f_wr;
@@ -178,21 +177,19 @@ template <typename T>
 struct TypeToVecWrapperType<T, typename std::enable_if<std::is_same_v<double, T>>::type>
 {
   using Vectype = vi128d_t;
-  using WrapperType =  vi128d_wr;
+  using WrapperType = vi128d_wr;
 };
 template <typename T>
-struct TypeToVecWrapperType<T, typename std::enable_if<std::is_unsigned_v<T> >::type>
-    : WidthToVecWrapperType<sizeof(T)>
+struct TypeToVecWrapperType<T, typename std::enable_if<std::is_unsigned_v<T>>::type>
+ : WidthToVecWrapperType<sizeof(T)>
 {
 };
 
 template <typename T>
-    struct TypeToVecWrapperType<
-        T, typename std::enable_if<std::is_signed_v<T> &&!is_floating_point_v<T>>::type>
-    : WidthToSVecWrapperType<sizeof(T)>
+struct TypeToVecWrapperType<T, typename std::enable_if<std::is_signed_v<T> && !is_floating_point_v<T>>::type>
+ : WidthToSVecWrapperType<sizeof(T)>
 {
 };
-
 
 template <typename T, ENUM_KIND KIND, typename ENABLE = void>
 struct IntegralToSIMD;
@@ -243,7 +240,8 @@ struct StorageToFiltering<T, KIND, typename std::enable_if<KIND != KIND_FLOAT>::
 template <typename VT, typename T, typename ENABLE = void>
 class SimdFilterProcessor;
 
-// Dummy class that captures all impossible cases, e.g. integer vector as VT and flot as CHECK_T.we use int32_t to do operations
+// Dummy class that captures all impossible cases, e.g. integer vector as VT and flot as CHECK_T.we use
+// int32_t to do operations
 template <typename VT, typename CHECK_T>
 class SimdFilterProcessor<
     VT, CHECK_T,
@@ -260,7 +258,8 @@ class SimdFilterProcessor<
   using SimdType = int32x4_t;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint32x4_t;
+  using MT = uint32x4_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -274,7 +273,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_s32(mask, y,x);
+    return vbslq_s32(mask, y, x);
   }
   MCS_FORCE_INLINE SimdType cmpGtSimdType(SimdType x, SimdType y) const
   {
@@ -284,7 +283,7 @@ class SimdFilterProcessor<
   {
     return vmaxvq_s32(x);
   }
-   MCS_FORCE_INLINE SimdType bwAnd(SimdType x, SimdType y) const
+  MCS_FORCE_INLINE SimdType bwAnd(SimdType x, SimdType y) const
   {
     return vandq_s32(x, y);
   }
@@ -333,12 +332,12 @@ class SimdFilterProcessor<
     return cmpDummy(x, y);
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0xFFFFFFFF);
   }
@@ -351,7 +350,7 @@ class SimdFilterProcessor<
   {
     return vdupq_n_u32(0xFFFFFFFF);
   }
-  
+
   MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
   {
     return cmpDummy(x, y);
@@ -379,7 +378,6 @@ class SimdFilterProcessor<
   {
     vst1q_s32(reinterpret_cast<int32_t*>(dst), x);
   }
-
 };
 
 template <typename VT, typename T>
@@ -396,10 +394,11 @@ class SimdFilterProcessor<
   using SimdType = simd::vi128d_t;
   using StorageSimdType = typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
   using StorageType = typename datatypes::WidthToSIntegralType<sizeof(T)>::type;
-  using StorageWrapperTypeType =typename WidthToSVecWrapperType<sizeof(T)>::WrapperType;
+  using StorageWrapperTypeType = typename WidthToSVecWrapperType<sizeof(T)>::WrapperType;
   using StorageVecProcType = SimdFilterProcessor<StorageWrapperTypeType, StorageType>;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
-  using MT=uint64x2_t;
+  using MT = uint64x2_t;
+  using MaskType = MT;
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
   {
@@ -420,7 +419,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_f64(mask,y,x);
+    return vbslq_f64(mask, y, x);
   }
 
   MCS_FORCE_INLINE SimdType bwAnd(SimdType x, SimdType y) const
@@ -469,12 +468,12 @@ class SimdFilterProcessor<
     return vreinterpretq_u64_u32(vmvnq_u32(vreinterpretq_u32_u64(cmpEq(x, y))));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u64(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u64(0xFFFFFFFFFFFFFFFF);
   }
@@ -487,7 +486,7 @@ class SimdFilterProcessor<
   {
     return vdupq_n_u64(0xFFFFFFFFFFFFFFFF);
   }
-   MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
+  MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
   {
     StorageVecProcType nullEmptyProcessor;
     NullEmptySimdType* xAsIntVecPtr = reinterpret_cast<NullEmptySimdType*>(&x);
@@ -533,15 +532,16 @@ class SimdFilterProcessor<
   constexpr static const uint16_t vecByteSize = 16U;
   constexpr static const uint16_t vecBitSize = 128U;
   using FilterType = T;
-  using NullEmptySimdType =typename  WidthToSVecWrapperType<sizeof(T)>::Vectype;
+  using NullEmptySimdType = typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
   using SimdWrapperType = vi128f_wr;
   using SimdType = vi128f_t;
   using StorageSimdType = typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
   using StorageType = typename datatypes::WidthToSIntegralType<sizeof(T)>::type;
-  using StorageWrapperTypeType =typename WidthToSVecWrapperType<sizeof(T)>::WrapperType;
+  using StorageWrapperTypeType = typename WidthToSVecWrapperType<sizeof(T)>::WrapperType;
   using StorageVecProcType = SimdFilterProcessor<StorageWrapperTypeType, StorageType>;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
-  using MT=uint32x4_t;
+  using MT = uint32x4_t;
+  using MaskType = MT;
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
   {
@@ -551,7 +551,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_f32(mask, y,x);
+    return vbslq_f32(mask, y, x);
   }
   MCS_FORCE_INLINE SimdType cmpGtSimdType(SimdType x, SimdType y) const
   {
@@ -610,12 +610,12 @@ class SimdFilterProcessor<
     return vmvnq_u32(vceqq_f32(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0xFFFFFFFF);
   }
@@ -679,10 +679,11 @@ class SimdFilterProcessor<
   constexpr static const uint16_t vecBitSize = 128U;
   using T = typename datatypes::WidthToSIntegralType<sizeof(CHECK_T)>::type;
   using SimdWrapperType = typename WidthToSVecWrapperType<sizeof(T)>::WrapperType;
-  using SimdType =typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
+  using SimdType = typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint64x2_t;
+  using MT = uint64x2_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -709,7 +710,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_s64(mask, y,x);
+    return vbslq_s64(mask, y, x);
   }
 
   MCS_FORCE_INLINE SimdType bwAnd(SimdType x, SimdType y) const
@@ -724,7 +725,7 @@ class SimdFilterProcessor<
   // Compare
   MCS_FORCE_INLINE MT cmpGe(SimdType x, SimdType y)
   {
-    return  vcgeq_s64(x,y);
+    return vcgeq_s64(x, y);
   }
 
   MCS_FORCE_INLINE MT cmpGt(SimdType x, SimdType y)
@@ -752,12 +753,12 @@ class SimdFilterProcessor<
     return vreinterpretq_u64_u32(vmvnq_u32(vreinterpretq_u32_u64(cmpEq(x, y))));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u64(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u64(0xFFFFFFFFFFFFFFFF);
   }
@@ -792,12 +793,12 @@ class SimdFilterProcessor<
 
   MCS_FORCE_INLINE SimdType min(SimdType x, SimdType y)
   {
-    return vbslq_s64(vcgtq_s64(y,x), x, y);
+    return vbslq_s64(vcgtq_s64(y, x), x, y);
   }
 
   MCS_FORCE_INLINE SimdType max(SimdType x, SimdType y)
   {
-    return vbslq_s64(vcgtq_s64(x,y), x, y);
+    return vbslq_s64(vcgtq_s64(x, y), x, y);
   }
   MCS_FORCE_INLINE void store(char* dst, SimdType x)
   {
@@ -819,7 +820,8 @@ class SimdFilterProcessor<
   using SimdType = typename WidthToVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint64x2_t;
+  using MT = uint64x2_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -833,7 +835,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_u64(mask, y,x);
+    return vbslq_u64(mask, y, x);
   }
   MCS_FORCE_INLINE SimdType cmpGtSimdType(SimdType x, SimdType y) const
   {
@@ -867,12 +869,12 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType min(SimdType x, SimdType y)
   {
-    return vbslq_u64(vcgtq_u64(y,x), x, y);
+    return vbslq_u64(vcgtq_u64(y, x), x, y);
   }
 
   MCS_FORCE_INLINE SimdType max(SimdType x, SimdType y)
   {
-    return vbslq_u64(vcgtq_u64(x,y), x, y);
+    return vbslq_u64(vcgtq_u64(x, y), x, y);
   }
   MCS_FORCE_INLINE MT cmpEq(SimdType x, SimdType y)
   {
@@ -894,17 +896,17 @@ class SimdFilterProcessor<
     return vreinterpretq_u64_u32(vmvnq_u32(vreinterpretq_u32_u64(vceqq_u64(x, y))));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u64(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u64(0xFFFFFFFFFFFFFFFF);
   }
 
- MCS_FORCE_INLINE MT falseMask()
+  MCS_FORCE_INLINE MT falseMask()
   {
     return vdupq_n_u64(0);
   }
@@ -912,7 +914,7 @@ class SimdFilterProcessor<
   MCS_FORCE_INLINE MT trueMask()
   {
     return vdupq_n_u64(0xFFFFFFFFFFFFFFFF);
-  } 
+  }
   MCS_FORCE_INLINE SimdType setToZero()
   {
     return vdupq_n_u64(0);
@@ -943,11 +945,12 @@ class SimdFilterProcessor<
   constexpr static const uint16_t vecByteSize = 16U;
   constexpr static const uint16_t vecBitSize = 128U;
   using T = typename datatypes::WidthToSIntegralType<sizeof(CHECK_T)>::type;
-  using SimdWrapperType =typename WidthToSVecWrapperType<sizeof(T)>::WrapperType;
+  using SimdWrapperType = typename WidthToSVecWrapperType<sizeof(T)>::WrapperType;
   using SimdType = typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint32x4_t;
+  using MT = uint32x4_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -970,7 +973,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_s32(mask, y,x);
+    return vbslq_s32(mask, y, x);
   }
   MCS_FORCE_INLINE SimdType cmpGtSimdType(SimdType x, SimdType y) const
   {
@@ -1023,12 +1026,12 @@ class SimdFilterProcessor<
     return vmvnq_u32(vceqq_s32(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0xFFFFFFFF);
   }
@@ -1041,7 +1044,7 @@ class SimdFilterProcessor<
   {
     return vdupq_n_u32(0xFFFFFFFF);
   }
-  
+
   MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
   {
     return cmpNe(x, y);
@@ -1056,7 +1059,6 @@ class SimdFilterProcessor<
   {
     return vdupq_n_s32(0);
   }
-
 
   MCS_FORCE_INLINE void store(char* dst, SimdType x)
   {
@@ -1078,7 +1080,8 @@ class SimdFilterProcessor<
   using SimdType = typename WidthToVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint32x4_t;
+  using MT = uint32x4_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -1101,7 +1104,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_u32(mask, y,x);
+    return vbslq_u32(mask, y, x);
   }
   MCS_FORCE_INLINE SimdType cmpGtSimdType(SimdType x, SimdType y) const
   {
@@ -1150,7 +1153,7 @@ class SimdFilterProcessor<
     return vmvnq_u32(vceqq_u32(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0);
   }
@@ -1158,7 +1161,7 @@ class SimdFilterProcessor<
   {
     return vminvq_u32(x);
   }
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u32(0xFFFFFFFF);
   }
@@ -1169,8 +1172,8 @@ class SimdFilterProcessor<
 
   MCS_FORCE_INLINE MT trueMask()
   {
-    return vdupq_n_u32(0xFFFFFF);
-  } 
+    return vdupq_n_u32(0xFFFFFFFF);
+  }
 
   MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
   {
@@ -1206,7 +1209,8 @@ class SimdFilterProcessor<
   using SimdType = typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint16x8_t;
+  using MT = uint16x8_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -1235,7 +1239,7 @@ class SimdFilterProcessor<
   }
   MCS_FORCE_INLINE SimdType blend(SimdType x, SimdType y, MT mask) const
   {
-    return vbslq_s16(mask, y,x);
+    return vbslq_s16(mask, y, x);
   }
 
   MCS_FORCE_INLINE SimdType bwAnd(SimdType x, SimdType y) const
@@ -1283,12 +1287,12 @@ class SimdFilterProcessor<
     return vmvnq_u16(cmpEq(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u16(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u16(0xFFFF);
   }
@@ -1300,8 +1304,8 @@ class SimdFilterProcessor<
   MCS_FORCE_INLINE MT trueMask()
   {
     return vdupq_n_u16(0xFFFF);
-  } 
-  
+  }
+
   MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
   {
     return cmpNe(x, y);
@@ -1317,7 +1321,6 @@ class SimdFilterProcessor<
     return vdupq_n_s16(0);
   }
 
-
   MCS_FORCE_INLINE void store(char* dst, SimdType x)
   {
     vst1q_s16(reinterpret_cast<int16_t*>(dst), x);
@@ -1325,19 +1328,20 @@ class SimdFilterProcessor<
 };
 
 template <typename VT, typename CHECK_T>
-class SimdFilterProcessor<VT, CHECK_T,
-                          typename std::enable_if<std::is_same<VT, viu2_wr>::value &&
-                                                  std::is_same<CHECK_T, uint16_t>::value>::type>
+class SimdFilterProcessor<
+    VT, CHECK_T,
+    typename std::enable_if<std::is_same<VT, viu2_wr>::value && std::is_same<CHECK_T, uint16_t>::value>::type>
 {
  public:
   constexpr static const uint16_t vecByteSize = 16U;
   constexpr static const uint16_t vecBitSize = 128U;
-  using T =  uint16_t;
+  using T = uint16_t;
   using SimdWrapperType = typename WidthToVecWrapperType<sizeof(T)>::WrapperType;
   using SimdType = typename WidthToVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint16x8_t;
+  using MT = uint16x8_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -1414,12 +1418,12 @@ class SimdFilterProcessor<VT, CHECK_T,
     return vmvnq_u16(vceqq_u16(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u16(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u16(0xFFFF);
   }
@@ -1431,8 +1435,8 @@ class SimdFilterProcessor<VT, CHECK_T,
   MCS_FORCE_INLINE MT trueMask()
   {
     return vdupq_n_u16(0xFFFF);
-  } 
-  
+  }
+
   MCS_FORCE_INLINE MT nullEmptyCmpNe(SimdType x, SimdType y)
   {
     return cmpNe(x, y);
@@ -1467,7 +1471,9 @@ class SimdFilterProcessor<
   using SimdType = typename WidthToSVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint8x16_t;
+  using MT = uint8x16_t;
+  using MaskType = MT;
+
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -1545,12 +1551,12 @@ class SimdFilterProcessor<
     return vmvnq_u8(vceqq_s8(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u8(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u8(0xff);
   }
@@ -1584,7 +1590,6 @@ class SimdFilterProcessor<
     return vdupq_n_s8(0);
   }
 
-
   MCS_FORCE_INLINE void store(char* dst, SimdType x)
   {
     vst1q_s8(reinterpret_cast<int8_t*>(dst), x);
@@ -1600,11 +1605,12 @@ class SimdFilterProcessor<
   constexpr static const uint16_t vecByteSize = 16U;
   constexpr static const uint16_t vecBitSize = 128U;
   using T = uint8_t;
-  using SimdWrapperType =typename WidthToVecWrapperType<sizeof(T)>::WrapperType;
+  using SimdWrapperType = typename WidthToVecWrapperType<sizeof(T)>::WrapperType;
   using SimdType = typename WidthToVecWrapperType<sizeof(T)>::Vectype;
   using FilterType = T;
   using StorageType = T;
-  using MT=uint8x16_t;
+  using MT = uint8x16_t;
+  using MaskType = MT;
   constexpr static const uint16_t FilterMaskStep = sizeof(T);
   // Load value
   MCS_FORCE_INLINE SimdType emptyNullLoadValue(const T fill)
@@ -1682,17 +1688,17 @@ class SimdFilterProcessor<
     return vmvnq_u8(vceqq_u8(x, y));
   }
 
-  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysFalse(SimdType x, SimdType y)
   {
     return vdupq_n_u8(0);
   }
 
- MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x,SimdType y)
+  MCS_FORCE_INLINE MT cmpAlwaysTrue(SimdType x, SimdType y)
   {
     return vdupq_n_u8(0xff);
   }
 
-MCS_FORCE_INLINE MT falseMask()
+  MCS_FORCE_INLINE MT falseMask()
   {
     return vdupq_n_u8(0);
   }
@@ -1721,6 +1727,6 @@ MCS_FORCE_INLINE MT falseMask()
   }
 };
 
-};      // namespace simd
+};  // namespace simd
 
 #endif
