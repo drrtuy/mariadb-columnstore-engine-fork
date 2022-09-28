@@ -1,9 +1,7 @@
 
-include_directories( ${ENGINE_COMMON_INCLUDES} ${ENGINE_SRC_DIR}/tools/passwd)
+include_directories(${ENGINE_COMMON_INCLUDES} ${ENGINE_SRC_DIR}/tools/passwd)
 
-
-########### next target ###############
-
+# ########## next target ###############
 set(joblist_LIB_SRCS
     anydatalist.cpp
     batchprimitiveprocessor-jl.cpp
@@ -30,6 +28,7 @@ set(joblist_LIB_SRCS
     jobstepassociation.cpp
     lbidlist.cpp
     limitedorderby.cpp
+    orderby.cpp
     passthrucommand-jl.cpp
     passthrustep.cpp
     pcolscan.cpp
@@ -63,9 +62,8 @@ add_dependencies(joblist loggingcpp)
 
 install(TARGETS joblist DESTINATION ${ENGINE_LIBDIR} COMPONENT columnstore-engine)
 
-if (WITH_ORDERBY_UT)
+if(WITH_ORDERBY_UT)
     add_executable(job_orderby_tests orderby-tests.cpp)
     target_link_libraries(job_orderby_tests ${ENGINE_LDFLAGS} ${MARIADB_CLIENT_LIBS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
     install(TARGETS job_orderby_tests DESTINATION ${ENGINE_BINDIR} COMPONENT columnstore-engine)
 endif()
-
