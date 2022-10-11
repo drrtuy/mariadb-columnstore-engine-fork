@@ -980,7 +980,7 @@ const JobStepVector doAggProject(const CalpontSelectExecutionPlan* csep, JobInfo
             // doesn't really make sense.
             if (op != AggregateColumn::SUM && op != AggregateColumn::DISTINCT_SUM &&
                 op != AggregateColumn::AVG && op != AggregateColumn::DISTINCT_AVG &&
-                op != AggregateColumn::BIT_AND && op != AggregateColumn::BIT_OR && 
+                op != AggregateColumn::BIT_AND && op != AggregateColumn::BIT_OR &&
                 op != AggregateColumn::BIT_XOR)
             {
               updateAggregateColType(aggc, srcp, op, jobInfo);
@@ -1524,6 +1524,7 @@ void parseExecutionPlan(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo, JobS
     jobInfo.stack.pop();
 
     // do some filter order optimization
+    // Puts pColStep after pDictionary steps presuming pDictionary set has smaller selectivity
     optimizeFilterOrder(querySteps);
   }
 
@@ -1584,21 +1585,6 @@ void parseExecutionPlan(CalpontSelectExecutionPlan* csep, JobInfo& jobInfo, JobS
             throw runtime_error("VARBINARY in filter or function is not supported.");
         }
       }
-
-      //			// save the current seentable for right-hand side
-      //			if (typeid(*(iter->get())) == typeid(OrDelimiterLhs))
-      //			{
-      //				seenTableStack.push(seenTableIds);
-      //				continue;
-      //			}
-      //
-      //			// restore the seentable
-      //			else if (typeid(*(iter->get())) == typeid(OrDelimiterRhs))
-      //			{
-      //				seenTableIds = seenTableStack.top();
-      //				seenTableStack.pop();
-      //				continue;
-      //			}
 
       if (typeid(*(iter->get())) == typeid(pColStep))
       {
