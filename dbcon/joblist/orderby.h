@@ -151,6 +151,22 @@ class FlatOrderBy
   {
     uint64_t rgdataID : 32 {}, rowID : 24 {}, flags : 8 {};
   };
+  struct KeyType
+  {
+    int64_t key_;
+    PermutationType perm_;
+
+    bool operator<(const KeyType& rhs) const
+    {
+      return this->key_ < rhs.key_;
+    }
+
+    bool operator>(const KeyType& rhs) const
+    {
+      return this->key_ > rhs.key_;
+    }
+  };
+
   using PermutationVec = std::vector<PermutationType>;
   using PermutationVecIter = std::vector<PermutationType>::iterator;
   using IterDiffT = std::iterator_traits<PermutationVecIter>::difference_type;
@@ -208,6 +224,7 @@ class FlatOrderBy
   rowgroup::RowGroup rg_;
   std::vector<rowgroup::RGData> rgDatas_;
   std::vector<PermutationType> permutation_;
+  std::vector<KeyType> keys_;
   std::unique_ptr<joblist::MemManager> mm_;
   IterDiffT flatCurPermutationDiff_ = 0;
   Ranges2SortQueue ranges2Sort_;
