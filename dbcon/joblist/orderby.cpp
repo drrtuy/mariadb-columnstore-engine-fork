@@ -173,6 +173,10 @@ bool FlatOrderBy::sortByColumnCF(joblist::OrderByKeysType columns)
     case execplan::CalpontSystemCatalog::MEDINT:
     case execplan::CalpontSystemCatalog::INT:
     {
+      using StorageType = datatypes::ColDataTypeToIntegralType<execplan::CalpontSystemCatalog::INT>::type;
+      using EncodedKeyType = KeyType;
+      return radixSortByColumnCF_<IsFirst, execplan::CalpontSystemCatalog::INT, StorageType, EncodedKeyType>(
+          columnId, sortDirection, columns);
       break;
     }
 
@@ -191,8 +195,8 @@ bool FlatOrderBy::sortByColumnCF(joblist::OrderByKeysType columns)
     {
       using StorageType = datatypes::ColDataTypeToIntegralType<execplan::CalpontSystemCatalog::BIGINT>::type;
       using EncodedKeyType = KeyType;
-      return exchangeSortByColumnCF_<IsFirst, execplan::CalpontSystemCatalog::BIGINT, StorageType,
-                                     EncodedKeyType>(columnId, sortDirection, columns);
+      return radixSortByColumnCF_<IsFirst, execplan::CalpontSystemCatalog::BIGINT, StorageType,
+                                  EncodedKeyType>(columnId, sortDirection, columns);
     }
     case execplan::CalpontSystemCatalog::DATETIME:
     {
@@ -605,12 +609,150 @@ bool FlatOrderBy::exchangeSortByColumnCF_(const uint32_t columnID, const bool so
   return isFailure;
 }
 
-// template <enum datatypes::SystemCatalog::ColDataType, typename StorageType, typename EncodedKeyType>
-// bool FlatOrderBy::distributionSortByColumn_(const uint32_t columnId)
-// {
-//   bool isFailure = false;
-//   return isFailure;
-// }
+template <bool IsFirst, datatypes::SystemCatalog::ColDataType ColType, typename StorageType,
+          typename EncodedKeyType>
+requires IsTrue<IsFirst>
+bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortDirection,
+                                       joblist::OrderByKeysType columns)
+{
+  bool isFailure = false;
+  // ASC = true, DESC = false
+  // MCS finally reads records from TAS in opposite to nullsFirst value,
+  // if nullsFirst is true the NULLS will be in the end and vice versa.
+  const bool nullsFirst = !sortDirection;
+  [[maybe_unused]] auto bytes = (sizeof(EncodedKeyType) + sizeof(FlatOrderBy::PermutationType)) *
+                                rgDatas_.size() * rowgroup::rgCommonSize;
+  {
+    std::vector<EncodedKeyType> keys;
+    std::vector<EncodedKeyType> temp_keys;
+    PermutationVec nulls;
+    PermutationVec permutation;
+    PermutationVec permutationTmp;
+    // Grab RAM  keys + permutation. NULLS are counted also.
+    // if (!mm_->acquire(bytes))
+    // {
+    //   cerr << IDBErrorInfo::instance()->errorMsg(ERR_LIMIT_TOO_BIG) << " @" << __FILE__ << ":" << __LINE__;
+    //   throw IDBExcept(ERR_LIMIT_TOO_BIG);
+    // }
+
+    initialPermutationKeysNulls<ColType, StorageType, EncodedKeyType>(columnID, nullsFirst, keys, nulls);
+
+    // This is the first column sorting and keys, nulls were already filled up previously.
+    permutation = std::move(permutation_);
+    size_t counts[256];
+    size_t count = keys.size();
+    bool swap = false;
+    temp_keys.reserve(keys.size());
+    permutationTmp.reserve(permutation.size());
+    for (size_t r = 1; r <= sizeof(EncodedKeyType); ++r)
+    {
+      memset(counts, 0, sizeof(counts));
+      const uint8_t* source_keys_ptr =
+          swap ? reinterpret_cast<uint8_t*>(temp_keys.data()) : reinterpret_cast<uint8_t*>(keys.data());
+      const uint8_t* target_keys_ptr =
+          swap ? reinterpret_cast<uint8_t*>(keys.data()) : reinterpret_cast<uint8_t*>(temp_keys.data());
+      const uint8_t* source_perm_ptr =
+          swap ? reinterpret_cast<uint8_t*>(temp_keys.data()) : reinterpret_cast<uint8_t*>(keys.data());
+      const uint8_t* target_perm_ptr =
+          swap ? reinterpret_cast<uint8_t*>(keys.data()) : reinterpret_cast<uint8_t*>(temp_keys.data());
+
+      const size_t offset = sizeof(EncodedKeyType) - r;
+      const uint8_t* offset_ptr = source_keys_ptr + offset;
+      for (size_t i = 0; i < count; ++i)
+      {
+        counts[*offset_ptr]++;
+        offset_ptr += sizeof(EncodedKeyType);
+      }
+      size_t max_count = counts[0];
+      for (size_t val = 1; val < 256; ++val)
+      {
+        max_count = std::max<size_t>(max_count, counts[val]);
+        if (max_count == count)
+          continue;
+      }
+      const uint8_t* keys_ptr = source_keys_ptr + (count - 1) * sizeof(EncodedKeyType);
+      const uint8_t* perm_ptr = source_perm_ptr + (count - 1) * sizeof(PermutationType);
+      for (size_t i = 0; i < count; ++i)
+      {
+        size_t radix_offset = --counts[*(keys_ptr + offset)];
+        memcpy((void*)(target_keys_ptr + radix_offset * sizeof(EncodedKeyType)), keys_ptr,
+               sizeof(EncodedKeyType));
+        memcpy((void*)(target_perm_ptr + radix_offset * sizeof(PermutationType)), perm_ptr,
+               sizeof(PermutationType));
+        keys_ptr -= sizeof(EncodedKeyType);
+        perm_ptr -= sizeof(PermutationType);
+      }
+      swap = !swap;
+      if (swap)
+      {
+        // Can be swap?
+        memcpy(keys.data(), temp_keys.data(), count * sizeof(EncodedKeyType));
+      }
+    }
+    // auto permBegin = (nullsFirst) ? permutation.begin() + nulls.size() : permutation.begin();
+    // auto permEnd = (nullsFirst) ? permutation.end() : permutation.end() - nulls.size();
+    // assert(std::distance(keys.begin(), keys.end()) == std::distance(permBegin, permEnd));
+    // assert(permutation.size() == keys.size() + ((nullsFirst) ? 0 : nulls.size()));
+    // большой логический косяк - диапазон permutation_ потенциально содержит null-ы в середине, а с краю
+    // могут быть индексы не NULL ключей. Решение в лоб - копия диапазона перестановки.fg
+    // sortDirection is true = ASC
+    // if (sortDirection)
+    // {
+    //   // sorting::mod_pdqsort(keys.begin(), keys.end(), permBegin, permEnd,
+    //   std::greater<EncodedKeyType>()); sorting::pdqsort(keys_.begin(), keys_.end(),
+    //   std::greater<EncodedKeyType>());
+    // }
+    // else
+    // {
+    //   // sorting::mod_pdqsort(keys.begin(), keys.end(), permBegin, permEnd, std::less<EncodedKeyType>());
+    //   sorting::pdqsort(keys_.begin(), keys_.end(), std::less<EncodedKeyType>());
+    // }
+    // Use && here
+    // FlatOrderBy::Ranges2SortQueue ranges4Sort;
+    // if (columns.size() > 1)
+    // {
+    //   ranges4Sort =
+    //       populateRanges<EncodedKeyType>((nullsFirst) ? nulls.size() : 0ULL, keys.begin(), keys.end());
+
+    //   // Adding NULLs range into ranges
+    //   if (nulls.size() > 1)
+    //   {
+    //     if (sortDirection)
+    //     {
+    //       ranges4Sort.push({keys.size(), permutation.size()});
+    //     }
+    //     else
+    //     {
+    //       ranges4Sort.push({0, nulls.size()});
+    //     }
+    //   }
+    // }
+
+    permutation_ = std::move(permutation);
+
+    // Check if copy ellision works here.
+    // Set a stack of equal values ranges. Comp complexity is O(N), mem complexity is O(N)
+    // ranges2Sort_ = std::move(ranges4Sort);
+  }
+  // if (columns.size() > 1)
+  // {
+  //   // !!! FREE RAM
+  //   mm_->release(bytes);
+  //   columns.erase(columns.begin());
+  //   return sortByColumnCF<false>(columns);
+  // }
+  return isFailure;
+}
+
+template <bool IsFirst, datatypes::SystemCatalog::ColDataType ColType, typename StorageType,
+          typename EncodedKeyType>
+requires IsFalse<IsFirst>
+bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortDirection,
+                                       joblist::OrderByKeysType columns)
+{
+  bool isFailure = false;
+  return isFailure;
+}
 
 void FlatOrderBy::processRow(const rowgroup::Row& row)
 {

@@ -194,6 +194,16 @@ class FlatOrderBy
   requires IsTrue<IsFirst>
   bool exchangeSortByColumnCF_(const uint32_t columnId, const bool sortDirection,
                                joblist::OrderByKeysType columns);
+  template <bool IsFirst, datatypes::SystemCatalog::ColDataType, typename StorageType,
+            typename EncodedKeyType>
+  requires IsFalse<IsFirst>
+  bool radixSortByColumnCF_(const uint32_t columnId, const bool sortDirection,
+                               joblist::OrderByKeysType columns);
+  template <bool IsFirst, datatypes::SystemCatalog::ColDataType, typename StorageType,
+            typename EncodedKeyType>
+  requires IsTrue<IsFirst>
+  bool radixSortByColumnCF_(const uint32_t columnId, const bool sortDirection,
+                               joblist::OrderByKeysType columns);
   template <datatypes::SystemCatalog::ColDataType ColType, typename StorageType, typename EncodedKeyType>
   void initialPermutationKeysNulls(const uint32_t columnID, const bool nullsFirst,
                                    std::vector<EncodedKeyType>& keys, std::vector<PermutationType>& nulls);

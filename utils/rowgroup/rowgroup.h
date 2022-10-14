@@ -1924,13 +1924,9 @@ inline void Row::getLocation(uint32_t* partNum, uint16_t* segNum, uint8_t* exten
     *rowNum = getRelRid();
 }
 
+// Modify copyRowM so that it is a memcpy
 inline void copyRowM(const Row& in, Row* out, uint32_t colCount)
 {
-  if (&in == out)
-    return;
-
-  // out->setRid(in.getRelRid());
-
   if (!in.usesStringTable() && !out->usesStringTable())
   {
     memcpy(out->getData(), in.getData(), std::min(in.getOffset(colCount), out->getOffset(colCount)));
