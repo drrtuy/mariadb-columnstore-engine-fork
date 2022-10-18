@@ -174,7 +174,7 @@ bool FlatOrderBy::sortByColumnCF(joblist::OrderByKeysType columns)
     case execplan::CalpontSystemCatalog::INT:
     {
       using StorageType = datatypes::ColDataTypeToIntegralType<execplan::CalpontSystemCatalog::INT>::type;
-      using EncodedKeyType = KeyType;
+      using EncodedKeyType = StorageType;
       return radixSortByColumnCF_<IsFirst, execplan::CalpontSystemCatalog::INT, StorageType, EncodedKeyType>(
           columnId, sortDirection, columns);
       break;
@@ -194,7 +194,7 @@ bool FlatOrderBy::sortByColumnCF(joblist::OrderByKeysType columns)
     case execplan::CalpontSystemCatalog::BIGINT:
     {
       using StorageType = datatypes::ColDataTypeToIntegralType<execplan::CalpontSystemCatalog::BIGINT>::type;
-      using EncodedKeyType = KeyType;
+      using EncodedKeyType = StorageType;
       return radixSortByColumnCF_<IsFirst, execplan::CalpontSystemCatalog::BIGINT, StorageType,
                                   EncodedKeyType>(columnId, sortDirection, columns);
     }
@@ -244,7 +244,7 @@ void FlatOrderBy::initialPermutationKeysNulls(const uint32_t columnID, const boo
   auto nullValue = sorting::getNullValue<StorageType>(ColType);
   RGDataOrRowIDType rgDataId = 0;
   // permutation_.reserve(rgDatas_.size() * rowgroup::rgCommonSize);  // WIP hardcode
-  keys_.reserve(rgDatas_.size() * rowgroup::rgCommonSize);
+  keys.reserve(rgDatas_.size() * rowgroup::rgCommonSize);
   rg_.initRow(&r);
   for (auto& rgData : rgDatas_)
   {
@@ -256,17 +256,16 @@ void FlatOrderBy::initialPermutationKeysNulls(const uint32_t columnID, const boo
 
     for (decltype(rowCount) i = 0; i < rowCount; ++i)
     {
-      // PermutationType permute = {rgDataId, i, 0};
-
-      EncodedKeyType value = {rg_.getColumnValue<ColType, StorageType>(columnID, i), {rgDataId, i, 0}};
-      if (value.key_ != nullValue)
+      PermutationType permute = {rgDataId, i, 0};
+      EncodedKeyType key = rg_.getColumnValue<ColType, StorageType>(columnID, i);
+      if (key != nullValue)
       {
-        keys_.push_back(value);
-        // permutation_.push_back(permute);
+        keys.push_back(key);
+        permutation_.push_back(permute);
       }
       else
       {
-        // nulls.push_back(permute);
+        nulls.push_back(permute);
       }
     }
     ++rgDataId;
@@ -311,17 +310,17 @@ void FlatOrderBy::loopIterKeysNullsPerm(const uint32_t columnID, const bool null
     for (auto p = permSrcBegin; p != permSrcEnd; ++p)
     {
       // set rgdata
-      // rg_.setData(&rgDatas_[p->rgdataID]);  // WIP costly thing
-      // EncodedKeyType value = rg_.getColumnValue<ColType, StorageType>(columnID, p->rowID);
-      // if (value != nullValue)
-      // {
-      //   keys.push_back(value);
-      //   permutation.push_back(*p);
-      // }
-      // else
-      // {
-      //   nulls.push_back(*p);
-      // }
+      rg_.setData(&rgDatas_[p->rgdataID]);  // WIP costly thing
+      EncodedKeyType value = rg_.getColumnValue<ColType, StorageType>(columnID, p->rowID);
+      if (value != nullValue)
+      {
+        keys.push_back(value);
+        permutation.push_back(*p);
+      }
+      else
+      {
+        nulls.push_back(*p);
+      }
     }
   }
   // else
@@ -360,7 +359,7 @@ FlatOrderBy::Ranges2SortQueue FlatOrderBy::populateRanges(
   auto rangeItRight = begin + 1;
   for (; rangeItRight != end; ++rangeItRight)
   {
-    if (rangeItLeft->key_ == rangeItRight->key_)
+    if (*rangeItLeft == *rangeItRight)
       continue;
     // left it value doesn't match right it value
     auto dist = std::distance(rangeItLeft, rangeItRight);
@@ -422,13 +421,13 @@ bool FlatOrderBy::exchangeSortByColumnCF_(const uint32_t columnID, const bool so
     // sortDirection is true = ASC
     if (sortDirection)
     {
-      // sorting::mod_pdqsort(keys.begin(), keys.end(), permBegin, permEnd, std::greater<EncodedKeyType>());
-      sorting::pdqsort(keys_.begin(), keys_.end(), std::greater<EncodedKeyType>());
+      sorting::mod_pdqsort(keys.begin(), keys.end(), permBegin, permEnd, std::greater<EncodedKeyType>());
+      // sorting::pdqsort(keys.begin(), keys.end(), std::greater<EncodedKeyType>());
     }
     else
     {
-      // sorting::mod_pdqsort(keys.begin(), keys.end(), permBegin, permEnd, std::less<EncodedKeyType>());
-      sorting::pdqsort(keys_.begin(), keys_.end(), std::less<EncodedKeyType>());
+      sorting::mod_pdqsort(keys.begin(), keys.end(), permBegin, permEnd, std::less<EncodedKeyType>());
+      // sorting::pdqsort(keys.begin(), keys.end(), std::less<EncodedKeyType>());
     }
     // Use && here
     FlatOrderBy::Ranges2SortQueue ranges4Sort;
@@ -620,26 +619,43 @@ bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortD
   // MCS finally reads records from TAS in opposite to nullsFirst value,
   // if nullsFirst is true the NULLS will be in the end and vice versa.
   const bool nullsFirst = !sortDirection;
-  [[maybe_unused]] auto bytes = (sizeof(EncodedKeyType) + sizeof(FlatOrderBy::PermutationType)) *
+  [[maybe_unused]] auto bytes = 2 * (sizeof(EncodedKeyType) + sizeof(FlatOrderBy::PermutationType)) *
                                 rgDatas_.size() * rowgroup::rgCommonSize;
   {
     std::vector<EncodedKeyType> keys;
     std::vector<EncodedKeyType> temp_keys;
     PermutationVec nulls;
     PermutationVec permutation;
-    PermutationVec permutationTmp;
-    // Grab RAM  keys + permutation. NULLS are counted also.
-    // if (!mm_->acquire(bytes))
-    // {
-    //   cerr << IDBErrorInfo::instance()->errorMsg(ERR_LIMIT_TOO_BIG) << " @" << __FILE__ << ":" << __LINE__;
-    //   throw IDBExcept(ERR_LIMIT_TOO_BIG);
-    // }
+    // Grab RAM keys + permutation.NULLS are counted also.
+    if (!mm_->acquire(bytes))
+    {
+      cerr << IDBErrorInfo::instance()->errorMsg(ERR_LIMIT_TOO_BIG) << " @" << __FILE__ << ":" << __LINE__;
+      throw IDBExcept(ERR_LIMIT_TOO_BIG);
+    }
 
     initialPermutationKeysNulls<ColType, StorageType, EncodedKeyType>(columnID, nullsFirst, keys, nulls);
 
+    if (!mm_->acquire(nulls.size() * sizeof(FlatOrderBy::PermutationType)))
+    {
+      cerr << IDBErrorInfo::instance()->errorMsg(ERR_LIMIT_TOO_BIG) << " @" << __FILE__ << ":" << __LINE__;
+      throw IDBExcept(ERR_LIMIT_TOO_BIG);
+    }
+
+    // if constexpr (sizeof(EncodedKeyType) <= 8)
+    // {
+    //   std::cout << "before sorting " << std::endl;
+    //   for (size_t i = 0; i < keys.size(); ++i)
+    //   {
+    //     int64_t va = keys[i];
+    //     std::cout << " " << va;
+    //   }
+    // }
+    // std::cout << std::endl;
     // This is the first column sorting and keys, nulls were already filled up previously.
     permutation = std::move(permutation_);
-    size_t counts[256];
+    PermutationVec permutationTmp(permutation.size());
+
+    size_t counts[Radix];
     size_t count = keys.size();
     bool swap = false;
     temp_keys.reserve(keys.size());
@@ -651,10 +667,10 @@ bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortD
           swap ? reinterpret_cast<uint8_t*>(temp_keys.data()) : reinterpret_cast<uint8_t*>(keys.data());
       const uint8_t* target_keys_ptr =
           swap ? reinterpret_cast<uint8_t*>(keys.data()) : reinterpret_cast<uint8_t*>(temp_keys.data());
-      const uint8_t* source_perm_ptr =
-          swap ? reinterpret_cast<uint8_t*>(temp_keys.data()) : reinterpret_cast<uint8_t*>(keys.data());
-      const uint8_t* target_perm_ptr =
-          swap ? reinterpret_cast<uint8_t*>(keys.data()) : reinterpret_cast<uint8_t*>(temp_keys.data());
+      const uint8_t* source_perm_ptr = swap ? reinterpret_cast<uint8_t*>(permutationTmp.data())
+                                            : reinterpret_cast<uint8_t*>(permutation.data());
+      const uint8_t* target_perm_ptr = swap ? reinterpret_cast<uint8_t*>(permutation.data())
+                                            : reinterpret_cast<uint8_t*>(permutationTmp.data());
 
       const size_t offset = sizeof(EncodedKeyType) - r;
       const uint8_t* offset_ptr = source_keys_ptr + offset;
@@ -663,32 +679,64 @@ bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortD
         counts[*offset_ptr]++;
         offset_ptr += sizeof(EncodedKeyType);
       }
+
       size_t max_count = counts[0];
-      for (size_t val = 1; val < 256; ++val)
+      for (size_t val = 1; val < Radix; ++val)
       {
         max_count = std::max<size_t>(max_count, counts[val]);
-        if (max_count == count)
-          continue;
+        counts[val] = counts[val] + counts[val - 1];
       }
-      const uint8_t* keys_ptr = source_keys_ptr + (count - 1) * sizeof(EncodedKeyType);
-      const uint8_t* perm_ptr = source_perm_ptr + (count - 1) * sizeof(PermutationType);
-      for (size_t i = 0; i < count; ++i)
+      // for (size_t val = 1; val < Radix; ++val)
+      // {
+      //   std::cout << " val " << val << " counts[val] " << counts[val] << std::endl;
+      // }
+
+      if (max_count == count)
+        continue;
+
+      // if (nullsFirst)
       {
-        size_t radix_offset = --counts[*(keys_ptr + offset)];
-        memcpy((void*)(target_keys_ptr + radix_offset * sizeof(EncodedKeyType)), keys_ptr,
-               sizeof(EncodedKeyType));
-        memcpy((void*)(target_perm_ptr + radix_offset * sizeof(PermutationType)), perm_ptr,
-               sizeof(PermutationType));
-        keys_ptr -= sizeof(EncodedKeyType);
-        perm_ptr -= sizeof(PermutationType);
+        const uint8_t* keys_ptr = source_keys_ptr;
+        const uint8_t* perm_ptr = source_perm_ptr;
+        for (size_t i = 0; i < count; ++i)
+        {
+          size_t radix_offset = --counts[*(keys_ptr + offset)];
+          // if constexpr (sizeof(EncodedKeyType) <= 8)
+          // {
+          //   std::cout << "radix offset i " << i << " " << radix_offset << std::endl;
+          //   std::cout << "keys_ptr i " << i << " " << *(EncodedKeyType*)keys_ptr << std::endl;
+          //   std::cout << "dst_keys_ptr i " << i << " "
+          //             << *(EncodedKeyType*)(target_keys_ptr + radix_offset * sizeof(EncodedKeyType))
+          //             << std::endl;
+          // }
+          memcpy((void*)(target_keys_ptr + radix_offset * sizeof(EncodedKeyType)), keys_ptr,
+                 sizeof(EncodedKeyType));
+          memcpy((void*)(target_perm_ptr + radix_offset * sizeof(PermutationType)), perm_ptr,
+                 sizeof(PermutationType));
+          keys_ptr += sizeof(EncodedKeyType);
+          perm_ptr += sizeof(PermutationType);
+        }
       }
       swap = !swap;
-      if (swap)
-      {
-        // Can be swap?
-        memcpy(keys.data(), temp_keys.data(), count * sizeof(EncodedKeyType));
-      }
     }
+
+    if (swap)
+    {
+      keys.swap(temp_keys);
+      permutation.swap(permutationTmp);
+    }
+    // if constexpr (sizeof(EncodedKeyType) <= 8)
+    // {
+    //   std::cout << "after sorting " << std::endl;
+
+    //   for (auto v : temp_keys)
+    //   {
+    //     size_t va = v;
+    //     std::cout << " " << va;
+    //   }
+    //   std::cout << std::endl;
+    // }
+
     // auto permBegin = (nullsFirst) ? permutation.begin() + nulls.size() : permutation.begin();
     // auto permEnd = (nullsFirst) ? permutation.end() : permutation.end() - nulls.size();
     // assert(std::distance(keys.begin(), keys.end()) == std::distance(permBegin, permEnd));
@@ -707,6 +755,7 @@ bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortD
     //   // sorting::mod_pdqsort(keys.begin(), keys.end(), permBegin, permEnd, std::less<EncodedKeyType>());
     //   sorting::pdqsort(keys_.begin(), keys_.end(), std::less<EncodedKeyType>());
     // }
+
     // Use && here
     // FlatOrderBy::Ranges2SortQueue ranges4Sort;
     // if (columns.size() > 1)
@@ -761,7 +810,7 @@ void FlatOrderBy::processRow(const rowgroup::Row& row)
 void FlatOrderBy::finalize()
 {
   // Signal getData() to return false if perm is empty. Impossible case though.
-  flatCurPermutationDiff_ = (keys_.size() > 0) ? keys_.size() : -1;
+  flatCurPermutationDiff_ = (permutation_.size() > 0) ? permutation_.size() : -1;
 }
 
 // returns false when finishes
@@ -789,9 +838,9 @@ bool FlatOrderBy::getData(rowgroup::RGData& data)
   {
     // find src row, copy into dst row
     // RGData::getRow but need to init an arg row first
-    assert(static_cast<size_t>(i) < keys_.size() && keys_[i].perm_.rgdataID < rgDatas_.size());
+    assert(static_cast<size_t>(i) < permutation_.size() && permutation_[i].rgdataID < rgDatas_.size());
     // Get RowPointer
-    rgDatas_[keys_[i].perm_.rgdataID].getRow(keys_[i].perm_.rowID, &inRow_);
+    rgDatas_[permutation_[i].rgdataID].getRow(permutation_[i].rowID, &inRow_);
     // std::cout << "inRow i " << i << inRow_.toString() << std::endl;
     rowgroup::copyRowM(inRow_, &outRow_, cols);
     outRow_.nextRow();  // I don't like this way of iterating the rows

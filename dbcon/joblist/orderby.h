@@ -151,21 +151,21 @@ class FlatOrderBy
   {
     uint64_t rgdataID : 32 {}, rowID : 24 {}, flags : 8 {};
   };
-  struct KeyType
-  {
-    int64_t key_;
-    PermutationType perm_;
+  // struct KeyType
+  // {
+  //   int64_t key_;
+  //   PermutationType perm_;
 
-    bool operator<(const KeyType& rhs) const
-    {
-      return this->key_ < rhs.key_;
-    }
+  //   bool operator<(const KeyType& rhs) const
+  //   {
+  //     return this->key_ < rhs.key_;
+  //   }
 
-    bool operator>(const KeyType& rhs) const
-    {
-      return this->key_ > rhs.key_;
-    }
-  };
+  //   bool operator>(const KeyType& rhs) const
+  //   {
+  //     return this->key_ > rhs.key_;
+  //   }
+  // };
 
   using PermutationVec = std::vector<PermutationType>;
   using PermutationVecIter = std::vector<PermutationType>::iterator;
@@ -198,12 +198,12 @@ class FlatOrderBy
             typename EncodedKeyType>
   requires IsFalse<IsFirst>
   bool radixSortByColumnCF_(const uint32_t columnId, const bool sortDirection,
-                               joblist::OrderByKeysType columns);
+                            joblist::OrderByKeysType columns);
   template <bool IsFirst, datatypes::SystemCatalog::ColDataType, typename StorageType,
             typename EncodedKeyType>
   requires IsTrue<IsFirst>
   bool radixSortByColumnCF_(const uint32_t columnId, const bool sortDirection,
-                               joblist::OrderByKeysType columns);
+                            joblist::OrderByKeysType columns);
   template <datatypes::SystemCatalog::ColDataType ColType, typename StorageType, typename EncodedKeyType>
   void initialPermutationKeysNulls(const uint32_t columnID, const bool nullsFirst,
                                    std::vector<EncodedKeyType>& keys, std::vector<PermutationType>& nulls);
@@ -234,7 +234,7 @@ class FlatOrderBy
   rowgroup::RowGroup rg_;
   std::vector<rowgroup::RGData> rgDatas_;
   std::vector<PermutationType> permutation_;
-  std::vector<KeyType> keys_;
+  // std::vector<KeyType> keys_;
   std::unique_ptr<joblist::MemManager> mm_;
   IterDiffT flatCurPermutationDiff_ = 0;
   Ranges2SortQueue ranges2Sort_;
@@ -245,6 +245,7 @@ class FlatOrderBy
   rowgroup::RowGroup rgOut_;
   rowgroup::Row inRow_;
   rowgroup::Row outRow_;
+  static constexpr size_t Radix = 256;
 };
 
 }  // namespace joblist
