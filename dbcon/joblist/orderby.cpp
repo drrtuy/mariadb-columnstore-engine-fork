@@ -611,14 +611,14 @@ bool FlatOrderBy::exchangeSortByColumnCF_(const uint32_t columnID, const bool so
 template <bool IsFirst, datatypes::SystemCatalog::ColDataType ColType, typename StorageType,
           typename EncodedKeyType>
 requires IsTrue<IsFirst>
-bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortDirection,
+bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool isAscSorting,
                                        joblist::OrderByKeysType columns)
 {
   bool isFailure = false;
   // ASC = true, DESC = false
   // MCS finally reads records from TAS in opposite to nullsFirst value,
   // if nullsFirst is true the NULLS will be in the end and vice versa.
-  const bool nullsFirst = !sortDirection;
+  const bool nullsFirst = !isAscSorting;
   [[maybe_unused]] auto bytes = 2 * (sizeof(EncodedKeyType) + sizeof(FlatOrderBy::PermutationType)) *
                                 rgDatas_.size() * rowgroup::rgCommonSize;
   {
@@ -660,7 +660,7 @@ bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortD
     bool swap = false;
     temp_keys.reserve(keys.size());
     permutationTmp.reserve(permutation.size());
-    for (size_t r = 1; r <= sizeof(EncodedKeyType); ++r)
+    for (size_t r = 0; r < sizeof(EncodedKeyType); ++r)
     {
       memset(counts, 0, sizeof(counts));
       const uint8_t* source_keys_ptr =
@@ -672,51 +672,92 @@ bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortD
       const uint8_t* target_perm_ptr = swap ? reinterpret_cast<uint8_t*>(permutation.data())
                                             : reinterpret_cast<uint8_t*>(permutationTmp.data());
 
-      const size_t offset = sizeof(EncodedKeyType) - r;
+      const size_t offset = r;
       const uint8_t* offset_ptr = source_keys_ptr + offset;
       for (size_t i = 0; i < count; ++i)
       {
+        // if constexpr (sizeof(EncodedKeyType) <= 8)
+        // {
+        //   size_t a = *offset_ptr;
+        //   std::cout << "hex byte to count " << std::hex << a << std::endl;
+        // }
         counts[*offset_ptr]++;
         offset_ptr += sizeof(EncodedKeyType);
       }
-
       size_t max_count = counts[0];
-      for (size_t val = 1; val < Radix; ++val)
+      if (!isAscSorting)
       {
-        max_count = std::max<size_t>(max_count, counts[val]);
-        counts[val] = counts[val] + counts[val - 1];
+        for (size_t val = 1; val < Radix; ++val)
+        {
+          max_count = std::max<size_t>(max_count, counts[val]);
+          counts[val] = counts[val] + counts[val - 1];
+        }
       }
-      // for (size_t val = 1; val < Radix; ++val)
+      else
+      {
+        max_count = counts[Radix - 1];
+        for (size_t val = Radix - 2; val > 0; --val)
+        {
+          max_count = std::max<size_t>(max_count, counts[val]);
+          counts[val] = counts[val] + counts[val + 1];
+        }
+        // one last step
+        counts[0] += counts[1];
+      }
+      if (max_count == count)
+        continue;
+
+      // for (size_t val = 0; val < Radix; ++val)
       // {
       //   std::cout << " val " << val << " counts[val] " << counts[val] << std::endl;
       // }
 
-      if (max_count == count)
-        continue;
-
-      // if (nullsFirst)
       {
         const uint8_t* keys_ptr = source_keys_ptr;
         const uint8_t* perm_ptr = source_perm_ptr;
         for (size_t i = 0; i < count; ++i)
         {
           size_t radix_offset = --counts[*(keys_ptr + offset)];
+          memcpy((void*)(target_keys_ptr + radix_offset * sizeof(EncodedKeyType)), keys_ptr,
+                 sizeof(EncodedKeyType));
+          memcpy((void*)(target_perm_ptr + radix_offset * sizeof(PermutationType)), perm_ptr,
+                 sizeof(PermutationType));
           // if constexpr (sizeof(EncodedKeyType) <= 8)
           // {
+          //   std::cout << std::hex;
           //   std::cout << "radix offset i " << i << " " << radix_offset << std::endl;
           //   std::cout << "keys_ptr i " << i << " " << *(EncodedKeyType*)keys_ptr << std::endl;
           //   std::cout << "dst_keys_ptr i " << i << " "
           //             << *(EncodedKeyType*)(target_keys_ptr + radix_offset * sizeof(EncodedKeyType))
           //             << std::endl;
+          //   std::cout << std::dec;
           // }
-          memcpy((void*)(target_keys_ptr + radix_offset * sizeof(EncodedKeyType)), keys_ptr,
-                 sizeof(EncodedKeyType));
-          memcpy((void*)(target_perm_ptr + radix_offset * sizeof(PermutationType)), perm_ptr,
-                 sizeof(PermutationType));
           keys_ptr += sizeof(EncodedKeyType);
           perm_ptr += sizeof(PermutationType);
         }
+        // if constexpr (sizeof(EncodedKeyType) <= 8)
+        // {
+        //   std::cout << "after sorting " << std::endl;
+        //   if (swap)
+        //   {
+        //     for (auto v : temp_keys)
+        //     {
+        //       size_t va = v;
+        //       std::cout << " " << va;
+        //     }
+        //   }
+        //   else
+        //   {
+        //     for (auto v : keys)
+        //     {
+        //       size_t va = v;
+        //       std::cout << " " << va;
+        //     }
+        //   }
+        //   std::cout << std::endl;
+        // }
       }
+      // std::cout << "round is finished " << std::endl;
       swap = !swap;
     }
 
@@ -725,11 +766,12 @@ bool FlatOrderBy::radixSortByColumnCF_(const uint32_t columnID, const bool sortD
       keys.swap(temp_keys);
       permutation.swap(permutationTmp);
     }
+
     // if constexpr (sizeof(EncodedKeyType) <= 8)
     // {
     //   std::cout << "after sorting " << std::endl;
 
-    //   for (auto v : temp_keys)
+    //   for (auto v : keys)
     //   {
     //     size_t va = v;
     //     std::cout << " " << va;
