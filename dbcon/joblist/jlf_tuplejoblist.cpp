@@ -25,8 +25,8 @@
 #include <stack>
 #include <iterator>
 #include <algorithm>
-//#define NDEBUG
-//#include <cassert>
+// #define NDEBUG
+// #include <cassert>
 #include <vector>
 #include <set>
 #include <map>
@@ -499,12 +499,6 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     deliverySteps[CNX_VTABLE_ID] = ws;
   }
 
-  // TODO MCOL-894 we don't need to run sorting|distinct
-  // every time
-  //    if ((jobInfo.limitCount != (uint64_t) - 1) ||
-  //            (jobInfo.constantCol == CONST_COL_EXIST) ||
-  //            (jobInfo.hasDistinct))
-  //    {
   if (jobInfo.annexStep.get() == NULL)
     jobInfo.annexStep.reset(new TupleAnnexStep(jobInfo));
 
@@ -513,10 +507,7 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 
   if (jobInfo.orderByColVec.size() > 0)
   {
-    tas->addOrderBy(new LimitedOrderBy());
-    if (jobInfo.orderByThreads > 1)
-      tas->setParallelOp();
-    tas->setMaxThreads(jobInfo.orderByThreads);
+    tas->addOrderBy(jobInfo);
   }
 
   if (jobInfo.constantCol == CONST_COL_EXIST)
@@ -524,8 +515,6 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
 
   if (jobInfo.hasDistinct)
     tas->setDistinct();
-
-  //    }
 
   if (jobInfo.annexStep)
   {
@@ -554,6 +543,19 @@ void adjustLastStep(JobStepVector& querySteps, DeliveredTableMap& deliverySteps,
     spdlOut->rowGroupDL(dlOut);
     JobStepAssociation jsaOut;
     jsaOut.outAdd(spdlOut);
+
+    // WIP add spec check for falt order by here
+    if (jobInfo.orderByColVec.size() > 0 && !tas->firstPhaseflatOrderBys_.empty())
+    {
+      for (size_t i = 1; i <= jobInfo.orderByThreads; ++i)
+      {
+        AnyDataListSPtr spdlOut(new AnyDataList());
+        RowGroupDL* dlOut = new RowGroupDL(1, jobInfo.fifoSize);
+        dlOut->OID(CNX_VTABLE_ID);
+        spdlOut->rowGroupDL(dlOut);
+        jsaOut.outAdd(spdlOut);
+      }
+    }
     jobInfo.annexStep->outputAssociation(jsaOut);
 
     querySteps.push_back(jobInfo.annexStep);

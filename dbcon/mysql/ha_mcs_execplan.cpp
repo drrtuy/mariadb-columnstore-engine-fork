@@ -8655,6 +8655,7 @@ int getSelectPlan(gp_walk_info& gwi, SELECT_LEX& select_lex, SCSEP& csep, bool i
         csep->specHandlerProcessed(true);
       }
     }
+    csep->orderByThreads(get_orderby_threads(gwi.thd));
 
     // json dictionary for debug and testing options
     csep->pron(get_pron(gwi.thd));

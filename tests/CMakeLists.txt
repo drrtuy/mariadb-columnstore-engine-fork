@@ -1,11 +1,17 @@
 include_directories( ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE} )
+<<<<<<< HEAD
 
 IF(NOT WITH_UBSAN AND NOT WITH_TSAN)
     MY_CHECK_AND_SET_COMPILER_FLAG("-U_FORTIFY_SOURCE" DEBUG RELWITHDEBINFO)
     MY_CHECK_AND_SET_COMPILER_FLAG("-fsanitize=address -fsanitize-address-use-after-scope -fPIC")
 ENDIF()
+=======
+MY_CHECK_AND_SET_COMPILER_FLAG("-U_FORTIFY_SOURCE" DEBUG RELWITHDEBINFO)
+MY_CHECK_AND_SET_COMPILER_FLAG("-fsanitize=address -fsanitize-address-use-after-scope ASAN_OPTIONS=alloc_dealloc_mismatch=0 -fPIC")
+>>>>>>> b3898bb2e (This commit fixes U20 linking issue when libwriteengine.so lacks boost_date_time  symbol)
 
-if (WITH_UNITTESTS)
+
+if(WITH_UNITTESTS)
     cmake_policy(SET CMP0054 NEW)
     set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
     ExternalProject_Add(googletest
@@ -16,18 +22,18 @@ if (WITH_UNITTESTS)
 
     # this is a workaround for gtest's bug still not closed
     # https://github.com/google/googletest/issues/3659
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         MY_CHECK_AND_SET_COMPILER_FLAG("-U__cpp_char8_t")
     endif()
 
-
     include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
+
     # lib64 for RPM-based distros
     link_directories(${EXTERNAL_INSTALL_LOCATION}/lib ${EXTERNAL_INSTALL_LOCATION}/lib64)
-    set(GTEST_LIBRARIES gtest gtest_main pthread)
+    set(GTEST_LIBRARIES gtest gtest_main gmock gmock_main pthread)
     include(GoogleTest)
 
-    #GoogleTest tests
+    # GoogleTest tests
     add_executable(rowgroup_tests rowgroup-tests.cpp)
     add_dependencies(rowgroup_tests googletest)
     target_link_libraries(rowgroup_tests ${ENGINE_LDFLAGS} ${GTEST_LIBRARIES} ${ENGINE_EXEC_LIBS})
@@ -71,6 +77,21 @@ if (WITH_UNITTESTS)
     target_link_libraries(simd_processors ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc)
     gtest_add_tests(TARGET simd_processors TEST_PREFIX columnstore:)
 
+    add_executable(heaporderby heaporderby-tests.cpp)
+    add_dependencies(heaporderby googletest)
+    target_link_libraries(heaporderby ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc)
+    gtest_add_tests(TARGET heaporderby TEST_PREFIX columnstore:)
+
+    add_executable(pdqorderby pdqorderby-tests.cpp)
+    add_dependencies(pdqorderby googletest)
+    target_link_libraries(pdqorderby ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc)
+    gtest_add_tests(TARGET pdqorderby TEST_PREFIX columnstore:)
+
+    add_executable(modified_pdqsort modified_pdqsort.cpp)
+    add_dependencies(modified_pdqsort googletest)
+    target_link_libraries(modified_pdqsort ${ENGINE_LDFLAGS} ${MARIADB_CLIENT_LIBS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc)
+    gtest_add_tests(TARGET modified_pdqsort TEST_PREFIX columnstore:)
+
     add_executable(fair_threadpool_test fair_threadpool.cpp)
     add_dependencies(fair_threadpool_test googletest)
     target_link_libraries(fair_threadpool_test ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc)
@@ -80,9 +101,15 @@ if (WITH_UNITTESTS)
     target_link_libraries(comparators_tests ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
     add_test(NAME columnstore:comparators_tests COMMAND comparators_tests)
 
+<<<<<<< HEAD
     add_executable(bytestream bytestream.cpp)
     target_link_libraries(bytestream ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
     add_test(NAME columnstore:bytestream COMMAND bytestream)
+=======
+    # add_executable(pqorderby_test pqorderby-test.cpp)
+    # target_link_libraries(pqorderby_test ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
+    # add_test(NAME columnstore:pqorderby_test COMMAND pqorderby_test)
+>>>>>>> b3898bb2e (This commit fixes U20 linking issue when libwriteengine.so lacks boost_date_time  symbol)
 
     # standalone EM routines test
     add_executable(brm_em_standalone brm-em-standalone.cpp)
@@ -91,11 +118,10 @@ if (WITH_UNITTESTS)
     set_tests_properties(columnstore:brm_em_standalone PROPERTIES DISABLED True)
 endif()
 
-if (WITH_MICROBENCHMARKS AND (NOT CMAKE_BUILD_TYPE STREQUAL "Debug"))
+if(WITH_MICROBENCHMARKS AND(NOT CMAKE_BUILD_TYPE STREQUAL "Debug"))
     find_package(benchmark REQUIRED)
     add_executable(primitives_scan_bench primitives_scan_bench.cpp)
-    target_include_directories(primitives_scan_bench PUBLIC ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE} )
+    target_include_directories(primitives_scan_bench PUBLIC ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE})
     target_link_libraries(primitives_scan_bench ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${GTEST_LIBRARIES} processor dbbc benchmark::benchmark)
     add_test(NAME columnstore_microbenchmarks:primitives_scan_bench, COMMAND primitives_scan_bench)
 endif()
-

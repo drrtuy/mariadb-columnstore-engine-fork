@@ -190,6 +190,10 @@ class TSInt128
   {
     return s128Value == static_cast<int128_t>(x);
   }
+  inline bool operator==(const TSInt128 x) const
+  {
+    return s128Value == x.s128Value;
+  }
 
   inline operator bool() const
   {
