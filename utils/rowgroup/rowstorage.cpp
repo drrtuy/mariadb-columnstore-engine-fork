@@ -24,6 +24,8 @@
 #include "rowstorage.h"
 #include "robin_hood.h"
 
+#include <unordered_map>
+
 namespace
 {
 int writeData(int fd, const char* buf, size_t sz)
@@ -1556,8 +1558,8 @@ bool RowAggStorage::getTargetRow(const Row& row, uint64_t hash, Row& rowOut)
     if (fExtKeys)
     {
       fRealKeysStorage.reset(new RowGroupStorage(fTmpDir, fKeysRowGroup, fMaxRows, fMM->getResourceManaged(),
-                                         fMM->getSessionLimit(), !fEnabledDiskAggregation,
-                                         !fEnabledDiskAggregation, fCompressor.get()));
+                                                 fMM->getSessionLimit(), !fEnabledDiskAggregation,
+                                                 !fEnabledDiskAggregation, fCompressor.get()));
       fKeysStorage = fRealKeysStorage.get();
     }
     else
@@ -1694,9 +1696,7 @@ void RowAggStorage::dump()
   {
     startNewGeneration();
   }
-  else if (fAllowGenerations &&
-           freeMem < totalMem / 10 * 3 &&
-           fRandDistr(fRandGen) < 30)
+  else if (fAllowGenerations && freeMem < totalMem / 10 * 3 && fRandDistr(fRandGen) < 30)
   {
     startNewGeneration();
   }
@@ -1983,6 +1983,33 @@ void RowAggStorage::startNewGeneration()
     reserve(fMaxRows);
     return;
   }
+  // std::cout << "startNewGeneration fCurData->hashMultiplier_ " << std::hex << fCurData->hashMultiplier_
+  // << std::dec << std::endl;
+
+  // Row r;
+  // RowGroup rg = *fStorage->fRowGroupOut;
+  // // rg.initRow(&r);
+  // for (size_t rgid = 0; rgid < fStorage->fRGDatas.size(); ++rgid)
+  // {
+  //   if (UNLIKELY(!fStorage->fRGDatas[rgid]))
+  //   {
+  //     fStorage->loadRG(rgid);
+  //   }
+  //   auto& rgd = *fStorage->fRGDatas[rgid];
+  //   rg.setData(&(rgd));
+  //   rg.initRow(&r);
+  //   rgd.getRow(0, &r);
+  //   size_t rows = rg.getRowCount();
+  //   // std::cout << "startNewGeneration rows " << rows << std::endl;
+  //   for (size_t i = 0; i < rows; ++i)
+  //   {
+  //     auto s = r.getConstString(0);
+  //     // std::cout << "startNewGeneration _preMa.size() " << s.toString() << std::endl;
+  //     _preMa.insert({s.toString(), s.toString()});
+  //     r.nextRow();
+  //   }
+  // }
+  // std::cout << "_preMa.size() " << _preMa.size() << std::endl;
 
   if (fCurData->fSize == 0)
     return;
@@ -2023,6 +2050,7 @@ void RowAggStorage::dumpInternalData() const
   bs << fCurData->fSize;
   bs << fCurData->fMask;
   bs << fCurData->fMaxSize;
+  bs << fCurData->hashMultiplier_;
   bs << fCurData->fInfoInc;
   bs << fCurData->fInfoHashShift;
   bs.append(fCurData->fInfo.get(), calcBytes(calcSizeWithBuffer(fCurData->fMask + 1, fCurData->fMaxSize)));
@@ -2056,14 +2084,21 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
   Row tmpKeyRow;
   fKeysStorage->initRow(tmpKeyRow);
   Row tmpRow;
+  // Row someRow;
+  // Row prevSomeRow;
+
   fStorage->initRow(tmpRow);
+  // fStorage->initRow(someRow);
+  // fStorage->initRow(prevSomeRow);
+
   dumpInternalData();
   fCurData->fHashes->dump();
   fStorage->dumpAll();
   if (fExtKeys)
     fKeysStorage->dumpAll();
-
+  // uint32_t count = 0, count2 = 0, count3 = 0, count4 = 0, count5 = 0, count6 = 0;
   uint16_t curGen = fGeneration + 1;
+  // std::cout << "fGeneration " << fGeneration << std::endl;
   while (--curGen > 0)
   {
     bool genUpdated = false;
@@ -2090,6 +2125,7 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
     size_t prevSize;
     size_t prevMask;
     size_t prevMaxSize;
+    size_t prevHashMultiplier;
     uint32_t prevInfoInc;
     uint32_t prevInfoHashShift;
     std::unique_ptr<uint8_t[]> prevInfo;
@@ -2099,9 +2135,11 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
     RowGroupStorage* prevKeyRowStorage{nullptr};
 
     auto elems = calcSizeWithBuffer(fCurData->fMask + 1);
+    // std::cout << "_prevMa.size() " << _preMa.size() << std::endl;
 
     for (uint16_t prevGen = 0; prevGen < curGen; ++prevGen)
     {
+      // std::cout << "prevGen " << prevGen << std::endl;
       prevRowStorage.reset(fStorage->clone(prevGen));
       if (fExtKeys)
       {
@@ -2111,7 +2149,8 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
       else
         prevKeyRowStorage = prevRowStorage.get();
 
-      loadGeneration(prevGen, prevSize, prevMask, prevMaxSize, prevInfoInc, prevInfoHashShift, prevInfo);
+      loadGeneration(prevGen, prevSize, prevMask, prevMaxSize, prevHashMultiplier, prevInfoInc,
+                     prevInfoHashShift, prevInfo);
       prevHashes = fCurData->fHashes->clone(prevMask + 1, prevGen, true);
 
       // iterate over current generation rows
@@ -2128,16 +2167,22 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
         }
 
         const auto& pos = fCurData->fHashes->get(idx);
-
+        // auto& keyRow = fExtKeys ? fKeyRow : rowOut;
+        // fKeysStorage->getRow(pos.idx, keyRow);
         if (fKeysStorage->isFinalized(pos.idx))
         {
+          // if (_preMa.contains(keyRow.getConstString(0).toString()))
+          //   ++count;
           // this row was already merged into newer generation, skip it
           continue;
         }
 
         // now try to find row in the previous generation
-        uint32_t pinfo = prevInfoInc + static_cast<uint32_t>((pos.hash & INFO_MASK) >> prevInfoHashShift);
-        uint64_t pidx = (pos.hash >> INIT_INFO_BITS) & prevMask;
+        size_t h = prevHashMultiplier * pos.hash;
+        h ^= h >> 33U;
+        uint32_t pinfo = prevInfoInc + static_cast<uint32_t>((h & INFO_MASK) >> prevInfoHashShift);
+        uint64_t pidx = (h >> INIT_INFO_BITS) & prevMask;
+
         while (pinfo < prevInfo[pidx])
         {
           ++pidx;
@@ -2145,6 +2190,11 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
         }
         if (prevInfo[pidx] != pinfo)
         {
+          // if (_preMa.contains(keyRow.getConstString(0).toString()))
+          // {
+          //   ++count2;
+          // }
+
           // there is no such row
           continue;
         }
@@ -2159,6 +2209,8 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
         }
         if (prevInfo[pidx] != pinfo || pos.hash != ppos.hash)
         {
+          // if (_preMa.contains(keyRow.getConstString(0).toString()))
+          //   ++count3;
           // no matches
           continue;
         }
@@ -2175,6 +2227,8 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
             ++pidx;
             pinfo += prevInfoInc;
             ppos = prevHashes->get(pidx);
+            // if (_preMa.contains(keyRow.getConstString(0).toString()))
+            //   ++count4;
             continue;
           }
 
@@ -2184,6 +2238,8 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
             ++pidx;
             pinfo += prevInfoInc;
             ppos = prevHashes->get(pidx);
+            // if (_preMa.contains(keyRow.getConstString(0).toString()))
+            //   ++count5;
             continue;
           }
           found = true;
@@ -2191,12 +2247,15 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
 
         if (!found)
         {
+          // if (_preMa.contains(keyRow.getConstString(0).toString()))
+          //   ++count6;
           // nothing was found, go to the next row
           continue;
         }
 
         if (UNLIKELY(prevKeyRowStorage->isFinalized(ppos.idx)))
         {
+          // std::cout << "should never happen" << std::endl;
           // just to be sure, it can NEVER happen
           continue;
         }
@@ -2256,6 +2315,12 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
     else
       fKeysStorage = prevKeyRowStorage;
   }
+  // std::cout << "finalize count " << count << std::endl;
+  // std::cout << "finalize count2 " << count2 << std::endl;
+  // std::cout << "finalize count3 " << count3 << std::endl;
+  // std::cout << "finalize count4 " << count4 << std::endl;
+  // std::cout << "finalize count5 " << count5 << std::endl;
+  // std::cout << "finalize count6 " << count6 << std::endl;
 
   fStorage->dumpFinalizedInfo();
   if (fExtKeys)
@@ -2276,12 +2341,12 @@ void RowAggStorage::finalize(std::function<void(Row&)> mergeFunc, Row& rowOut)
 
 void RowAggStorage::loadGeneration(uint16_t gen)
 {
-  loadGeneration(gen, fCurData->fSize, fCurData->fMask, fCurData->fMaxSize, fCurData->fInfoInc,
-                 fCurData->fInfoHashShift, fCurData->fInfo);
+  loadGeneration(gen, fCurData->fSize, fCurData->fMask, fCurData->fMaxSize, fCurData->hashMultiplier_,
+                 fCurData->fInfoInc, fCurData->fInfoHashShift, fCurData->fInfo);
 }
 
 void RowAggStorage::loadGeneration(uint16_t gen, size_t& size, size_t& mask, size_t& maxSize,
-                                   uint32_t& infoInc, uint32_t& infoHashShift,
+                                   size_t& hashMultiplier, uint32_t& infoInc, uint32_t& infoHashShift,
                                    std::unique_ptr<uint8_t[]>& info)
 {
   messageqcpp::ByteStream bs;
@@ -2312,6 +2377,7 @@ void RowAggStorage::loadGeneration(uint16_t gen, size_t& size, size_t& mask, siz
   bs >> size;
   bs >> mask;
   bs >> maxSize;
+  bs >> hashMultiplier;
   bs >> infoInc;
   bs >> infoHashShift;
   size_t infoSz = calcBytes(calcSizeWithBuffer(mask + 1, maxSize));

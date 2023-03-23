@@ -239,9 +239,9 @@ class RowAggStorage
 
   void nextHashMultiplier()
   {
-      // adding an *even* number, so that the multiplier will always stay odd. This is necessary
-      // so that the hash stays a mixing function (and thus doesn't have any information loss).
-      fCurData->hashMultiplier_ += 0xc4ceb9fe1a85ec54;
+    // adding an *even* number, so that the multiplier will always stay odd. This is necessary
+    // so that the hash stays a mixing function (and thus doesn't have any information loss).
+    fCurData->hashMultiplier_ += 0xc4ceb9fe1a85ec54;
   }
 
   /** @brief Increase internal data size if needed
@@ -310,8 +310,8 @@ class RowAggStorage
    */
   void loadGeneration(uint16_t gen);
   /** @brief Load previously dumped data into the tmp storage */
-  void loadGeneration(uint16_t gen, size_t& size, size_t& mask, size_t& maxSize, uint32_t& infoInc,
-                      uint32_t& infoHashShift, std::unique_ptr<uint8_t[]>& info);
+  void loadGeneration(uint16_t gen, size_t& size, size_t& mask, size_t& maxSize, size_t& hashMultiplier,
+                      uint32_t& infoInc, uint32_t& infoHashShift, std::unique_ptr<uint8_t[]>& info);
 
   /** @brief Remove temporary data files */
   void cleanup();
@@ -371,6 +371,7 @@ class RowAggStorage
   std::random_device fRD;
   std::mt19937 fRandGen;
   std::uniform_int_distribution<uint8_t> fRandDistr;
+  // std::unordered_map<std::string, std::string> _preMa;
 };
 
 }  // namespace rowgroup
