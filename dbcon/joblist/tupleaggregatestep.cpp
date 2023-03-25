@@ -18,8 +18,8 @@
 
 //  $Id: tupleaggregatestep.cpp 9732 2013-08-02 15:56:15Z pleblanc $
 
-//#define NDEBUG
-// Cross engine needs to be at top due to MySQL includes
+// #define NDEBUG
+//  Cross engine needs to be at top due to MySQL includes
 #define PREFER_MY_CONFIG_H
 #include "crossenginestep.h"
 
@@ -69,7 +69,7 @@ using namespace querytele;
 #include "tuplehashjoin.h"
 #include "tupleaggregatestep.h"
 
-//#include "stopwatch.cpp"
+// #include "stopwatch.cpp"
 
 // Stopwatch timer;
 
@@ -2842,7 +2842,8 @@ void TupleAggregateStep::prep1PhaseDistinctAggregate(JobInfo& jobInfo, vector<Ro
                     f->fAggFunction == ROWAGG_MIN || f->fAggFunction == ROWAGG_MAX ||
                     f->fAggFunction == ROWAGG_STATS || f->fAggFunction == ROWAGG_BIT_AND ||
                     f->fAggFunction == ROWAGG_BIT_OR || f->fAggFunction == ROWAGG_BIT_XOR ||
-                    f->fAggFunction == ROWAGG_CONSTANT || f->fAggFunction == ROWAGG_GROUP_CONCAT || f->fAggFunction == ROWAGG_JSON_ARRAY))
+                    f->fAggFunction == ROWAGG_CONSTANT || f->fAggFunction == ROWAGG_GROUP_CONCAT ||
+                    f->fAggFunction == ROWAGG_JSON_ARRAY))
           {
             funct.reset(new RowAggFunctionCol(f->fAggFunction, f->fStatsFunction, f->fInputColumnIndex,
                                               f->fOutputColumnIndex, f->fAuxColumnIndex - multiParms));
@@ -5789,7 +5790,32 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
               // for "group by without distinct" case
               else
               {
-                fAggregator->append(fAggregators[i].get());
+                // fAggregator->append(fAggregators[i].get());
+                while (fAggregators[i]->nextRowGroup_() && !cancelled())
+                {
+                  fAggregators[i]->finalize();
+                  rowCount = fAggregators[i]->fRowGroupOut->getRowCount();
+                  fRowsReturned += rowCount;
+                  fRowGroupDelivered.setData(fAggregators[i]->fRowGroupOut->getRGData());
+
+                  if (rowCount != 0)
+                  {
+                    if (fRowGroupOut.getColumnCount() != fRowGroupDelivered.getColumnCount())
+                      pruneAuxColumns();
+
+                    if (dlp)
+                    {
+                      rgData = fRowGroupDelivered.duplicate();
+                      dlp->insert(rgData);
+                    }
+                    else
+                    {
+                      bs.restart();
+                      fRowGroupDelivered.serializeRGData(bs);
+                      break;
+                    }
+                  }
+                }
               }
             }
           }
@@ -5801,34 +5827,34 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
       bool done = true;
 
       //@bug4459
-      while (fAggregator->nextRowGroup() && !cancelled())
-      {
-        done = false;
-        fAggregator->finalize();
-        rowCount = fRowGroupOut.getRowCount();
-        fRowsReturned += rowCount;
-        fRowGroupDelivered.setData(fRowGroupOut.getRGData());
+      // while (fAggregator->nextRowGroup() && !cancelled())
+      // {
+      //   done = false;
+      //   fAggregator->finalize();
+      //   rowCount = fRowGroupOut.getRowCount();
+      //   fRowsReturned += rowCount;
+      //   fRowGroupDelivered.setData(fRowGroupOut.getRGData());
 
-        if (rowCount != 0)
-        {
-          if (fRowGroupOut.getColumnCount() != fRowGroupDelivered.getColumnCount())
-            pruneAuxColumns();
+      //   if (rowCount != 0)
+      //   {
+      //     if (fRowGroupOut.getColumnCount() != fRowGroupDelivered.getColumnCount())
+      //       pruneAuxColumns();
 
-          if (dlp)
-          {
-            rgData = fRowGroupDelivered.duplicate();
-            dlp->insert(rgData);
-          }
-          else
-          {
-            bs.restart();
-            fRowGroupDelivered.serializeRGData(bs);
-            break;
-          }
-        }
+      //     if (dlp)
+      //     {
+      //       rgData = fRowGroupDelivered.duplicate();
+      //       dlp->insert(rgData);
+      //     }
+      //     else
+      //     {
+      //       bs.restart();
+      //       fRowGroupDelivered.serializeRGData(bs);
+      //       break;
+      //     }
+      //   }
 
-        done = true;
-      }
+      //   done = true;
+      // }
 
       if (done)
       {
