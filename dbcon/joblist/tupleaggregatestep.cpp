@@ -5711,8 +5711,6 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 
           uint32_t bucketsPerThread = fNumOfBuckets / fNumOfThreads;
           uint32_t numThreads = ((fNumOfBuckets % fNumOfThreads) == 0 ? fNumOfThreads : fNumOfThreads + 1);
-          // uint32_t bucketsPerThread = 1;
-          // uint32_t numThreads = fNumOfBuckets;
 
           runners.reserve(numThreads);
 
@@ -5761,6 +5759,7 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
     else
     {
       auto* agg = dynamic_cast<RowAggregationDistinct*>(fAggregator.get());
+      bool done = true;
 
       if (!fEndOfResult)
       {
@@ -5770,7 +5769,7 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
           {
             if (fEndOfResult == false)
             {
-              // do the final aggregtion and deliver the results
+              // do the final aggregation and deliver the results
               // at least one RowGroup for aggregate results
               // for "distinct without group by" case
               if (agg != nullptr)
@@ -5786,13 +5785,42 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
                 }
 
                 agg->doDistinctAggregation();
+
+                while (fAggregator->nextRowGroup() && !cancelled())
+                {
+                  done = false;
+                  fAggregator->finalize();
+                  rowCount = fRowGroupOut.getRowCount();
+                  fRowsReturned += rowCount;
+                  fRowGroupDelivered.setData(fRowGroupOut.getRGData());
+
+                  if (rowCount != 0)
+                  {
+                    if (fRowGroupOut.getColumnCount() != fRowGroupDelivered.getColumnCount())
+                      pruneAuxColumns();
+
+                    if (dlp)
+                    {
+                      rgData = fRowGroupDelivered.duplicate();
+                      dlp->insert(rgData);
+                    }
+                    else
+                    {
+                      bs.restart();
+                      fRowGroupDelivered.serializeRGData(bs);
+                      break;
+                    }
+                  }
+
+                  done = true;
+                }
               }
               // for "group by without distinct" case
               else
               {
-                // fAggregator->append(fAggregators[i].get());
                 while (fAggregators[i]->nextRowGroup_() && !cancelled())
                 {
+                  done = false;
                   fAggregators[i]->finalize();
                   rowCount = fAggregators[i]->fRowGroupOut->getRowCount();
                   fRowsReturned += rowCount;
@@ -5815,6 +5843,7 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
                       break;
                     }
                   }
+                  done = true;
                 }
               }
             }
@@ -5823,8 +5852,6 @@ uint64_t TupleAggregateStep::doThreadedAggregate(ByteStream& bs, RowGroupDL* dlp
 
         fDoneAggregate = true;
       }
-
-      bool done = true;
 
       //@bug4459
       // while (fAggregator->nextRowGroup() && !cancelled())
