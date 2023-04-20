@@ -153,6 +153,10 @@ MasterSegmentTable::MasterSegmentTable()
   }
 }
 
+MasterSegmentTable::~MasterSegmentTable()
+{
+}
+
 void MasterSegmentTable::makeMSTSegment()
 {
   fPImpl = MasterSegmentTableImpl::makeMasterSegmentTableImpl(fShmKeys.MST_SYSVKEY, MSTshmsize);
