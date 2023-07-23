@@ -1,6 +1,4 @@
 include_directories( ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE} )
-MY_CHECK_AND_SET_COMPILER_FLAG("-U_FORTIFY_SOURCE" DEBUG RELWITHDEBINFO)
-MY_CHECK_AND_SET_COMPILER_FLAG("-fsanitize=address -fsanitize-address-use-after-scope -fPIC")
 
 if (WITH_UNITTESTS)
     cmake_policy(SET CMP0054 NEW)
@@ -82,6 +80,11 @@ if (WITH_UNITTESTS)
     target_include_directories(patterns_test PUBLIC ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE} )
     target_link_libraries(patterns_test ${GTEST_LIBRARIES})
     gtest_add_tests(TARGET patterns_test TEST_PREFIX mpark_patterns:)
+
+    add_executable(vss_tests vss.cpp)
+    add_dependencies(vss_tests googletest)
+    target_link_libraries(vss_tests ${ENGINE_LDFLAGS} ${GTEST_LIBRARIES} ${ENGINE_EXEC_LIBS})
+    gtest_add_tests(TARGET vss_tests TEST_PREFIX columnstore:)
 
     # standalone EM routines test
     add_executable(brm_em_standalone brm-em-standalone.cpp)

@@ -247,7 +247,8 @@ class SlaveDBRMNode
    * @param OID The OID of the object being deleted
    * @return 0 on success, -1 on error
    */
-  int deleteOID(OID_t oid) throw();
+  int deleteOID(OID_t oid, const bool vbbmIsLocked = false, const bool vssIsLocked = false,
+                const bool cleanUpEM = true) throw();
 
   /** @brief Delete the extents of OIDs and invalidate VSS references to them
    *
@@ -323,7 +324,8 @@ class SlaveDBRMNode
    * first.
    * @return 0 on success, -1 on error
    */
-  int writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID, uint32_t vbFBO) throw();
+  int writeVBEntry(VER_t transID, LBID_t lbid, OID_t vbOID, uint32_t vbFBO, const bool vbbmIsLocked,
+                   const bool vssIsLocked = false) throw();
 
   /** @brief Bulk registers a version buffer entry.
    *
@@ -468,7 +470,8 @@ class SlaveDBRMNode
   VSS vss;
   CopyLocks copylocks;
   bool locked[3];  // 0 = VBBM, 1 = VSS, 2 = CopyLocks
-  std::vector<std::unique_ptr<VSS>> vss_;
+  std::vector<bool> vssIsLocked_;
+  VssPtrVector vss_;
 };
 
 }  // namespace BRM

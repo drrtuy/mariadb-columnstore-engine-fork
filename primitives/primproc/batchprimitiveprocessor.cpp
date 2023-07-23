@@ -33,7 +33,7 @@
 #include <stdexcept>
 #include <unistd.h>
 #include <cstring>
-//#define NDEBUG
+// #define NDEBUG
 #include <cassert>
 #include <string>
 #include <sstream>
@@ -629,7 +629,7 @@ void BatchPrimitiveProcessor::addToJoiner(ByteStream& bs)
   {
     uint64_t key;
     uint32_t value;
-  } * arr;
+  }* arr;
 #pragma pack(pop)
 
   /* skip the header */
@@ -931,7 +931,7 @@ void BatchPrimitiveProcessor::initProcessor()
     strValues.reset(new string[LOGICAL_BLOCK_RIDS]);
 
   outMsgSize = defaultBufferSize;
-  outputMsg.reset(new(std::align_val_t(MAXCOLUMNWIDTH)) uint8_t[outMsgSize]);
+  outputMsg.reset(new (std::align_val_t(MAXCOLUMNWIDTH)) uint8_t[outMsgSize]);
 
   if (ot == ROW_GROUP)
   {
@@ -1479,8 +1479,8 @@ void BatchPrimitiveProcessor::execute()
 
           if (!asyncLoaded[p + 1])
           {
-            loadBlockAsync(col->getLBIDAux(), versionInfo, txnID, 2, &cachedIO, &physIO,
-                           LBIDTrace, sessionID, &counterLock, &busyLoaderCount, sendThread, &vssCache);
+            loadBlockAsync(col->getLBIDAux(), versionInfo, txnID, 2, &cachedIO, &physIO, LBIDTrace, sessionID,
+                           &counterLock, &busyLoaderCount, sendThread, &vssCache);
             asyncLoaded[p + 1] = true;
           }
         }
@@ -2852,9 +2852,12 @@ void BatchPrimitiveProcessor::buildVSSCache(uint32_t loopCount)
 
   if (rc == 0)
     for (i = 0; i < vssData.size(); i++)
+    {
+      cout << "buildVSSCache lbid " << lbidList[i] << " txn" << vssData[i].verID << endl;
       vssCache.insert(make_pair(lbidList[i], vssData[i]));
+    }
 
-  //	cout << "buildVSSCache inserted " << vssCache.size() << " elements" << endl;
+  cout << "buildVSSCache inserted " << vssCache.size() << " elements" << endl;
 }
 
 }  // namespace primitiveprocessor

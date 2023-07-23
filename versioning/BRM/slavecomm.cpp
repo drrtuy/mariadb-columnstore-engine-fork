@@ -191,7 +191,6 @@ SlaveComm::SlaveComm()
   slave = std::make_unique<SlaveDBRMNode>();
 }
 
-
 void SlaveComm::stop()
 {
   die = true;
@@ -1638,7 +1637,8 @@ void SlaveComm::do_writeVBEntry(ByteStream& msg)
     return;
   }
 
-  err = slave->writeVBEntry(transID, lbid, vbOID, vbFBO);
+  bool vbbmIsLocked = false;
+  err = slave->writeVBEntry(transID, lbid, vbOID, vbFBO, vbbmIsLocked);
   reply << (uint8_t)err;
 #ifdef BRM_VERBOSE
   cerr << "WorkerComm: do_writeVBEntry() err code is " << err << endl;
@@ -1928,7 +1928,8 @@ void SlaveComm::do_confirm()
   {
     if (!currentSaveFile)
     {
-      currentSaveFile.reset(IDBDataFile::open(IDBPolicy::getType(tmp.c_str(), IDBPolicy::WRITEENG), tmp.c_str(), "wb", 0));
+      currentSaveFile.reset(
+          IDBDataFile::open(IDBPolicy::getType(tmp.c_str(), IDBPolicy::WRITEENG), tmp.c_str(), "wb", 0));
     }
 
     if (currentSaveFile == NULL)
@@ -1951,7 +1952,8 @@ void SlaveComm::do_confirm()
     if (err < (int)relative.length())
     {
       ostringstream os;
-      os << "WorkerComm: currentfile write() returned " << err << " file pointer is " << currentSaveFile.get();
+      os << "WorkerComm: currentfile write() returned " << err << " file pointer is "
+         << currentSaveFile.get();
 
       if (err < 0)
         os << " errno: " << strerror(errno);
@@ -1966,7 +1968,7 @@ void SlaveComm::do_confirm()
 
     ;
     journalh.reset(IDBDataFile::open(IDBPolicy::getType(journalName.c_str(), IDBPolicy::WRITEENG),
-                                 journalName.c_str(), "w+b", 0));
+                                     journalName.c_str(), "w+b", 0));
 
     if (!journalh)
       throw runtime_error("Could not open the BRM journal for writing!");
@@ -2326,4 +2328,3 @@ void SlaveComm::do_dmlReleaseLBIDRanges(ByteStream& msg)
 }
 
 }  // namespace BRM
-

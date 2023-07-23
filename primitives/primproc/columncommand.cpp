@@ -49,7 +49,6 @@ using namespace rowgroup;
 #include "messageids.h"
 using namespace logging;
 
-
 namespace primitiveprocessor
 {
 extern int noVB;
@@ -206,9 +205,9 @@ void ColumnCommand::_loadData()
     uint8_t** blockPtrsAux = (uint8_t**)alloca(1 * sizeof(uint8_t*));
     blockPtrsAux[0] = &bpp->blockDataAux[0];
     lbidsAux[0] = lbidAux;
-    wasCached = primitiveprocessor::loadBlocks(lbidsAux, bpp->versionInfo, bpp->txnID, 2,
-                                               blockPtrsAux, &blocksRead, bpp->LBIDTrace, bpp->sessionID,
-                                               1, &wasVersioned, true, &bpp->vssCache);
+    wasCached = primitiveprocessor::loadBlocks(lbidsAux, bpp->versionInfo, bpp->txnID, 2, blockPtrsAux,
+                                               &blocksRead, bpp->LBIDTrace, bpp->sessionID, 1, &wasVersioned,
+                                               true, &bpp->vssCache);
     bpp->cachedIO += wasCached;
     bpp->physIO += blocksRead;
     bpp->touchedBlocks += 1;
@@ -631,8 +630,7 @@ void ColumnCommand::fillInPrimitiveMessageHeader(const int8_t outputType, const 
   size_t inputMsgBufSize = baseMsgLength + (LOGICAL_BLOCK_RIDS * sizeof(primitives::RIDType));
 
   if (!inputMsg)
-    inputMsg.reset(new(std::align_val_t(utils::MAXCOLUMNWIDTH)) uint8_t[inputMsgBufSize]);
-
+    inputMsg.reset(new (std::align_val_t(utils::MAXCOLUMNWIDTH)) uint8_t[inputMsgBufSize]);
 
   primMsg = (NewColRequestHeader*)inputMsg.get();
   outMsg = (ColResultHeader*)bpp->outputMsg.get();
@@ -765,7 +763,7 @@ void ColumnCommand::_projectResultRG(RowGroup& rg, uint32_t pos)
   rg.initRow(&r);
   offset = r.getOffset(pos);
   rowSize = r.getSize();
-
+  // std::cout << "_projectResultRG W " << W << " nvals " << nvals << std::endl;
   if ((primMsg->NVALS != nvals || nvals != bpp->ridCount) && (!noVB || bpp->sessionID & 0x80000000))
   {
     ostringstream os;
@@ -777,7 +775,7 @@ void ColumnCommand::_projectResultRG(RowGroup& rg, uint32_t pos)
     uint32_t fbo;
     brm.lookupLocal(lbid, 0, false, oid, dbroot, partNum, segNum, fbo);
 
-    os << __FILE__ << " error on projectResultRG for oid " << oid << " lbid " << lbid;
+    // os << __FILE__ << " error on projectResultRG for oid " << oid << " lbid " << lbid;
 
     if (primMsg->NVALS != nvals)
       os << ": input rids " << primMsg->NVALS;
