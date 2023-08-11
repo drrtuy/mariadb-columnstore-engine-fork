@@ -2853,11 +2853,11 @@ void BatchPrimitiveProcessor::buildVSSCache(uint32_t loopCount)
   if (rc == 0)
     for (i = 0; i < vssData.size(); i++)
     {
-      cout << "buildVSSCache lbid " << lbidList[i] << " txn" << vssData[i].verID << endl;
+      // cout << "buildVSSCache lbid " << lbidList[i] << " txn" << vssData[i].verID << endl;
       vssCache.insert(make_pair(lbidList[i], vssData[i]));
     }
 
-  cout << "buildVSSCache inserted " << vssCache.size() << " elements" << endl;
+  // cout << "buildVSSCache inserted " << vssCache.size() << " elements" << endl;
 }
 
 }  // namespace primitiveprocessor
