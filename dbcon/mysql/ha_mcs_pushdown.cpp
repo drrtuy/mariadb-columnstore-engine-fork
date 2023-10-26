@@ -715,21 +715,28 @@ int ha_mcs_group_by_handler::end_scan()
 
 /*@brief  create_columnstore_select_handler_- Creates handler
 ************************************************************
- * DESCRIPTION:
- * Creates a select handler if there is no non-equi JOIN, e.g
- * t1.c1 > t2.c2 and logical OR in the filter predicates.
- * More details in server/sql/select_handler.h
- * PARAMETERS:
- *    thd - THD pointer.
- *    sel_lex - SELECT_LEX* that describes the query.
- *    sel_unit - SELECT_LEX_UNIT* that describes the query.
- * RETURN:
- *    select_handler if possible
- *    NULL in other case
- ***********************************************************/
+* DESCRIPTION:
+* Creates a select handler if there is no non-equi JOIN, e.g
+* t1.c1 > t2.c2 and logical OR in the filter predicates.
+* More details in server/sql/select_handler.h
+* PARAMETERS:
+*    thd - THD pointer.
+*    sel_lex - SELECT_LEX* that describes the query.
+*    sel_unit - SELECT_LEX_UNIT* that describes the query.
+* RETURN:
+*    select_handler if possible
+*    NULL in other case
+***********************************************************/
 select_handler* create_columnstore_select_handler_(THD* thd, SELECT_LEX* sel_lex, SELECT_LEX_UNIT* sel_unit)
 {
   mcs_select_handler_mode_t select_handler_mode = get_select_handler_mode(thd);
+
+  // This is the part of a temporary solution for MCOL-4740.
+  // This disables select_handler for multi-update and multi-delete.
+  if (thd->lex->sql_command == SQLCOM_UPDATE_MULTI || thd->lex->sql_command == SQLCOM_DELETE_MULTI)
+  {
+    return nullptr;
+  }
 
   // Check the session variable value to enable/disable use of
   // select_handler
@@ -810,15 +817,15 @@ select_handler* create_columnstore_select_handler_(THD* thd, SELECT_LEX* sel_lex
   // or unsupported feature.
   ha_columnstore_select_handler* handler;
 
-  if (sel_unit && sel_lex) // partial pushdown of the SELECT_LEX_UNIT
+  if (sel_unit && sel_lex)  // partial pushdown of the SELECT_LEX_UNIT
   {
     handler = new ha_columnstore_select_handler(thd, sel_lex, sel_unit);
   }
-  else if (sel_unit) // complete pushdown of the SELECT_LEX_UNIT
+  else if (sel_unit)  // complete pushdown of the SELECT_LEX_UNIT
   {
     handler = new ha_columnstore_select_handler(thd, sel_unit);
   }
-  else // Query only has a SELECT_LEX, no SELECT_LEX_UNIT
+  else  // Query only has a SELECT_LEX, no SELECT_LEX_UNIT
   {
     handler = new ha_columnstore_select_handler(thd, sel_lex);
   }
@@ -908,8 +915,7 @@ select_handler* create_columnstore_select_handler_(THD* thd, SELECT_LEX* sel_lex
           select_lex != select_lex->master_unit()->fake_select_lex)  // (2)
         thd->lex->set_limit_rows_examined();
 
-      if ((!sel_unit || sel_lex) && !join->tables_list &&
-          (join->table_count || !select_lex->with_sum_func) &&
+      if ((!sel_unit || sel_lex) && !join->tables_list && (join->table_count || !select_lex->with_sum_func) &&
           !select_lex->have_window_funcs())
       {
         if (!thd->is_error())

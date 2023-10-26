@@ -16,6 +16,14 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
    MA 02110-1301, USA. */
 
+// This makes specific MDB classes' attributes public to implement
+// MCOL-4740 temporary solution. Search for MCOL-4740
+// to get the actual place where it is used.
+#define updated_leaves \
+  updated_leaves;      \
+                       \
+ public:
+
 #include "ha_mcs.h"
 #include "maria_def.h"
 #include <typeinfo>
@@ -621,19 +629,23 @@ int ha_mcs::rnd_end()
   // MCOL-4740 multi_update::send_eof(), which outputs the affected
   // number of rows to the client, is called after handler::rnd_end().
   // So we set multi_update::updated and multi_update::found here.
-  if (current_thd->lex->sql_command == SQLCOM_UPDATE_MULTI)
+  if (isMultiUpdateStatement(current_thd->lex->sql_command))
   {
-    SELECT_LEX_UNIT *unit = &current_thd->lex->unit;
-    SELECT_LEX *select_lex= unit->first_select();
-    multi_update* multi = (multi_update*) select_lex->join->result;
-    multi->table_to_update = multi->update_tables ? multi->update_tables->table : 0;
+    SELECT_LEX_UNIT* unit = &current_thd->lex->unit;
+    SELECT_LEX* select_lex = unit->first_select();
+    auto* multi = (select_lex->join) ? reinterpret_cast<multi_update*>(select_lex->join->result) : nullptr;
 
-    cal_impl_if::cal_connection_info* ci =
-      reinterpret_cast<cal_impl_if::cal_connection_info*>(get_fe_conn_info_ptr());
-
-    if (ci)
+    if (multi)
     {
-      multi->updated = multi->found = ci->affectedRows;
+      multi->table_to_update = multi->update_tables ? multi->update_tables->table : 0;
+
+      cal_impl_if::cal_connection_info* ci =
+          reinterpret_cast<cal_impl_if::cal_connection_info*>(get_fe_conn_info_ptr());
+
+      if (ci)
+      {
+        multi->updated = multi->found = ci->affectedRows;
+      }
     }
   }
 
