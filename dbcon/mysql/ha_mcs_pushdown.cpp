@@ -733,10 +733,10 @@ select_handler* create_columnstore_select_handler_(THD* thd, SELECT_LEX* sel_lex
 
   // This is the part of a temporary solution for MCOL-4740.
   // This disables select_handler for multi-update and multi-delete.
-  if (thd->lex->sql_command == SQLCOM_UPDATE_MULTI || thd->lex->sql_command == SQLCOM_DELETE_MULTI)
-  {
-    return nullptr;
-  }
+  // if (isMultiUpdateStatement(current_thd->lex->sql_command))
+  // {
+  //   return nullptr;
+  // }
 
   // Check the session variable value to enable/disable use of
   // select_handler

@@ -622,6 +622,52 @@ int ha_mcs::rnd_init(bool scan)
   DBUG_RETURN(rc);
 }
 
+bool isMCSTable(TABLE* table_ptr)
+{
+#if (defined(_MSC_VER) && defined(_DEBUG)) || defined(SAFE_MUTEX)
+
+  if (!(table_ptr->s && (*table_ptr->s->db_plugin)->name.str))
+#else
+  if (!(table_ptr->s && (table_ptr->s->db_plugin)->name.str))
+#endif
+    return true;
+
+#if (defined(_MSC_VER) && defined(_DEBUG)) || defined(SAFE_MUTEX)
+  string engineName = (*table_ptr->s->db_plugin)->name.str;
+#else
+  string engineName = table_ptr->s->db_plugin->name.str;
+#endif
+
+  if (engineName == "Columnstore" || engineName == "Columnstore_cache")
+    return true;
+  else
+    return false;
+}
+
+inline bool isUpdateStatement(const enum_sql_command& command)
+{
+  return ((command == SQLCOM_UPDATE) || (command == SQLCOM_UPDATE_MULTI));
+}
+
+bool isForeignTableUpdate(THD* thd)
+{
+  LEX* lex = thd->lex;
+
+  if (!isUpdateStatement(lex->sql_command))
+    return false;
+
+  Item_field* item;
+  List_iterator_fast<Item> field_it(lex->first_select_lex()->item_list);
+
+  while ((item = (Item_field*)field_it++))
+  {
+    if (item->field && item->field->table && !isMCSTable(item->field->table))
+      return true;
+  }
+
+  return false;
+}
+
 int ha_mcs::rnd_end()
 {
   DBUG_ENTER("ha_mcs::rnd_end");
@@ -629,7 +675,7 @@ int ha_mcs::rnd_end()
   // MCOL-4740 multi_update::send_eof(), which outputs the affected
   // number of rows to the client, is called after handler::rnd_end().
   // So we set multi_update::updated and multi_update::found here.
-  if (isMultiUpdateStatement(current_thd->lex->sql_command))
+  if (isMultiUpdateStatement(current_thd->lex->sql_command) && !isForeignTableUpdate(current_thd))
   {
     SELECT_LEX_UNIT* unit = &current_thd->lex->unit;
     SELECT_LEX* select_lex = unit->first_select();
