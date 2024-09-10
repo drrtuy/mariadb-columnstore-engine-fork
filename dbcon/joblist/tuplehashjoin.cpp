@@ -154,8 +154,8 @@ void TupleHashJoinStep::run()
 
   deliverMutex.lock();
 
-  // 	cout << "TupleHashJoinStep::run(): fOutputJobStepAssociation.outSize = " <<
-  // fOutputJobStepAssociation.outSize() << ", fDelivery = " << boolalpha << fDelivery << endl;
+  cout << "TupleHashJoinStep::run(): fOutputJobStepAssociation.outSize = "
+       << fOutputJobStepAssociation.outSize() << ", fDelivery = " << boolalpha << fDelivery << endl;
   idbassert((fOutputJobStepAssociation.outSize() == 1 && !fDelivery) ||
             (fOutputJobStepAssociation.outSize() == 0 && fDelivery));
   idbassert(fInputJobStepAssociation.outSize() >= 2);
@@ -246,6 +246,7 @@ void TupleHashJoinStep::trackMem(uint index)
     if (!joinIsTooBig &&
         (isDML || !allowDJS || (fSessionId & 0x80000000) || (tableOid() < 3000 && tableOid() >= 1000)))
     {
+      std::cout << "mThr JITB" << std::endl;
       joinIsTooBig = true;
       ostringstream oss;
       oss << "(" << __LINE__ << ") "
@@ -298,29 +299,41 @@ void TupleHashJoinStep::startSmallRunners(uint index)
   stopMemTracking = false;
   utils::VLArray<uint64_t> jobs(numCores);
   uint64_t memMonitor = jobstepThreadPool.invoke([this, index] { this->trackMem(index); });
+
+  auto start = std::chrono::high_resolution_clock::now();
+  joiner->rows_.resize(numCores, std::vector<Row::Pointer>());
   // starting 1 thread when in PM mode, since it's only inserting into a
   // vector of rows.  The rest will be started when converted to UM mode.
-  if (joiner->inUM())
+  // if (joiner->inUM())
+  // {
+  for (int i = 0; i < numCores; i++)
   {
-    for (int i = 0; i < numCores; i++)
-    {
-      jobs[i] = jobstepThreadPool.invoke([this, i, index, &jobs] { this->smallRunnerFcn(index, i, jobs); });
-    }
+    jobs[i] = jobstepThreadPool.invoke([this, i, index, &jobs, start]
+                                       { this->smallRunnerFcn(index, i, jobs, start); });
   }
-  else
-  {
-    jobs[0] = jobstepThreadPool.invoke([this, index, &jobs] { this->smallRunnerFcn(index, 0, jobs); });
-  }
+  // }
+  // else
+  // {
+  //   // joiner->getSmallSide()->reserve(178585601);
+  //   jobs[0] = jobstepThreadPool.invoke([this, index, &jobs, start]
+  //                                      { this->smallRunnerFcn(index, 0, jobs, start); });
+  // }
 
   // wait for the first thread to join, then decide whether the others exist and need joining
   jobstepThreadPool.join(jobs[0]);
-  if (joiner->inUM())
+  // if (joiner->inUM())
   {
     for (int i = 1; i < numCores; i++)
     {
       jobstepThreadPool.join(jobs[i]);
     }
   }
+
+  // if (!joiner->inUM())
+  // {
+  [[maybe_unused]] auto& v = joiner->calculateOffsets();
+  // }
+
   // stop the monitor thread
   memTrackMutex.lock();
   stopMemTracking = true;
@@ -382,7 +395,8 @@ void TupleHashJoinStep::startSmallRunners(uint index)
 }
 
 /* Index is which small input to read. */
-void TupleHashJoinStep::smallRunnerFcn(uint32_t index, uint threadID, uint64_t* jobs)
+void TupleHashJoinStep::smallRunnerFcn(uint32_t index, uint threadID, uint64_t* jobs,
+                                       std::chrono::time_point<std::chrono::system_clock> start)
 {
   utils::setThreadName("HJSmallRunner");
   bool more = true;
@@ -416,6 +430,7 @@ void TupleHashJoinStep::smallRunnerFcn(uint32_t index, uint threadID, uint64_t* 
       utils::releaseSpinlock(rgdLock);
 
       rgSize = smallRG.getSizeWithStrings();
+      // std::cout << "smFnc rgSize " << rgSize << std::endl;
       gotMem = resourceManager->getMemory(rgSize, sessionMemLimit, true);
       if (gotMem)
       {
@@ -433,6 +448,8 @@ void TupleHashJoinStep::smallRunnerFcn(uint32_t index, uint threadID, uint64_t* 
           return;
         if (!allowDJS || isDML || (fSessionId & 0x80000000) || (tableOid() < 3000 && tableOid() >= 1000))
         {
+          std::cout << "mThr JITB 2" << std::endl;
+
           joinIsTooBig = true;
           ostringstream oss;
           oss << "(" << __LINE__ << ") "
@@ -451,13 +468,23 @@ void TupleHashJoinStep::smallRunnerFcn(uint32_t index, uint threadID, uint64_t* 
       joiner->insertRGData(smallRG, threadID);
       if (!joiner->inUM() && (memUsedByEachJoin[index] > pmMemLimit))
       {
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed1 = end - start;
+        std::cout << "Before conv to UM" << " Elapsed time: " << elapsed1.count() << " seconds. Rows "
+                  << joiner->rowsNumber() << std::endl;
+
         joiner->setInUM(rgData[index]);
 
-        for (int i = 1; i < numCores; i++)
-        {
-          jobs[i] =
-              jobstepThreadPool.invoke([this, i, index, jobs] { this->smallRunnerFcn(index, i, jobs); });
-        }
+        auto end2 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed2 = end2 - end;
+        std::cout << "After conv to UM" << " Elapsed time: " << elapsed2.count() << " seconds. Rows "
+                  << joiner->rowsNumber() << std::endl;
+
+        // for (int i = 1; i < numCores; i++)
+        // {
+        //   jobs[i] = jobstepThreadPool.invoke([this, i, index, jobs, start]
+        //                                      { this->smallRunnerFcn(index, i, jobs, start); });
+        // }
       }
     next:
       dlMutex.lock();
@@ -846,6 +873,8 @@ void TupleHashJoinStep::hjRunner()
   {
     if (joinIsTooBig && !status())
     {
+      std::cout << "mThr JITB 3" << std::endl;
+
       ostringstream oss;
       oss << "(" << __LINE__ << ") "
           << logging::IDBErrorInfo::instance()->errorMsg(logging::ERR_JOIN_TOO_BIG);
@@ -1922,6 +1951,7 @@ void TupleHashJoinStep::segregateJoiners()
   {
     if (anyTooLarge)
     {
+      std::cout << "TupleHashJoinStep::segregateJoiners: join is too big 1" << std::endl;
       joinIsTooBig = true;
       abort();
     }
@@ -1951,6 +1981,7 @@ void TupleHashJoinStep::segregateJoiners()
     if (anyTooLarge)
     {
       joinIsTooBig = true;
+      std::cout << "TupleHashJoinStep::segregateJoiners: join is too big 2" << std::endl;
 
       for (i = 0; i < smallSideCount; i++)
       {
@@ -1982,6 +2013,8 @@ void TupleHashJoinStep::segregateJoiners()
       }
       else
       {
+        std::cout << "TupleHashJoinStep::generateJoiNResultSet: join is too big 1" << std::endl;
+
         joinIsTooBig = true;
         joiners[i]->setConvertToDiskJoin();
         // cout << "1joiner " << i << "  " << hex << (uint64_t) joiners[i].get() << dec << " -> DJS" << endl;
@@ -2007,6 +2040,8 @@ void TupleHashJoinStep::segregateJoiners()
 
     for (; i < smallSideCount; i++)
     {
+      std::cout << "TupleHashJoinStep::segregateJoiners: join is too big 2" << std::endl;
+
       joinIsTooBig = true;
       joiners[i]->setConvertToDiskJoin();
       // cout << "2joiner " << i << "  " << hex << (uint64_t) joiners[i].get() << dec << " -> DJS" << endl;

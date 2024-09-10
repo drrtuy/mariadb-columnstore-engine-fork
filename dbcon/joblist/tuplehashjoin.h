@@ -458,7 +458,8 @@ class TupleHashJoinStep : public JobStep, public TupleDeliveryStep
   ssize_t pmMemLimit;
 
   void hjRunner();
-  void smallRunnerFcn(uint32_t index, uint threadID, uint64_t* threads);
+  void smallRunnerFcn(uint32_t index, uint threadID, uint64_t* threads,
+                      std::chrono::time_point<std::chrono::system_clock>);
 
   struct HJRunner
   {

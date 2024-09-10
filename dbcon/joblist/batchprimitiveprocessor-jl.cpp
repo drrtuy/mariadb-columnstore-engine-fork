@@ -1396,8 +1396,11 @@ bool BatchPrimitiveProcessorJL::pickNextJoinerNum()
   for (i = 0; i < PMJoinerCount; i++)
   {
     joinerNum = (joinerNum + 1) % PMJoinerCount;
-    if (posByJoinerNum[joinerNum] != tJoiners[joinerNum]->getSmallSide()->size())
+    // if (posByJoinerNum[joinerNum] != tJoiners[joinerNum]->getSmallSide()->size())
+    if (posByJoinerNum[joinerNum] != tJoiners[joinerNum]->rowsNumber())
+    {
       break;
+    }
   }
   if (i == PMJoinerCount)
     return false;
@@ -1412,7 +1415,7 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream& bs)
   uint32_t size = 0, toSend, i, j;
   ISMPacketHeader ism;
   Row r;
-  vector<Row::Pointer>* tSmallSide;
+  // vector<Row::Pointer>* tSmallSide;
   joiner::TypelessData tlData;
   uint32_t smallKeyCol;
   uint32_t largeKeyCol;
@@ -1435,30 +1438,8 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream& bs)
   }
 
   memset((void*)&ism, 0, sizeof(ism));
-  tSmallSide = tJoiners[joinerNum]->getSmallSide();
-  size = tSmallSide->size();
-
-#if 0
-    if (joinerNum == PMJoinerCount - 1 && pos == size)
-    {
-        /* last message */
-// 		cout << "sending last joiner msg\n";
-        ism.Command = BATCH_PRIMITIVE_END_JOINER;
-        bs.load((uint8_t*) &ism, sizeof(ism));
-        bs << (messageqcpp::ByteStream::quadbyte)sessionID;
-        bs << (messageqcpp::ByteStream::quadbyte)stepID;
-        bs << uniqueID;
-        pos = 0;
-        return false;
-    }
-    else if (pos == size)
-    {
-        joinerNum++;
-        tSmallSide = tJoiners[joinerNum]->getSmallSide();
-        size = tSmallSide->size();
-        pos = 0;
-    }
-#endif
+  // auto* tSmallSide = tJoiners[joinerNum]->getSmallSide();
+  size = tJoiners[joinerNum]->rowsNumber();
 
   ism.Command = BATCH_PRIMITIVE_ADD_JOINER;
   bs.load((uint8_t*)&ism, sizeof(ism));
@@ -1485,7 +1466,9 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream& bs)
 
     for (i = pos; i < pos + toSend; i++)
     {
-      r.setPointer((*tSmallSide)[i]);
+      // r.setPointer((*tSmallSide)[i]);
+      r.setPointer(tJoiners[joinerNum]->getRowPointer(i));
+
       isNull = false;
       bSignedUnsigned = tJoiners[joinerNum]->isSignedUnsignedJoin();
 
@@ -1552,7 +1535,8 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream& bs)
 
     for (i = pos, j = 0; i < pos + toSend; ++i, ++j)
     {
-      r.setPointer((*tSmallSide)[i]);
+      // r.setPointer((*tSmallSide)[i]);
+      r.setPointer(tJoiners[joinerNum]->getRowPointer(i));
 
       if (r.getColType(smallKeyCol) == CalpontSystemCatalog::LONGDOUBLE)
       {
@@ -1625,7 +1609,9 @@ bool BatchPrimitiveProcessorJL::nextTupleJoinerMsg(ByteStream& bs)
 
     for (i = pos; i < pos + toSend; i++, tmpRow.nextRow())
     {
-      r.setPointer((*tSmallSide)[i]);
+      // r.setPointer((*tSmallSide)[i]);
+      r.setPointer(tJoiners[joinerNum]->getRowPointer(i));
+
       copyRow(r, &tmpRow);
     }
 

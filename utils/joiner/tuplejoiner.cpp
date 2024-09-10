@@ -252,6 +252,52 @@ bool TupleJoiner::operator<(const TupleJoiner& tj) const
   return size() < tj.size();
 }
 
+// WIP can optimize to add the size as the last element of the vector
+std::vector<size_t>& TupleJoiner::calculateOffsets()
+{
+  rowsOffsets_.reserve(rows_.size());
+  size_t offset = 0;
+  for (const auto& rows : rows_)
+  {
+    offset += rows.size();
+    rowsOffsets_.push_back((offset) ? offset : 0);
+  }
+  // std::cout << "calculateOffsets: ";
+  // std::copy(rowsOffsets_.begin(), rowsOffsets_.end(), std::ostream_iterator<size_t>(std::cout, " "));
+  // std::cout << std::endl;
+
+  return rowsOffsets_;
+}
+
+const rowgroup::Row::Pointer& TupleJoiner::getRowPointer(size_t index) const
+{
+  auto natIndex = index + 1;
+  auto it = std::lower_bound(rowsOffsets_.begin(), rowsOffsets_.end(), natIndex);
+  auto row = it - rowsOffsets_.begin();
+  // std::cout << "getRowPointer: idx " << index << " row " << row << std::endl;
+  while (rows_[row].empty() && it != rowsOffsets_.end())
+  {
+    ++it;
+    ++row;
+  }
+
+  if (it == rowsOffsets_.end())
+  {
+    // std::cout << "Throw in getRowPointer " << std::endl;
+    throw std::out_of_range("Index out of range 1");
+  }
+
+  if (*it < rows_[row].size())
+  {
+    // std::cout << "Throw in getRowPointer " << std::endl;
+    throw std::out_of_range("Index out of range 2");
+  }
+  auto column = *it - rows_[row].size() + index;
+  // std::cout << "getRowPointer: column " << column << std::endl;
+
+  return rows_[row][column];
+}
+
 void TupleJoiner::getBucketCount()
 {
   // get the # of cores, round up to nearest power of 2
@@ -405,9 +451,15 @@ void TupleJoiner::insertRGData(RowGroup& rg, uint threadID)
   }
   else
   {
+    // if (rows.size() == 0)
+    // {
+    //   rows.reserve(rowCount);
+    // }
     // while in PM-join mode, inserting is single-threaded
     for (i = 0; i < rowCount; i++, r.nextRow())
-      rows.push_back(r.getPointer());
+    {
+      rows_[threadID].push_back(r.getPointer());
+    }
   }
 }
 
@@ -472,7 +524,10 @@ void TupleJoiner::insert(Row& r, bool zeroTheRid)
     }
   }
   else
+  {
+    std::cout << " Must not get here ! " << std::endl;
     rows.push_back(r.getPointer());
+  }
 }
 
 void TupleJoiner::match(rowgroup::Row& largeSideRow, uint32_t largeRowIndex, uint32_t threadID,
@@ -487,12 +542,21 @@ void TupleJoiner::match(rowgroup::Row& largeSideRow, uint32_t largeRowIndex, uin
     vector<uint32_t>& v = pmJoinResults[threadID][largeRowIndex];
     uint32_t size = v.size();
 
+    size_t rowsNumber = this->rowsNumber();
+
     for (i = 0; i < size; i++)
-      if (v[i] < rows.size())
-        matches->push_back(rows[v[i]]);
+    {
+      if (v[i] < rowsNumber)
+      {
+        // matches->push_back(rows[v[i]]);
+        matches->push_back(getRowPointer(v[i]));
+      }
+    }
 
     if (UNLIKELY((semiJoin() || antiJoin()) && matches->size() == 0))
+    {
       matches->push_back(smallNullRow.getPointer());
+    }
   }
   else if (LIKELY(!isNull))
   {
@@ -729,7 +793,10 @@ void TupleJoiner::doneInserting()
     for (i = 0; i < rowCount; i++)
     {
       if (joinAlg == PM)
-        smallRow.setPointer(rows[pmpos++]);
+      {
+        // smallRow.setPointer(rows[pmpos++]);
+        smallRow.setPointer(getRowPointer(pmpos++));
+      }
       else if (typelessJoin)
       {
         while (thit == ht[bucket]->end())
@@ -819,7 +886,8 @@ void TupleJoiner::umJoinConvert(size_t begin, size_t end)
 
   while (begin < end)
   {
-    smallRow.setPointer(rows[begin++]);
+    // smallRow.setPointer(rows[begin++]);
+    smallRow.setPointer(getRowPointer(begin++));
     insert(smallRow);
   }
 }
@@ -828,31 +896,40 @@ void TupleJoiner::setInUM()
 {
   vector<Row::Pointer> empty;
   Row smallRow;
-  uint32_t i, size;
+  // uint32_t i, size;
+  uint32_t i;
 
   if (joinAlg == UM)
     return;
 
+  [[maybe_unused]] auto& v = calculateOffsets();
+
   joinAlg = UM;
-  size = rows.size();
-  size_t chunkSize =
-      ((size / numCores) + 1 < 50000 ? 50000
-                                     : (size / numCores) + 1);  // don't start a thread to process < 50k rows
+  // size = rows.size();
+  size_t rowsNumber = this->rowsNumber();
+
+  size_t chunkSize = ((rowsNumber / numCores) + 1 < 50000
+                          ? 50000
+                          : (rowsNumber / numCores) + 1);  // don't start a thread to process < 50k rows
 
   utils::VLArray<uint64_t> jobs(numCores);
   i = 0;
-  for (size_t firstRow = 0; i < (uint)numCores && firstRow < size; i++, firstRow += chunkSize)
+  for (size_t firstRow = 0; i < (uint)numCores && firstRow < rowsNumber; i++, firstRow += chunkSize)
     jobs[i] = jobstepThreadPool->invoke(
-        [this, firstRow, chunkSize, size]
-        { this->umJoinConvert(firstRow, (firstRow + chunkSize < size ? firstRow + chunkSize : size)); });
-
+        [this, firstRow, chunkSize, rowsNumber] {
+          this->umJoinConvert(firstRow,
+                              (firstRow + chunkSize < rowsNumber ? firstRow + chunkSize : rowsNumber));
+        });
   for (uint j = 0; j < i; j++)
+  {
     jobstepThreadPool->join(jobs[j]);
+  }
 
 #ifdef TJ_DEBUG
   cout << "done\n";
 #endif
   rows.swap(empty);
+  cleanRows();
 
   if (typelessJoin)
   {
@@ -887,6 +964,7 @@ void TupleJoiner::setInUM(vector<RGData>& rgs)
   {  // don't need rows anymore, free the mem
     vector<Row::Pointer> empty;
     rows.swap(empty);
+    cleanRows();
   }
 
   joinAlg = UM;
@@ -928,12 +1006,15 @@ void TupleJoiner::markMatches(uint32_t threadID, uint32_t rowCount)
   std::shared_ptr<vector<uint32_t>[]> matches = pmJoinResults[threadID];
   uint32_t i, j;
 
+  size_t rowsNumber = this->rowsNumber();
+
   for (i = 0; i < rowCount; i++)
     for (j = 0; j < matches[i].size(); j++)
     {
-      if (matches[i][j] < rows.size())
+      if (matches[i][j] < rowsNumber)
       {
-        smallRow[threadID].setPointer(rows[matches[i][j]]);
+        // smallRow[threadID].setPointer(rows[matches[i][j]]);
+        smallRow[threadID].setPointer(getRowPointer(matches[i][j]));
         smallRow[threadID].markRow();
       }
     }
@@ -991,16 +1072,22 @@ void TupleJoiner::getUnmarkedRows(vector<Row::Pointer>* out)
 
   if (inPM())
   {
-    uint32_t i, size;
+    uint32_t i;
 
-    size = rows.size();
+    // size = rows.size();
+    size_t rowsNumber = this->rowsNumber();
 
-    for (i = 0; i < size; i++)
+    for (i = 0; i < rowsNumber; i++)
     {
-      smallR.setPointer(rows[i]);
+      // smallR.setPointer(rows[i]);
+      auto& rP = getRowPointer(i);
+      smallR.setPointer(rP);
 
       if (!smallR.isMarked())
-        out->push_back(rows[i]);
+      {
+        // out->push_back(rows[i]);
+        out->push_back(rP);
+      }
     }
   }
   else
@@ -1079,7 +1166,10 @@ uint64_t TupleJoiner::getMemUsage() const
     return ret;
   }
   else
-    return (rows.size() * sizeof(Row::Pointer));
+  {
+    // return (rows.size() * sizeof(Row::Pointer));
+    return (rowsNumber() * sizeof(Row::Pointer));
+  }
 }
 
 void TupleJoiner::setFcnExpFilter(boost::shared_ptr<funcexp::FuncExpWrapper> pt)
@@ -1220,7 +1310,8 @@ size_t TupleJoiner::size() const
     return ret;
   }
 
-  return rows.size();
+  // return rows.size();
+  return rowsNumber();
 }
 
 class TypelessDataStringEncoder
@@ -1817,6 +1908,8 @@ void TupleJoiner::clearData()
 
   std::vector<rowgroup::Row::Pointer> empty;
   rows.swap(empty);
+  cleanRows();
+
   finished = false;
 }
 

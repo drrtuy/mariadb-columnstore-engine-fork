@@ -463,6 +463,30 @@ class TupleJoiner
   }
   void setConvertToDiskJoin();
 
+  std::vector<std::vector<rowgroup::Row::Pointer>> rows_;  // used for PM join
+  std::vector<size_t> rowsOffsets_;                        // used for PM join
+
+  size_t rowsNumber() const
+  {
+    size_t res = 0;
+    for (const auto& rows : rows_)
+    {
+      res += rows.size();
+    }
+    // std::cout << "rowsNumber: " << res << std::endl;
+    return res;
+  }
+
+  // WIP can optimize to add the size as the last element of the vector
+  std::vector<size_t>& calculateOffsets();
+  const rowgroup::Row::Pointer& getRowPointer(size_t index) const;
+
+  void cleanRows()
+  {
+    rows_.clear();
+    rowsOffsets_.clear();
+  }
+
  private:
   typedef std::unordered_multimap<int64_t, uint8_t*, hasher, std::equal_to<int64_t>,
                                   utils::STLPoolAllocator<std::pair<const int64_t, uint8_t*> > >

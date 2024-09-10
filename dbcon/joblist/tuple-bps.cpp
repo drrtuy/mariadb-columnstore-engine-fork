@@ -1485,8 +1485,15 @@ void TupleBPS::run()
     fDec->write(uniqueID, sbs);
     BPPIsAllocated = true;
 
+    // auto start = std::chrono::high_resolution_clock::now();
     if (doJoin && tjoiners[0]->inPM())
+    {
       serializeJoiner();
+    }
+
+    // auto end = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> elapsed = end - start;
+    // std::cout << "uI " << uniqueID << " Elapsed time: " << elapsed.count() << " seconds" << std::endl;
 
     prepCasualPartitioning();
     startPrimitiveThread();
