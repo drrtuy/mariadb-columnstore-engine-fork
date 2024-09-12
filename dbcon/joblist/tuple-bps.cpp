@@ -79,8 +79,6 @@ using namespace querytele;
 #include "pseudocolumn.h"
 // #define DEBUG 1
 
-// #include "poormanprofiler.inc"
-
 extern boost::mutex fileLock_g;
 
 namespace
@@ -1667,11 +1665,11 @@ void TupleBPS::sendJobs(const vector<Job>& jobs)
 {
   uint32_t i;
   boost::unique_lock<boost::mutex> tplLock(tplMutex, boost::defer_lock);
-
   for (i = 0; i < jobs.size() && !cancelled(); i++)
   {
     fDec->write(uniqueID, jobs[i].msg);
     tplLock.lock();
+    // A single msg here is a message for a processed block.
     msgsSent += jobs[i].expectedResponses;
 
     if (recvWaiting)
