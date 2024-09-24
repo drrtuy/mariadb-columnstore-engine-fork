@@ -1387,6 +1387,7 @@ void BatchPrimitiveProcessor::execute()
 #ifdef PRIMPROC_STOPWATCH
     stopwatch->start("BatchPrimitiveProcessor::execute first part");
 #endif
+    utils::setThreadName("BPPFilt&Pr");
 
     // if only one scan step which has no predicate, async load all columns
     if (filterCount == 1 && hasScan)
@@ -1550,6 +1551,8 @@ void BatchPrimitiveProcessor::execute()
 #endif
       outputRG.resetRowGroup(baseRid);
 
+      utils::setThreadName("BPPFE1_1");
+
       if (fe1)
       {
         uint32_t newRidCount = 0;
@@ -1616,6 +1619,8 @@ void BatchPrimitiveProcessor::execute()
         }
         if (fe2)
         {
+          utils::setThreadName("BPPFE2_1");
+
           /* functionize this -> processFE2() */
           fe2Output.resetRowGroup(baseRid);
           fe2Output.getRow(0, &fe2Out);
@@ -1646,6 +1651,8 @@ void BatchPrimitiveProcessor::execute()
 
         if (fAggregator)
         {
+          utils::setThreadName("BPPAgg_1");
+
           *serialized << (uint8_t)1;  // the "count this msg" var
 
           RowGroup& toAggregate = (fe2 ? fe2Output : outputRG);
@@ -1660,17 +1667,17 @@ void BatchPrimitiveProcessor::execute()
 
           if ((currentBlockOffset + 1) == count)  // @bug4507, 8k
           {
-            fAggregator->loadResult(*serialized);            // @bug4507, 8k
-          }                                                  // @bug4507, 8k
+            fAggregator->loadResult(*serialized);  // @bug4507, 8k
+          }  // @bug4507, 8k
           else if (utils::MonitorProcMem::isMemAvailable())  // @bug4507, 8k
           {
             fAggregator->loadEmptySet(*serialized);  // @bug4507, 8k
-          }                                          // @bug4507, 8k
-          else                                       // @bug4507, 8k
+          }  // @bug4507, 8k
+          else  // @bug4507, 8k
           {
             fAggregator->loadResult(*serialized);  // @bug4507, 8k
             fAggregator->aggReset();               // @bug4507, 8k
-          }                                        // @bug4507, 8k
+          }  // @bug4507, 8k
         }
 
         if (!fAggregator && !fe2)
@@ -1724,6 +1731,8 @@ void BatchPrimitiveProcessor::execute()
 
         do  // while (startRid > 0)
         {
+          utils::setThreadName("BPPJoin_1");
+
 #ifdef PRIMPROC_STOPWATCH
           stopwatch->start("-- executeTupleJoin()");
           startRid = executeTupleJoin(startRid, largeSideRowGroup);
@@ -1775,6 +1784,8 @@ void BatchPrimitiveProcessor::execute()
               *serialized << sendCount;
               if (fe2)
               {
+                utils::setThreadName("BPPFE2_2");
+
                 /* functionize this -> processFE2()*/
                 fe2Output.resetRowGroup(baseRid);
                 fe2Output.setDBRoot(dbRoot);
@@ -1798,21 +1809,23 @@ void BatchPrimitiveProcessor::execute()
 
               if (fAggregator)
               {
+                utils::setThreadName("BPPAgg_2");
+
                 fAggregator->addRowGroup(&nextRG);
 
                 if ((currentBlockOffset + 1) == count && moreRGs == false && startRid == 0)  // @bug4507, 8k
                 {
-                  fAggregator->loadResult(*serialized);            // @bug4507, 8k
-                }                                                  // @bug4507, 8k
+                  fAggregator->loadResult(*serialized);  // @bug4507, 8k
+                }  // @bug4507, 8k
                 else if (utils::MonitorProcMem::isMemAvailable())  // @bug4507, 8k
                 {
                   fAggregator->loadEmptySet(*serialized);  // @bug4507, 8k
-                }                                          // @bug4507, 8k
-                else                                       // @bug4507, 8k
+                }  // @bug4507, 8k
+                else  // @bug4507, 8k
                 {
                   fAggregator->loadResult(*serialized);  // @bug4507, 8k
                   fAggregator->aggReset();               // @bug4507, 8k
-                }                                        // @bug4507, 8k
+                }  // @bug4507, 8k
               }
               else
               {
@@ -1899,6 +1912,7 @@ void BatchPrimitiveProcessor::execute()
       // 		cout << "sent physIO=" << physIO << " cachedIO=" << cachedIO <<
       // 			" touchedBlocks=" << touchedBlocks << endl;
     }
+    utils::setThreadName("BPPExecuteEnd");
 
 #ifdef PRIMPROC_STOPWATCH
     stopwatch->stop("BatchPrimitiveProcessor::execute fourth part");
@@ -2749,7 +2763,6 @@ void BatchPrimitiveProcessor::buildVSSCache(uint32_t loopCount)
   if (rc == 0)
     for (i = 0; i < vssData.size(); i++)
       vssCache.insert(make_pair(lbidList[i], vssData[i]));
-
 }
 
 }  // namespace primitiveprocessor
