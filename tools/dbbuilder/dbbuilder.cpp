@@ -305,6 +305,15 @@ int main(int argc, char* argv[])
       }
       else
       {
+        string cmd = "echo 'Upgrade system catalog' > " + logFile;
+        if (canWrite)
+        {
+          rc = system(cmd.c_str());
+        }
+        else
+        {
+          cerr << cmd << endl;
+        }
         sysCatalog.upgrade(upgradeOidMap, upgradeOidTypeMap, upgradeOidDefaultValStrMap);
       }
 
