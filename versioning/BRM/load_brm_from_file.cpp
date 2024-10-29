@@ -35,6 +35,8 @@ using namespace std;
 #include "CLI11.hpp"
 #include "extentmap.h"
 
+static const char* BIN_NAME = "mcs-load-brm-from-file";
+
 template <typename T>
 T parseField(std::stringstream& ss, const char delimiter)
 {
@@ -73,15 +75,21 @@ BRM::EMEntry parseLine(const std::string& line, char delimiter = '|')
 
 int main(int argc, char** argv)
 {
-  CLI::App app{"mcs_load_brm_from_file"};
-
+  CLI::App app{BIN_NAME};
+  app.description(
+      "A tool to build Extent Map image file from its text representation. A text representation can be obtained using 'editem -i'"
+      "display the lock state.");
   std::string srcFilename;
   std::string dstFilename;
   bool debug = false;
 
-  app.add_option("-i,--input-filename", srcFilename, "Name to greet")->required();
-  app.add_option("-o,--output-filename", dstFilename, "Number of greetings")->default_val("");
-  app.add_option("-d,--debug", debug, "Number of greetings")->default_val(false);
+  app.add_option("-i,--input-filename", srcFilename,
+                 "Extent Map as its text representation.")
+      ->required();
+  app.add_option("-o,--output-filename", dstFilename,
+                 "Extent Map output image file, default as input-filename.out")
+      ->default_val("");
+  app.add_option("-d,--debug", debug, "Print extra output")->default_val(false);
 
   CLI11_PARSE(app, argc, argv);
 

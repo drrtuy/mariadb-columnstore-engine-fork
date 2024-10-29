@@ -193,20 +193,19 @@ int main(int argc, char* argv[])
     bool isUpgrade = false;
 
     std::unordered_map<int, std::pair<int, bool>> upgradeOidMap;
-    upgradeOidMap[OID_SYSTABLE_AUXCOLUMNOID] =      // This is the candidate OID for the upgrade.
-      std::make_pair(OID_SYSTABLE_OBJECTID, false); // std::pair::first is the reference OID used
-                                                    // to fill the candidate OID with default vals
-                                                    // std::pair::second is set to false by default
-                                                    // which means the candidate OID will not be
-                                                    // upgraded. This is set to true in the code
-                                                    // below if a specific condition is met. Please
-                                                    // note that the candidate and reference OID
-                                                    // datatypes and colwidths are assumed to be the
-                                                    // same in SystemCatalog::upgrade().
+    upgradeOidMap[OID_SYSTABLE_AUXCOLUMNOID] =         // This is the candidate OID for the upgrade.
+        std::make_pair(OID_SYSTABLE_OBJECTID, false);  // std::pair::first is the reference OID used
+                                                       // to fill the candidate OID with default vals
+                                                       // std::pair::second is set to false by default
+                                                       // which means the candidate OID will not be
+                                                       // upgraded. This is set to true in the code
+                                                       // below if a specific condition is met. Please
+                                                       // note that the candidate and reference OID
+                                                       // datatypes and colwidths are assumed to be the
+                                                       // same in SystemCatalog::upgrade().
 
     std::unordered_map<int, OidTypeT> upgradeOidTypeMap;
-    upgradeOidTypeMap[OID_SYSTABLE_AUXCOLUMNOID] =
-      std::make_pair(CalpontSystemCatalog::INT, 4);
+    upgradeOidTypeMap[OID_SYSTABLE_AUXCOLUMNOID] = std::make_pair(CalpontSystemCatalog::INT, 4);
 
     std::unordered_map<int, std::string> upgradeOidDefaultValStrMap;
     upgradeOidDefaultValStrMap[OID_SYSTABLE_AUXCOLUMNOID] = "0";
@@ -300,7 +299,16 @@ int main(int argc, char* argv[])
       }
       else
       {
-        sysCatalog.upgrade(upgradeOidMap, upgradeOidTypeMap,upgradeOidDefaultValStrMap);
+        string cmd = "echo 'Upgrade system catalog' > " + logFile;
+        if (canWrite)
+        {
+          rc = system(cmd.c_str());
+        }
+        else
+        {
+          cerr << cmd << endl;
+        }
+        sysCatalog.upgrade(upgradeOidMap, upgradeOidTypeMap, upgradeOidDefaultValStrMap);
       }
 
       std::string cmd = "echo 'OK: buildOption=" + oam.itoa(buildOption) + "' > " + logFile;
