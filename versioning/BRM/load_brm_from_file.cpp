@@ -127,7 +127,7 @@ int main(int argc, char** argv)
   std::ifstream infile(srcFilename);
   if (!infile.is_open())
   {
-    std::cerr << "Ошибка: Не удалось открыть файл " << srcFilename << " для чтения.\n";
+    std::cerr << "Can not open file " << srcFilename << std::endl;
     return 1;
   }
 
