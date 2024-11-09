@@ -16,7 +16,7 @@
    MA 02110-1301, USA. */
 
 #include <vector>
-#include "fdbcs.hpp"
+#include "../include/fdbcs.hpp"
 
 using namespace std;
 using namespace FDBCS;
