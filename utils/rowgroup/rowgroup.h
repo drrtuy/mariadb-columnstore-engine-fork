@@ -2088,8 +2088,6 @@ inline void Row::getLocation(uint32_t* partNum, uint16_t* segNum, uint8_t* exten
     *rowNum = getRelRid();
 }
 
-<<<<<<< HEAD
-=======
 inline void copyRowM(const Row& in, Row* out, uint32_t colCount)
 {
   if (&in == out)
@@ -2144,7 +2142,6 @@ inline void copyRowM(const Row& in, Row* out, uint32_t colCount)
   }
 }
 
->>>>>>> b3898bb2e (This commit fixes U20 linking issue when libwriteengine.so lacks boost_date_time  symbol)
 // This routine can be slow for your purposes. Please inspect copyRowInline below,
 // in some cases it can be faster.
 // Please be sure that copyRowInline does indeed copy rows of the same structure of
@@ -2228,10 +2225,6 @@ inline void copyRowInline(const Row& in, Row* out, uint32_t colCount)
   copyRow(in, out, colCount);
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> b3898bb2e (This commit fixes U20 linking issue when libwriteengine.so lacks boost_date_time  symbol)
 inline utils::NullString StringStore::getString(uint64_t off) const
 {
   uint32_t length;

@@ -1,14 +1,9 @@
 include_directories( ${ENGINE_COMMON_INCLUDES} ${ENGINE_BLOCKCACHE_INCLUDE} ${ENGINE_PRIMPROC_INCLUDE} )
-<<<<<<< HEAD
 
 IF(NOT WITH_UBSAN AND NOT WITH_TSAN)
     MY_CHECK_AND_SET_COMPILER_FLAG("-U_FORTIFY_SOURCE" DEBUG RELWITHDEBINFO)
     MY_CHECK_AND_SET_COMPILER_FLAG("-fsanitize=address -fsanitize-address-use-after-scope -fPIC")
 ENDIF()
-=======
-MY_CHECK_AND_SET_COMPILER_FLAG("-U_FORTIFY_SOURCE" DEBUG RELWITHDEBINFO)
-MY_CHECK_AND_SET_COMPILER_FLAG("-fsanitize=address -fsanitize-address-use-after-scope ASAN_OPTIONS=alloc_dealloc_mismatch=0 -fPIC")
->>>>>>> b3898bb2e (This commit fixes U20 linking issue when libwriteengine.so lacks boost_date_time  symbol)
 
 
 if(WITH_UNITTESTS)
@@ -101,15 +96,13 @@ if(WITH_UNITTESTS)
     target_link_libraries(comparators_tests ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
     add_test(NAME columnstore:comparators_tests COMMAND comparators_tests)
 
-<<<<<<< HEAD
     add_executable(bytestream bytestream.cpp)
     target_link_libraries(bytestream ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
     add_test(NAME columnstore:bytestream COMMAND bytestream)
-=======
-    # add_executable(pqorderby_test pqorderby-test.cpp)
-    # target_link_libraries(pqorderby_test ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
-    # add_test(NAME columnstore:pqorderby_test COMMAND pqorderby_test)
->>>>>>> b3898bb2e (This commit fixes U20 linking issue when libwriteengine.so lacks boost_date_time  symbol)
+ 
+    add_executable(pqorderby pqorderby-test.cpp)
+    target_link_libraries(pqorderby ${ENGINE_LDFLAGS} ${ENGINE_WRITE_LIBS} ${CPPUNIT_LIBRARIES} cppunit)
+    add_test(NAME columnstore:pqorderby COMMAND pqorderby)
 
     # standalone EM routines test
     add_executable(brm_em_standalone brm-em-standalone.cpp)

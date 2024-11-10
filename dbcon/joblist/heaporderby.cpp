@@ -429,7 +429,7 @@ bool KeyType::less(const KeyType& r, rowgroup::RowGroup& rg, const joblist::Orde
       longString = true;
     }
     // std::cout << "less pos left " << std::hex << (uint64_t)(key_ + l_offset) << " pos right "
-    //           << (uint64_t)(r.key_ + l_offset) << std::endl;
+    //           << (uint64_t)(r.key_ + l_offset) << std::dec << std::endl;
 
     cmpResult = memcmp(key_ + l_offset, r.key_ + l_offset, r_offset - l_offset);
     if (!cmpResult && longString)
@@ -468,9 +468,9 @@ HeapOrderBy::HeapOrderBy(const rowgroup::RowGroup& rg, const joblist::OrderByKey
  , recordsLeftInRanges_(0)
  , jobListorderByRGColumnIDs_(sortingKeyCols)
  , rg_(rg)
+ , mm_(mm)
  , rgOut_(rg)
 {
-  mm_.reset(mm);
   data_.reinit(rg_, 2);
   rg_.setData(&data_);
   rg_.resetRowGroup(0);
@@ -490,6 +490,7 @@ HeapOrderBy::HeapOrderBy(const rowgroup::RowGroup& rg, const joblist::OrderByKey
            });
   mm_->acquire((heapSize + 1) * keyBytesSize_);
   keyBuf_.reset(new uint8_t[(heapSize + 1) * keyBytesSize_]);
+  // std::cout << "keyBuf_.ind " << std::hex << (uint64_t)keyBuf_.get() << std::dec << std::endl;
 
   // Make a permutations struct
   for (auto range = ranges.begin(); auto& prevPhaseSortingThread : prevPhaseSortingThreads)
@@ -521,9 +522,13 @@ HeapOrderBy::HeapOrderBy(const rowgroup::RowGroup& rg, const joblist::OrderByKey
   auto heapSizeHalf = heapSize >> 1;
   for (size_t i = 0; i < heapSize; ++i)
   {
+    // std::cout << "i " << i << " keyBuf_.ind " << std::hex << (uint64_t)keyBuf_.get() << std::dec << std::endl;
     heap_.push_back({KeyType(rg_, keyBuf_.get() + (i * keyBytesSize_)), {0, 0, i % heapSizeHalf}});
   }
 
+  // std::cout << "heap_.data() " << std::hex << (uint64_t)heap_.data() << std::dec << std::endl;
+  // std::cout << "heap_.size() " << heap_.size() << std::endl;
+  
   size_t prevHeapIdx = heap_.size();
   for (size_t heapIdx = nextPowOf2; heapIdx >= 1; heapIdx >>= 1, prevHeapIdx >>= 1)  // level
   {
@@ -568,6 +573,7 @@ size_t HeapOrderBy::idxOfMin(Heap& heap, const size_t left, const size_t right,
   {
     return right;
   }
+  // std::cout << " left " << left << " right " << right << std::endl;
   if (rightP == ImpossiblePermute ||
       heap[left].first.less(heap[right].first, rg_, colsAndDirection, leftP, rightP, prevPhaseSorting))
     return left;

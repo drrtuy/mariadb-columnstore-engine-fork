@@ -25,6 +25,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <tuple>
 #include <type_traits>
@@ -184,6 +185,8 @@ TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalAsc)
     ASSERT_FALSE(key.key() == nullptr);
     ASSERT_EQ(memcmp(expected, key.key(), bufUnitSize), 0);
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalDsc)
@@ -220,6 +223,8 @@ TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalDsc)
     ASSERT_FALSE(key.key() == nullptr);
     ASSERT_EQ(memcmp(expected, key.key(), bufUnitSize), 0);
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalLessAsc)
@@ -227,16 +232,14 @@ TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalLessAsc)
   sorting::SortingThreads prevPhaseSorting;
   size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
   size_t keysNumber = this->rg_.getRowCount();
-  std::vector<uint8_t*> keyBufsVec(keysNumber);
+  std::vector<std::unique_ptr<uint8_t[]>> keyBufsVec;
   std::vector<KeyType> keys;
-  size_t i = 0;
-  for_each(keyBufsVec.begin(), keyBufsVec.end(),
-           [this, &keys, &i, bufUnitSize](uint8_t* buf)
-           {
-             buf = new uint8_t[bufUnitSize];
-             std::memset(buf, 0, bufUnitSize);
-             keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i++, 0}, buf));
-           });
+  for (size_t i = 0; i < keysNumber; ++i)
+  {
+    keyBufsVec.emplace_back(std::unique_ptr<uint8_t[]>(new uint8_t[bufUnitSize]));
+    std::memset(keyBufsVec.back().get(), 0, bufUnitSize);
+    keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i, 0}, keyBufsVec.back().get()));
+  }
   // keys[0] == NULL
   std::vector<std::vector<OutcomesT>> expectedResultsMatrix = {
       {FAL, TR, TR, TR, TR, TR, TR},       {FAL, FAL, TR, FAL, FAL, FAL, FAL},
@@ -272,7 +275,6 @@ TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalLessAsc)
   {
     ASSERT_TRUE(false);
   }
-  i = 0;
 }
 
 TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalLessDsc)
@@ -282,16 +284,14 @@ TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalLessDsc)
   sorting::SortingThreads prevPhaseSorting;
   size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
   size_t keysNumber = this->rg_.getRowCount();
-  std::vector<uint8_t*> keyBufsVec(keysNumber);
+  std::vector<std::unique_ptr<uint8_t[]>> keyBufsVec;
   std::vector<KeyType> keys;
-  size_t i = 0;
-  for_each(keyBufsVec.begin(), keyBufsVec.end(),
-           [this, &keys, &i, bufUnitSize](uint8_t* buf)
-           {
-             buf = new uint8_t[bufUnitSize];
-             std::memset(buf, 0, bufUnitSize);
-             keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i++, 0}, buf));
-           });
+  for (size_t i = 0; i < keysNumber; ++i)
+  {
+    keyBufsVec.emplace_back(std::unique_ptr<uint8_t[]>(new uint8_t[bufUnitSize]));
+    std::memset(keyBufsVec.back().get(), 0, bufUnitSize);
+    keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i, 0}, keyBufsVec.back().get()));
+  }
   std::vector<std::vector<OutcomesT>> expectedResultsMatrix = {{FAL, FAL, FAL, FAL, FAL, FAL, FAL},
 
                                                                {TR, FAL, FAL, TR, TR, TR, TR},
@@ -336,7 +336,7 @@ TEST_F(KeyTypeWideDecimalTest, KeyTypeCtorWDecimalLessDsc)
   {
     ASSERT_TRUE(false);
   }
-  i = 0;
+  // i = 0;
 }
 
 template <typename T>
@@ -483,6 +483,8 @@ TYPED_TEST(KeyTypeFloatTest, KeyTypeCtorAsc)
     ASSERT_FALSE(key.key() == nullptr);
     ASSERT_EQ(memcmp(key.key(), expected, bufUnitSize), 0);
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TYPED_TEST(KeyTypeFloatTest, KeyTypeCtorDsc)
@@ -534,6 +536,8 @@ TYPED_TEST(KeyTypeFloatTest, KeyTypeCtorDsc)
     ASSERT_FALSE(key.key() == nullptr);
     ASSERT_EQ(memcmp(expected, key.key(), bufUnitSize), 0);
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TYPED_TEST(KeyTypeFloatTest, KeyTypeLessAsc)
@@ -541,15 +545,14 @@ TYPED_TEST(KeyTypeFloatTest, KeyTypeLessAsc)
   sorting::SortingThreads prevPhaseSorting;
   size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
   size_t keysNumber = this->rg_.getRowCount();
-  std::vector<std::unique_ptr<uint8_t>> keyBufsVec;
+  std::vector<std::unique_ptr<uint8_t[]>> keyBufsVec;
   std::vector<KeyType> keys;
   for (size_t i = 0; i < keysNumber; ++i)
   {
-    keyBufsVec.emplace_back(std::unique_ptr<uint8_t>(new uint8_t[bufUnitSize]));
+    keyBufsVec.emplace_back(std::unique_ptr<uint8_t[]>(new uint8_t[bufUnitSize]));
     std::memset(keyBufsVec.back().get(), 0, bufUnitSize);
     keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i, 0}, keyBufsVec.back().get()));
   }
-  // keys[0] == NULL
   std::vector<std::vector<OutcomesT>> expectedResultsMatrix = {
       {FAL, TR, TR, TR, SKIP, TR, TR, TR, TR, TR},
 
@@ -601,76 +604,6 @@ TYPED_TEST(KeyTypeFloatTest, KeyTypeLessAsc)
   }
 }
 
-// TYPED_TEST(KeyTypeFloatTest1, KeyTypeLessAsc1)
-// {
-//   sorting::SortingThreads prevPhaseSorting;
-//   size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
-//   size_t keysNumber = this->rg_.getRowCount();
-//   std::vector<std::unique_ptr<uint8_t>> keyBufsVec;  // (keysNumber);
-//   std::vector<KeyType> keys;
-//   for (size_t i = 0; i < keysNumber; ++i)
-//   //  [this, &keys, &i, &keyBufsVec, bufUnitSize](uint8_t* buf)
-//   {
-//     keyBufsVec.emplace_back(std::unique_ptr<uint8_t>(new uint8_t[bufUnitSize]));
-//     // auto buf = std::unique_ptr<uint8_t>(new uint8_t[bufUnitSize]);
-//     std::memset(keyBufsVec.back().get(), 0, bufUnitSize);
-//     keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i++, 0}, keyBufsVec.back().get()));
-//   }
-//   //  });
-//   // keys[0] == NULL
-//   std::vector<std::vector<OutcomesT>> expectedResultsMatrix = {
-//       {FAL, TR, TR, TR, SKIP, TR, TR, TR, TR, TR},
-
-//       {FAL, FAL, TR, TR, FAL, FAL, FAL, FAL, TR, FAL},
-
-//       {FAL, FAL, FAL, TR, FAL, FAL, FAL, FAL, FAL, FAL},
-
-//       {FAL, FAL, FAL, FAL, FAL, FAL, FAL, FAL, FAL, FAL},
-
-//       {FAL, TR, TR, TR, FAL, SKIP, TR, TR, TR, TR},
-
-//       {FAL, TR, TR, TR, FAL, FAL, TR, TR, TR, TR},
-
-//       {FAL, TR, TR, TR, FAL, FAL, FAL, FAL, TR, TR},
-
-//       {FAL, TR, TR, TR, FAL, FAL, TR, FAL, TR, TR},
-
-//       {FAL, FAL, TR, TR, FAL, FAL, FAL, FAL, FAL, FAL},
-
-//       {FAL, TR, TR, TR, FAL, FAL, FAL, FAL, TR, FAL}};
-//   [[maybe_unused]] size_t x = 0;
-//   [[maybe_unused]] size_t y = 0;
-//   bool testHadFailed = false;
-//   for_each(keys.begin(), keys.end(),
-//            [this, &prevPhaseSorting, &expectedResultsMatrix, &keys, &x, &y, &testHadFailed](auto& key1)
-//            {
-//              y = 0;
-//              for_each(
-//                  keys.begin(), keys.end(),
-//                  [this, &prevPhaseSorting, &expectedResultsMatrix, &key1, &x, &y, &testHadFailed](auto&
-//                  key2)
-//                  {
-//                    OutcomesT result =
-//                        (key1.less(key2, this->rg_, this->keysCols_, {0, 42, 0}, {0, 42, 0},
-//                        prevPhaseSorting))
-//                            ? TR
-//                            : FAL;
-//                    if (expectedResultsMatrix[x][y] != SKIP && expectedResultsMatrix[x][y] != result)
-//                    {
-//                      std::cout << "Results mismatch with: left row number = " << x
-//                                << " and right row number = " << y << std::endl;
-//                      testHadFailed = true;
-//                    }
-//                    ++y;
-//                  });
-//              ++x;
-//            });
-//   if (testHadFailed)
-//   {
-//     ASSERT_TRUE(false);
-//   }
-// }
-
 TYPED_TEST(KeyTypeFloatTest, KeyTypeLessDsc)
 {
   const bool isAsc = false;
@@ -678,16 +611,15 @@ TYPED_TEST(KeyTypeFloatTest, KeyTypeLessDsc)
   sorting::SortingThreads prevPhaseSorting;
   size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
   size_t keysNumber = this->rg_.getRowCount();
-  std::vector<uint8_t*> keyBufsVec(keysNumber);
+  std::vector<std::unique_ptr<uint8_t[]>> keyBufsVec;
   std::vector<KeyType> keys;
-  size_t i = 0;
-  for_each(keyBufsVec.begin(), keyBufsVec.end(),
-           [this, &keys, &i, bufUnitSize](uint8_t* buf)
-           {
-             buf = new uint8_t[bufUnitSize];
-             std::memset(buf, 0, bufUnitSize);
-             keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i++, 0}, buf));
-           });
+  // size_t i = 0;
+  for (size_t i = 0; i < keysNumber; ++i)
+  {
+    keyBufsVec.emplace_back(std::unique_ptr<uint8_t[]>(new uint8_t[bufUnitSize]));
+    std::memset(keyBufsVec.back().get(), 0, bufUnitSize);
+    keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i, 0}, keyBufsVec.back().get()));
+  }
   std::vector<std::vector<OutcomesT>> expectedResultsMatrix = {
       {FAL, FAL, FAL, FAL, FAL, FAL, FAL, FAL, FAL, FAL},
 
@@ -815,16 +747,17 @@ TYPED_TEST(KeyTypeTestIntT, KeyTypeCtorAsc)
 {
   using T = typename KeyTypeTestIntT<TypeParam>::IntegralType;
   size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
-  uint8_t* expected = new uint8_t[bufUnitSize];
-  uint8_t* buf = new uint8_t[bufUnitSize * rowgroup::rgCommonSize + 1];
+  std::unique_ptr<uint8_t[]> expected(new uint8_t[bufUnitSize]);
+  std::unique_ptr<uint8_t[]> buf(new uint8_t[bufUnitSize * rowgroup::rgCommonSize + 1]);
   size_t upperBound = (sizeof(T) == 1) ? 127 : rowgroup::rgCommonSize;
   for (size_t i = 0; i < upperBound; ++i)
   {
-    auto key = KeyType(this->rg_, this->keysCols_, {0, i, 0}, &buf[i * bufUnitSize]);
+    auto ptr = buf.get() + i * bufUnitSize;
+    auto key = KeyType(this->rg_, this->keysCols_, {0, i, 0}, ptr);
     if (i != 42)
     {
-      expected[0] = 1;
-      T* v = reinterpret_cast<T*>(&expected[1]);
+      expected.get()[0] = 1;
+      T* v = reinterpret_cast<T*>(&(expected.get()[1]));
       if (sizeof(T) == 8 && i == 8190)
       {
         *v = -3004747259;
@@ -852,12 +785,12 @@ TYPED_TEST(KeyTypeTestIntT, KeyTypeCtorAsc)
       }
       // *v = htonll(*v);
       ASSERT_FALSE(key.key() == nullptr);
-      ASSERT_EQ(memcmp(expected, key.key(), bufUnitSize), 0);
+      ASSERT_EQ(memcmp(expected.get(), key.key(), bufUnitSize), 0);
     }
     else
     {
       expected[0] = 0;
-      ASSERT_EQ(memcmp(expected, key.key(), 1), 0);
+      ASSERT_EQ(memcmp(expected.get(), key.key(), 1), 0);
     }
   }
 }
@@ -914,6 +847,8 @@ TYPED_TEST(KeyTypeTestIntT, KeyTypeCtorDsc)
       ASSERT_EQ(memcmp(expected, key.key(), 1), 0);
     }
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TYPED_TEST(KeyTypeTestIntT, KeyTypeLessAsc)
@@ -958,6 +893,13 @@ TYPED_TEST(KeyTypeTestIntT, KeyTypeLessAsc)
   ASSERT_TRUE(key1.less(key5, this->rg_, this->keysCols_, {0, 42, 0}, {0, 4001, 0}, prevPhaseSorting));
   ASSERT_FALSE(key4.less(key1, this->rg_, this->keysCols_, {0, 4001, 0}, {0, 42, 0}, prevPhaseSorting));
   ASSERT_FALSE(key5.less(key1, this->rg_, this->keysCols_, {0, 4002, 0}, {0, 42, 0}, prevPhaseSorting));
+
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
 }
 
 template <typename T>
@@ -1054,6 +996,8 @@ TYPED_TEST(KeyTypeTestUIntT, KeyTypeCtorAsc)
       ASSERT_EQ(memcmp(expected, key.key(), 1), 0);
     }
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TYPED_TEST(KeyTypeTestUIntT, KeyTypeCtorDsc)
@@ -1102,6 +1046,8 @@ TYPED_TEST(KeyTypeTestUIntT, KeyTypeCtorDsc)
       ASSERT_EQ(memcmp(expected, key.key(), 1), 0);
     }
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TYPED_TEST(KeyTypeTestUIntT, KeyTypeLessAsc)
@@ -1172,6 +1118,15 @@ TYPED_TEST(KeyTypeTestUIntT, KeyTypeLessAsc)
   ASSERT_FALSE(key4.less(key4, this->rg_, this->keysCols_, {0, 42, 0}, {0, 42, 0}, prevPhaseSorting));
   ASSERT_FALSE(key5.less(key5, this->rg_, this->keysCols_, {0, 42, 0}, {0, 42, 0}, prevPhaseSorting));
   ASSERT_FALSE(key6.less(key6, this->rg_, this->keysCols_, {0, 42, 0}, {0, 42, 0}, prevPhaseSorting));
+
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
+  delete[] key7Buf;
+  delete[] key8Buf;
 }
 
 TYPED_TEST(KeyTypeTestUIntT, KeyTypeLessDsc)
@@ -1249,6 +1204,15 @@ TYPED_TEST(KeyTypeTestUIntT, KeyTypeLessDsc)
   ASSERT_FALSE(key4.less(key4, this->rg_, this->keysCols_, {0, 42, 0}, {0, 42, 0}, prevPhaseSorting));
   ASSERT_FALSE(key5.less(key5, this->rg_, this->keysCols_, {0, 42, 0}, {0, 42, 0}, prevPhaseSorting));
   ASSERT_FALSE(key6.less(key6, this->rg_, this->keysCols_, {0, 42, 0}, {0, 42, 0}, prevPhaseSorting));
+
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
+  delete[] key7Buf;
+  delete[] key8Buf;
 }
 
 class KeyTypeTestVarcharP : public testing::TestWithParam<std::tuple<uint32_t, CHARSET_INFO*>>
@@ -1335,6 +1299,8 @@ TEST_P(KeyTypeTestVarcharP, KeyTypeCtorVarchar)
     ASSERT_EQ(memcmp(expected, key.key(), bufUnitSizeNoNull), 0);
     ++i;
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TEST_P(KeyTypeTestVarcharP, KeyTypeLessVarcharPad1)
@@ -1350,16 +1316,24 @@ TEST_P(KeyTypeTestVarcharP, KeyTypeLessVarcharPad1)
 
   // size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
   size_t keysNumber = this->rg_.getRowCount();
-  std::vector<uint8_t*> keyBufsVec(keysNumber);
+  // std::vector<uint8_t*> keyBufsVec(keysNumber);
+  std::vector<std::unique_ptr<uint8_t[]>> keyBufsVec;
   std::vector<KeyType> keys;
-  size_t i = 0;
-  for_each(keyBufsVec.begin(), keyBufsVec.end(),
-           [this, &keys, &i, bufUnitSize](uint8_t* buf)
-           {
-             buf = new uint8_t[bufUnitSize];
-             std::memset(buf, 0, bufUnitSize);
-             keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i++, 0}, buf));
-           });
+
+  for (size_t i = 0; i < keysNumber; ++i)
+  {
+    keyBufsVec.emplace_back(std::unique_ptr<uint8_t[]>(new uint8_t[bufUnitSize]));
+    std::memset(keyBufsVec.back().get(), 0, bufUnitSize);
+    keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i, 0}, keyBufsVec.back().get()));
+  }
+  // size_t i = 0;
+  // for_each(keyBufsVec.begin(), keyBufsVec.end(),
+  //          [this, &keys, &i, bufUnitSize](uint8_t* buf)
+  //          {
+  //            buf = new uint8_t[bufUnitSize];
+  //            std::memset(buf, 0, bufUnitSize);
+  //            keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i++, 0}, buf));
+  //          });
   // keys[0] == NULL
   std::vector<std::vector<OutcomesT>> expectedResultsMatrix = {
       {FAL, TR, TR, TR},
@@ -1412,18 +1386,15 @@ TEST_P(KeyTypeTestVarcharP, KeyTypeLessVarcharNoPad)
            : w) +
       1;  // NULL byte
 
-  // size_t bufUnitSize = this->rg_.getColumnWidth(0) + 1;
   size_t keysNumber = this->rg_.getRowCount();
-  std::vector<uint8_t*> keyBufsVec(keysNumber);
+  std::vector<std::unique_ptr<uint8_t[]>> keyBufsVec;
   std::vector<KeyType> keys;
-  size_t i = 0;
-  for_each(keyBufsVec.begin(), keyBufsVec.end(),
-           [this, &keys, &i, bufUnitSize](uint8_t* buf)
-           {
-             buf = new uint8_t[bufUnitSize];
-             std::memset(buf, 0, bufUnitSize);
-             keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i++, 0}, buf));
-           });
+  for (size_t i = 0; i < keysNumber; ++i)
+  {
+    keyBufsVec.emplace_back(std::unique_ptr<uint8_t[]>(new uint8_t[bufUnitSize]));
+    std::memset(keyBufsVec.back().get(), 0, bufUnitSize);
+    keys.emplace_back(KeyType(this->rg_, this->keysCols_, {0, i, 0}, keyBufsVec.back().get()));
+  }
   // keys[0] == NULL
   std::vector<std::vector<OutcomesT>> expectedResultsMatrix = {
       {FAL, FAL, TR, TR},
@@ -1647,6 +1618,14 @@ TEST_F(KeyTypeTestLongVarchar, KeyTypeLessVarcharPadAsc)
   ASSERT_TRUE(key5.less(key3, rg_, keysCols_, {0, 5, 0}, {0, 3, 0}, prevPhasThreads_));
 
   ASSERT_FALSE(key3.less(key5, rg_, keysCols_, {0, 3, 0}, {0, 5, 0}, prevPhasThreads_));
+
+  delete[] key0Buf;
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
 }
 
 TEST_F(KeyTypeTestLongVarchar, KeyTypeLessVarcharPadDsc)
@@ -1729,6 +1708,14 @@ TEST_F(KeyTypeTestLongVarchar, KeyTypeLessVarcharPadDsc)
   ASSERT_FALSE(key5.less(key3, rg_, keysCols_, {0, 5, 0}, {0, 3, 0}, prevPhasThreads_));
 
   ASSERT_TRUE(key3.less(key5, rg_, keysCols_, {0, 3, 0}, {0, 5, 0}, prevPhasThreads_));
+
+  delete[] key0Buf;
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
 }
 
 TEST_F(KeyTypeTestLongVarchar, KeyTypeLessVarcharNoPadAsc)
@@ -1809,6 +1796,14 @@ TEST_F(KeyTypeTestLongVarchar, KeyTypeLessVarcharNoPadAsc)
   ASSERT_TRUE(key5.less(key3, rg_, keysCols_, {0, 5, 0}, {0, 3, 0}, prevPhasThreads_));
 
   ASSERT_FALSE(key3.less(key5, rg_, keysCols_, {0, 3, 0}, {0, 5, 0}, prevPhasThreads_));
+
+  delete[] key0Buf;
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
 }
 
 TEST_F(KeyTypeTestLongVarchar, KeyTypeLessVarcharNoPadDsc)
@@ -1891,6 +1886,14 @@ TEST_F(KeyTypeTestLongVarchar, KeyTypeLessVarcharNoPadDsc)
   ASSERT_FALSE(key5.less(key3, rg_, keysCols_, {0, 5, 0}, {0, 3, 0}, prevPhasThreads_));
 
   ASSERT_TRUE(key3.less(key5, rg_, keysCols_, {0, 3, 0}, {0, 5, 0}, prevPhasThreads_));
+
+  delete[] key0Buf;
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
 }
 
 class KeyTypeCompositeKeyTest : public testing::Test
@@ -2026,6 +2029,8 @@ TEST_F(KeyTypeCompositeKeyTest, KeyTypeCtorVarcharPadAsc)
     ASSERT_EQ(memcmp(expected, key.key(), bufUnitSize), 0);
     ++i;
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TEST_F(KeyTypeCompositeKeyTest, KeyTypeCtorVarcharPadDsc)
@@ -2080,6 +2085,8 @@ TEST_F(KeyTypeCompositeKeyTest, KeyTypeCtorVarcharPadDsc)
     ASSERT_EQ(memcmp(expected, key.key(), bufUnitSize), 0);
     ++i;
   }
+  delete[] buf;
+  delete[] expected;
 }
 
 TEST_F(KeyTypeCompositeKeyTest, KeyTypeCtorVarcharPadAscLess)
@@ -2173,6 +2180,16 @@ TEST_F(KeyTypeCompositeKeyTest, KeyTypeCtorVarcharPadAscLess)
   ASSERT_TRUE(key5.less(key3, rg_, keysCols_, {0, 5, 0}, {0, 3, 0}, prevPhasThreads_));
 
   ASSERT_FALSE(key3.less(key5, rg_, keysCols_, {0, 3, 0}, {0, 5, 0}, prevPhasThreads_));
+  delete[] buf;
+  delete[] expected;
+
+  delete[] key0Buf;
+  delete[] key1Buf;
+  delete[] key2Buf;
+  delete[] key3Buf;
+  delete[] key4Buf;
+  delete[] key5Buf;
+  delete[] key6Buf;
 }
 
 class HeapOrderByTest : public testing::Test
@@ -2212,7 +2229,7 @@ TEST_F(HeapOrderByTest, HeapOrderByCtor)
   rowgroup::Row r;
   sorting::SortingThreads prevPhasThreads;
   joblist::OrderByKeysType keysAndDirections = {{0, true}};
-  joblist::MemManager* mm = new joblist::MemManager;  //(&rm, sl, false, false);
+  std::unique_ptr<joblist::MemManager> mm(new joblist::MemManager);
   // no NULLs yet
   // отсортировать
   std::vector<std::vector<int64_t>> data{{3660195432, 3377000516, 3369182711, 2874400139, 2517866456,
@@ -2249,7 +2266,7 @@ TEST_F(HeapOrderByTest, HeapOrderByCtor)
     prevPhasThreads.back()->getRGDatas().push_back(rgData);
     prevPhasThreads.back()->getMutPermutation().swap(perm);
   }
-  HeapOrderBy h(rg_, keysAndDirections, 0, std::numeric_limits<size_t>::max(), mm, 1, prevPhasThreads,
+  HeapOrderBy h(rg_, keysAndDirections, 0, std::numeric_limits<size_t>::max(), mm.get(), 1, prevPhasThreads,
                 heapSizeHalf, ranges);
   PermutationVec right = {PermutationType{0, 0, 0}, PermutationType{0, 9, 0}, PermutationType{0, 8, 0},
                           PermutationType{0, 9, 3}, PermutationType{0, 7, 0}, PermutationType{0, 9, 1},
@@ -2266,7 +2283,7 @@ TEST_F(HeapOrderByTest, HeapOrderByCtorOddSourceThreadsNumber)
   rowgroup::Row r;
   sorting::SortingThreads prevPhasThreads;
   joblist::OrderByKeysType keysAndDirections = {{0, true}};
-  joblist::MemManager* mm = new joblist::MemManager;  //(&rm, sl, false, false);
+  std::unique_ptr<joblist::MemManager> mm(new joblist::MemManager);
   // no NULLs yet
   std::vector<std::vector<int64_t>> data{
       {3660195432, 3377000516, 3369182711, 2874400139, 2517866456, -517915385, -1950920917, -2522630870,
@@ -2302,7 +2319,7 @@ TEST_F(HeapOrderByTest, HeapOrderByCtorOddSourceThreadsNumber)
     prevPhasThreads.back()->getRGDatas().push_back(rgData);
     prevPhasThreads.back()->getMutPermutation().swap(perm);
   }
-  HeapOrderBy h(rg_, keysAndDirections, 0, std::numeric_limits<size_t>::max(), mm, 1, prevPhasThreads,
+  HeapOrderBy h(rg_, keysAndDirections, 0, std::numeric_limits<size_t>::max(), mm.get(), 1, prevPhasThreads,
                 heapSizeHalf, ranges);
   PermutationVec right = {
       PermutationType{0, 0, 0},
@@ -2334,7 +2351,7 @@ TEST_F(HeapOrderByTest, HeapOrderBy_getTopPermuteFromHeapLarge)
   sorting::SortingThreads prevPhasThreads;
   const bool isAsc = true;
   joblist::OrderByKeysType keysAndDirections = {{0, isAsc}};
-  joblist::MemManager* mm = new joblist::MemManager;
+  std::unique_ptr<joblist::MemManager> mm(new joblist::MemManager);
   // no NULLs yet
   const size_t perThreadNumbers = 5000;
   std::mt19937 mt;
@@ -2374,7 +2391,7 @@ TEST_F(HeapOrderByTest, HeapOrderBy_getTopPermuteFromHeapLarge)
     prevPhasThreads.back()->getRGDatas().push_back(rgData);
     prevPhasThreads.back()->getMutPermutation().swap(perm);
   }
-  HeapOrderBy h(rg_, keysAndDirections, 0, std::numeric_limits<size_t>::max(), mm, 1, prevPhasThreads,
+  HeapOrderBy h(rg_, keysAndDirections, 0, std::numeric_limits<size_t>::max(), mm.get(), 1, prevPhasThreads,
                 heapSizeHalf, ranges);
 
   PermutationType p;

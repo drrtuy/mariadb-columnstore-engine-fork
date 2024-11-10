@@ -107,8 +107,8 @@ class HeapOrderBy
   size_t recordsLeftInRanges_;
   joblist::OrderByKeysType jobListorderByRGColumnIDs_;
   rowgroup::RowGroup rg_;
-  std::unique_ptr<joblist::MemManager> mm_;
-  std::unique_ptr<uint8_t> keyBuf_;
+  joblist::MemManager* mm_;
+  std::unique_ptr<uint8_t[]> keyBuf_;
   Heap heap_;
   HeapPermutations ranges_;
   // Scratch desk
