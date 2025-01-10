@@ -24,6 +24,7 @@
 
 #include "hasher.h"
 #include "lbidlist.h"
+#include "resourcemanager.h"
 #include "spinlock.h"
 #include "vlarray.h"
 #include "threadnaming.h"
@@ -36,10 +37,17 @@ using namespace joblist;
 
 namespace joiner
 {
+// TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
+//                          uint32_t smallJoinColumn, uint32_t largeJoinColumn, JoinType jt,
+//                          threadpool::ThreadPool* jsThreadPool)
+//  : TupleJoiner(smallInput, largeInput, smallJoinColumn, largeJoinColumn, jt, jsThreadPool, nullptr)
+// {
+// }
+
 // Typed joiner ctor
 TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
                          uint32_t smallJoinColumn, uint32_t largeJoinColumn, JoinType jt,
-                         threadpool::ThreadPool* jsThreadPool)
+                         threadpool::ThreadPool* jsThreadPool, joblist::ResourceManager* rm)
  : smallRG(smallInput)
  , largeRG(largeInput)
  , joinAlg(INSERTING)
@@ -63,7 +71,7 @@ TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::R
     _pool.reset(new boost::shared_ptr<PoolAllocator>[bucketCount]);
     for (i = 0; i < bucketCount; i++)
     {
-      STLPoolAllocator<pair<const long double, Row::Pointer>> alloc;
+      STLPoolAllocator<pair<const long double, Row::Pointer>> alloc(resourceManager_);
       _pool[i] = alloc.getPoolAllocator();
       ld[i].reset(new ldhash_t(10, hasher(), ldhash_t::key_equal(), alloc));
     }
@@ -74,7 +82,7 @@ TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::R
     _pool.reset(new boost::shared_ptr<PoolAllocator>[bucketCount]);
     for (i = 0; i < bucketCount; i++)
     {
-      STLPoolAllocator<pair<const int64_t, Row::Pointer>> alloc;
+      STLPoolAllocator<pair<const int64_t, Row::Pointer>> alloc(resourceManager_);
       _pool[i] = alloc.getPoolAllocator();
       sth[i].reset(new sthash_t(10, hasher(), sthash_t::key_equal(), alloc));
     }
@@ -85,7 +93,7 @@ TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::R
     _pool.reset(new boost::shared_ptr<PoolAllocator>[bucketCount]);
     for (i = 0; i < bucketCount; i++)
     {
-      STLPoolAllocator<pair<const int64_t, uint8_t*>> alloc;
+      STLPoolAllocator<pair<const int64_t, uint8_t*>> alloc(resourceManager_);
       _pool[i] = alloc.getPoolAllocator();
       h[i].reset(new hash_t(10, hasher(), hash_t::key_equal(), alloc));
     }
@@ -142,10 +150,17 @@ TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::R
   nullValueForJoinColumn = smallNullRow.getSignedNullValue(smallJoinColumn);
 }
 
+// TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
+//                          const vector<uint32_t>& smallJoinColumns, const vector<uint32_t>& largeJoinColumns,
+//                          JoinType jt, threadpool::ThreadPool* jsThreadPool)
+//  : TupleJoiner(smallInput, largeInput, smallJoinColumns, largeJoinColumns, jt, jsThreadPool, nullptr)
+// {
+// }
+
 // Typeless joiner ctor
 TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
                          const vector<uint32_t>& smallJoinColumns, const vector<uint32_t>& largeJoinColumns,
-                         JoinType jt, threadpool::ThreadPool* jsThreadPool)
+                         JoinType jt, threadpool::ThreadPool* jsThreadPool, joblist::ResourceManager* rm)
  : smallRG(smallInput)
  , largeRG(largeInput)
  , joinAlg(INSERTING)
@@ -168,7 +183,7 @@ TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::R
   ht.reset(new boost::scoped_ptr<typelesshash_t>[bucketCount]);
   for (i = 0; i < bucketCount; i++)
   {
-    STLPoolAllocator<pair<const TypelessData, Row::Pointer>> alloc;
+    STLPoolAllocator<pair<const TypelessData, Row::Pointer>> alloc(resourceManager_);
     _pool[i] = alloc.getPoolAllocator();
     ht[i].reset(new typelesshash_t(10, hasher(), typelesshash_t::key_equal(), alloc));
   }
@@ -224,7 +239,10 @@ TupleJoiner::TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::R
   // TODO: make it explicit to avoid future confusion.
   storedKeyAlloc.reset(new FixedAllocator[numCores]);
   for (i = 0; i < (uint)numCores; i++)
-    storedKeyAlloc[i].setAllocSize(keyLength);
+  {
+    auto alloc = resourceManager_->getAllocator<utils::FixedAllocatorBufType>();
+    storedKeyAlloc[i] = FixedAllocator(alloc, keyLength);
+  }
 }
 
 TupleJoiner::TupleJoiner()
@@ -859,7 +877,11 @@ void TupleJoiner::setInUM()
     tmpKeyAlloc.reset(new FixedAllocator[threadCount]);
 
     for (i = 0; i < threadCount; i++)
-      tmpKeyAlloc[i] = FixedAllocator(keyLength, true);
+    {
+      auto alloc = resourceManager_->getAllocator<utils::FixedAllocatorBufType>();
+      tmpKeyAlloc[i] = FixedAllocator(alloc, keyLength, true);
+
+    }
   }
 }
 
@@ -914,7 +936,10 @@ void TupleJoiner::setInUM(vector<RGData>& rgs)
     tmpKeyAlloc.reset(new FixedAllocator[threadCount]);
 
     for (i = 0; i < threadCount; i++)
-      tmpKeyAlloc[i] = FixedAllocator(keyLength, true);
+    {
+      auto alloc = resourceManager_->getAllocator<utils::FixedAllocatorBufType>();
+      tmpKeyAlloc[i] = FixedAllocator(alloc, keyLength, true);
+    }
   }
 }
 
@@ -970,7 +995,10 @@ void TupleJoiner::setThreadCount(uint32_t cnt)
     tmpKeyAlloc.reset(new FixedAllocator[threadCount]);
 
     for (uint32_t i = 0; i < threadCount; i++)
-      tmpKeyAlloc[i] = FixedAllocator(keyLength, true);
+    {
+      auto alloc = resourceManager_->getAllocator<utils::FixedAllocatorBufType>();
+      tmpKeyAlloc[i] = FixedAllocator(alloc, keyLength, true);
+    }
   }
 
   if (fe)
@@ -1842,6 +1870,7 @@ std::shared_ptr<TupleJoiner> TupleJoiner::copyForDiskJoin()
 
   ret->discreteValues.reset(new bool[smallKeyColumns.size()]);
   ret->cpValues.reset(new vector<int128_t>[smallKeyColumns.size()]);
+  ret->resourceManager_ = resourceManager_;
 
   for (uint32_t i = 0; i < smallKeyColumns.size(); i++)
   {
@@ -1880,7 +1909,10 @@ std::shared_ptr<TupleJoiner> TupleJoiner::copyForDiskJoin()
   {
     ret->storedKeyAlloc.reset(new FixedAllocator[numCores]);
     for (int i = 0; i < numCores; i++)
-      ret->storedKeyAlloc[i].setAllocSize(keyLength);
+    {
+      auto alloc = resourceManager_->getAllocator<utils::FixedAllocatorBufType>();
+      storedKeyAlloc[i] = FixedAllocator(alloc, keyLength);
+    }
   }
 
   ret->numCores = numCores;

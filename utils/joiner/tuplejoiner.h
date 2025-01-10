@@ -26,6 +26,7 @@
 #include <boost/scoped_array.hpp>
 #include <unordered_map>
 
+#include "resourcemanager.h"
 #include "rowgroup.h"
 #include "joiner.h"
 #include "fixedallocator.h"
@@ -266,14 +267,22 @@ class TupleJoiner
   };
 
   /* ctor to use for numeric join */
+  // TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
+  //             uint32_t smallJoinColumn, uint32_t largeJoinColumn, joblist::JoinType jt,
+  //             threadpool::ThreadPool* jsThreadPool);
+
   TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
               uint32_t smallJoinColumn, uint32_t largeJoinColumn, joblist::JoinType jt,
-              threadpool::ThreadPool* jsThreadPool);
+              threadpool::ThreadPool* jsThreadPool, joblist::ResourceManager* rm);
 
   /* ctor to use for string & compound join */
-  TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
+  // TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
+  //             const std::vector<uint32_t>& smallJoinColumns, const std::vector<uint32_t>& largeJoinColumns,
+  //             joblist::JoinType jt, threadpool::ThreadPool* jsThreadPool);
+
+    TupleJoiner(const rowgroup::RowGroup& smallInput, const rowgroup::RowGroup& largeInput,
               const std::vector<uint32_t>& smallJoinColumns, const std::vector<uint32_t>& largeJoinColumns,
-              joblist::JoinType jt, threadpool::ThreadPool* jsThreadPool);
+              joblist::JoinType jt, threadpool::ThreadPool* jsThreadPool, joblist::ResourceManager* rm);
 
   ~TupleJoiner();
 
@@ -562,6 +571,8 @@ class TupleJoiner
   void bucketsToTables(buckets_t*, hash_table_t*);
 
   bool _convertToDiskJoin;
+  joblist::ResourceManager* resourceManager_ = nullptr;
+
 };
 
 }  // namespace joiner
