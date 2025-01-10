@@ -271,22 +271,21 @@ void TupleHashJoinStep::startSmallRunners(uint index)
 
   if (typelessJoin[index])
   {
-    joiner.reset(new TupleJoiner(smallRGs[index], largeRG, smallSideKeys[index], largeSideKeys[index], jt,
-                                 &jobstepThreadPool));
+    joiners[index].reset(new TupleJoiner(smallRGs[index], largeRG, smallSideKeys[index], largeSideKeys[index],
+                                         jt, &jobstepThreadPool, resourceManager));
   }
   else
   {
-    joiner.reset(new TupleJoiner(smallRGs[index], largeRG, smallSideKeys[index][0], largeSideKeys[index][0],
-                                 jt, &jobstepThreadPool));
+    joiners[index].reset(new TupleJoiner(smallRGs[index], largeRG, smallSideKeys[index][0], largeSideKeys[index][0],
+                                 jt, &jobstepThreadPool, resourceManager));
   }
 
-  joiner->setUniqueLimit(uniqueLimit);
-  joiner->setTableName(smallTableNames[index]);
-  joiners[index] = joiner;
+  joiners[index]->setUniqueLimit(uniqueLimit);
+  joiners[index]->setTableName(smallTableNames[index]);
 
   /* check for join types unsupported on the PM. */
   if (!largeBPS || !isExeMgr)
-    joiner->setInUM(rgData[index]);
+    joiners[index]->setInUM(rgData[index]);
 
   /*
       start the small runners
@@ -300,7 +299,7 @@ void TupleHashJoinStep::startSmallRunners(uint index)
   uint64_t memMonitor = jobstepThreadPool.invoke([this, index] { this->trackMem(index); });
   // starting 1 thread when in PM mode, since it's only inserting into a
   // vector of rows.  The rest will be started when converted to UM mode.
-  if (joiner->inUM())
+  if (joiners[index]->inUM())
   {
     for (int i = 0; i < numCores; i++)
     {
@@ -314,7 +313,7 @@ void TupleHashJoinStep::startSmallRunners(uint index)
 
   // wait for the first thread to join, then decide whether the others exist and need joining
   jobstepThreadPool.join(jobs[0]);
-  if (joiner->inUM())
+  if (joiners[index]->inUM())
   {
     for (int i = 1; i < numCores; i++)
     {
@@ -346,17 +345,17 @@ void TupleHashJoinStep::startSmallRunners(uint index)
   end_time = boost::posix_time::microsec_clock::universal_time();
   if (!(fSessionId & 0x80000000))
       cout << "hash table construction time = " << end_time - start_time <<
-      " size = " << joiner->size() << endl;
+      " size = " << joiners[index]->size() << endl;
   */
 
   extendedInfo += "\n";
 
   ostringstream oss;
-  if (!joiner->onDisk())
+  if (!joiners[index]->onDisk())
   {
     // add extended info, and if not aborted then tell joiner
     // we're done reading the small side.
-    if (joiner->inPM())
+    if (joiners[index]->inPM())
     {
       oss << "PM join (" << index << ")" << endl;
 #ifdef JLF_DEBUG
@@ -364,7 +363,7 @@ void TupleHashJoinStep::startSmallRunners(uint index)
 #endif
       extendedInfo += oss.str();
     }
-    else if (joiner->inUM())
+    else if (joiners[index]->inUM())
     {
       oss << "UM join (" << index << ")" << endl;
 #ifdef JLF_DEBUG
@@ -373,7 +372,7 @@ void TupleHashJoinStep::startSmallRunners(uint index)
       extendedInfo += oss.str();
     }
     if (!cancelled())
-      joiner->doneInserting();
+      joiners[index]->doneInserting();
   }
 
   boost::mutex::scoped_lock lk(*fStatsMutexPtr);
