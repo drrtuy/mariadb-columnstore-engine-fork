@@ -256,6 +256,12 @@ class ExtentMapRBTreeImpl
   static ExtentMapRBTreeImpl* makeExtentMapRBTreeImpl(unsigned key, off_t size, bool readOnly, bool& emLocked,
                                                       const MasterSegmentTable* emSegTable = nullptr);
 
+  static void refreshShmWithLock()
+  {
+    boost::mutex::scoped_lock lk(fInstanceMutex);
+    return refreshShm();
+  }
+
   static void refreshShm()
   {
     if (fInstance)
@@ -308,6 +314,13 @@ class FreeListImpl
   ~FreeListImpl(){};
 
   static FreeListImpl* makeFreeListImpl(unsigned key, off_t size, bool readOnly = false);
+  
+  static void refreshShmWithLock()
+  {
+    boost::mutex::scoped_lock lk(fInstanceMutex);
+    return refreshShm();
+  }
+  
   static void refreshShm()
   {
     if (fInstance)
