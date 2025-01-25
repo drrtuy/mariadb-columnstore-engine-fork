@@ -22,7 +22,7 @@ SET(Boost_LIBRARY_DIRS "${INSTALL_LOCATION}/lib")
 LINK_DIRECTORIES("${Boost_LIBRARY_DIRS}")
 
 set(_cxxargs "-fPIC -DBOOST_NO_AUTO_PTR -fvisibility=default")
-set(_b2args cxxflags=${_cxxargs};cflags=-fPIC;threading=multi;${_extra};toolset=${_toolset} --without-python;--prefix=${INSTALL_LOCATION})
+set(_b2args cxxflags=${_cxxargs};cflags=-fPIC;threading=multi;${_extra}; --without-python;--prefix=${INSTALL_LOCATION})
 
 SET(byproducts)
 FOREACH(name chrono filesystem program_options regex system thread)
@@ -37,8 +37,8 @@ ENDFOREACH()
 
 ExternalProject_Add(external_boost
   PREFIX .boost
-  URL https://archives.boost.io/release/1.79.0/source/boost_1_79_0.tar.bz2
-  URL_HASH SHA256=475d589d51a7f8b3ba2ba4eda022b170e562ca3b760ee922c146b6c65856ef39
+  URL https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.gz
+  URL_HASH SHA256=a5800f405508f5df8114558ca9855d2640a2de8f0445f051fa1c7c3383045724
   CONFIGURE_COMMAND ./bootstrap.sh
   UPDATE_COMMAND ""
   BUILD_COMMAND ./b2 -q ${_b2args}
