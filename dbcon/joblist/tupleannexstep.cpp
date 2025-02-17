@@ -18,7 +18,7 @@
 
 //  $Id: tupleannexstep.cpp 9661 2013-07-01 20:33:05Z pleblanc $
 
-//#define NDEBUG
+// #define NDEBUG
 #include <cassert>
 #include <sstream>
 #include <iomanip>
@@ -380,7 +380,7 @@ void TupleAnnexStep::execute(uint32_t id)
 
 void TupleAnnexStep::executeNoOrderBy()
 {
-  utils::setThreadName("TASwoOrd");
+  utils::setThreadName("TNSwoOrd");
   RGData rgDataIn;
   RGData rgDataOut;
   bool more = false;
@@ -399,53 +399,69 @@ void TupleAnnexStep::executeNoOrderBy()
     sts.total_units_of_work = 1;
     postStepStartTele(sts);
 
-    while (more && !cancelled() && !fLimitHit)
+    if (!fConstant && fLimitCount == std::numeric_limits<uint64_t>::max())
     {
-      fRowGroupIn.setData(&rgDataIn);
-      fRowGroupIn.getRow(0, &fRowIn);
-      // Get a new output rowgroup for each input rowgroup to preserve the rids
-      rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
-      fRowGroupOut.setData(&rgDataOut);
-      fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
-      fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
-      fRowGroupOut.getRow(0, &fRowOut);
-
-      for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled() && !fLimitHit; ++i)
+      while (more && !cancelled())
       {
-        // skip first limit-start rows
-        if (fRowsProcessed++ < fLimitStart)
+        fRowGroupIn.setData(&rgDataIn);
+        if (fRowGroupIn.getRowCount() > 0)
         {
-          fRowIn.nextRow();
-          continue;
+          fOutputDL->insert(rgDataIn);
         }
 
-        if (UNLIKELY(fRowsReturned >= fLimitCount))
-        {
-          fLimitHit = true;
-          fJobList->abortOnLimit((JobStep*)this);
-          continue;
-        }
-
-        if (fConstant)
-          fConstant->fillInConstants(fRowIn, fRowOut);
-        else
-          copyRow(fRowIn, &fRowOut);
-
-        fRowGroupOut.incRowCount();
-
-        if (++fRowsReturned < fLimitCount)
-        {
-          fRowOut.nextRow();
-          fRowIn.nextRow();
-        }
+        more = fInputDL->next(fInputIterator, &rgDataIn);
       }
-
-      if (fRowGroupOut.getRowCount() > 0)
+    }
+    else
+    {
+      while (more && !cancelled() && !fLimitHit)
       {
-        fOutputDL->insert(rgDataOut);
-      }
+        fRowGroupIn.setData(&rgDataIn);
+        fRowGroupIn.getRow(0, &fRowIn);
+        // Get a new output rowgroup for each input rowgroup to preserve the rids
+        rgDataOut.reinit(fRowGroupOut, fRowGroupIn.getRowCount());
+        fRowGroupOut.setData(&rgDataOut);
+        fRowGroupOut.resetRowGroup(fRowGroupIn.getBaseRid());
+        fRowGroupOut.setDBRoot(fRowGroupIn.getDBRoot());
+        fRowGroupOut.getRow(0, &fRowOut);
 
-      more = fInputDL->next(fInputIterator, &rgDataIn);
+        for (uint64_t i = 0; i < fRowGroupIn.getRowCount() && !cancelled() && !fLimitHit; ++i)
+        {
+          // skip first limit-start rows
+          if (fRowsProcessed++ < fLimitStart)
+          {
+            fRowIn.nextRow();
+            continue;
+          }
+
+          if (UNLIKELY(fRowsReturned >= fLimitCount))
+          {
+            fLimitHit = true;
+            fJobList->abortOnLimit((JobStep*)this);
+            continue;
+          }
+
+          if (fConstant)
+            fConstant->fillInConstants(fRowIn, fRowOut);
+          else
+            copyRow(fRowIn, &fRowOut);
+
+          fRowGroupOut.incRowCount();
+
+          if (++fRowsReturned < fLimitCount)
+          {
+            fRowOut.nextRow();
+            fRowIn.nextRow();
+          }
+        }
+
+        if (fRowGroupOut.getRowCount() > 0)
+        {
+          fOutputDL->insert(rgDataOut);
+        }
+
+        more = fInputDL->next(fInputIterator, &rgDataIn);
+      }
     }
   }
   catch (...)
@@ -463,7 +479,7 @@ void TupleAnnexStep::executeNoOrderBy()
 
 void TupleAnnexStep::executeNoOrderByWithDistinct()
 {
-  utils::setThreadName("TASwoOrdDist");
+  utils::setThreadName("TNSwoOrdDist");
   scoped_ptr<DistinctMap_t> distinctMap(new DistinctMap_t(10, TAHasher(this), TAEq(this)));
   vector<RGData> dataVec;
   vector<RGData> dataVecSkip;
@@ -599,7 +615,7 @@ void TupleAnnexStep::executeNoOrderByWithDistinct()
 
 void TupleAnnexStep::executeWithOrderBy()
 {
-  utils::setThreadName("TASwOrd");
+  utils::setThreadName("TNSwOrd");
   RGData rgDataIn;
   RGData rgDataOut;
   bool more = false;
@@ -702,7 +718,7 @@ void TupleAnnexStep::executeWithOrderBy()
 */
 void TupleAnnexStep::finalizeParallelOrderByDistinct()
 {
-  utils::setThreadName("TASwParOrdDistM");
+  utils::setThreadName("TNSwParOrdDistM");
   uint64_t count = 0;
   uint64_t offset = 0;
   uint32_t rowSize = 0;
@@ -858,7 +874,7 @@ void TupleAnnexStep::finalizeParallelOrderByDistinct()
         break;
       }
     }  // end of limit bound while loop
-  }    // end of if-else
+  }  // end of if-else
 
   if (fRowGroupOut.getRowCount() > 0)
   {
@@ -901,7 +917,7 @@ void TupleAnnexStep::finalizeParallelOrderByDistinct()
 */
 void TupleAnnexStep::finalizeParallelOrderBy()
 {
-  utils::setThreadName("TASwParOrdMerge");
+  utils::setThreadName("TNSwParOrdMerge");
   uint64_t count = 0;
   uint64_t offset = 0;
   uint32_t rowSize = 0;
@@ -1045,7 +1061,7 @@ void TupleAnnexStep::finalizeParallelOrderBy()
         break;
       }
     }  // end of limit bound while loop
-  }    // end of if-else
+  }  // end of if-else
 
   if (fRowGroupOut.getRowCount() > 0)
   {
@@ -1076,7 +1092,7 @@ void TupleAnnexStep::finalizeParallelOrderBy()
 
 void TupleAnnexStep::executeParallelOrderBy(uint64_t id)
 {
-  utils::setThreadName("TASwParOrd");
+  utils::setThreadName("TNSwParOrd");
   RGData rgDataIn;
   RGData rgDataOut;
   bool more = false;
@@ -1241,14 +1257,9 @@ void TupleAnnexStep::formatMiniStats()
 {
   ostringstream oss;
   oss << "TNS ";
-  oss << "UM "
-      << "- "
-      << "- "
-      << "- "
-      << "- "
-      << "- "
-      << "- " << JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime()) << " "
-      << fRowsReturned << " ";
+  oss << "UM " << "- " << "- " << "- " << "- " << "- " << "- "
+      << JSTimeStamp::tsdiffstr(dlTimes.EndOfInputTime(), dlTimes.FirstReadTime()) << " " << fRowsReturned
+      << " ";
   fMiniInfo += oss.str();
 }
 
