@@ -302,6 +302,12 @@ void UserDataStore::deserialize(ByteStream& bs)
   return;
 }
 
+
+RGData::RGData(allocators::CountingAllocator<RGDataBufType>& _alloc) : RGData()
+{
+  alloc = _alloc;
+}
+
 RGData::RGData(const RowGroup& rg, uint32_t rowCount)
 {
   // cout << "rgdata++ = " << __sync_add_and_fetch(&rgDataCount, 1) << endl;
