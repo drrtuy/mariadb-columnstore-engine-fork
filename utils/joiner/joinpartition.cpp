@@ -436,7 +436,7 @@ int64_t JoinPartition::processSmallBuffer(RGData& rgData)
     the amount stored in RowGroups in mem + the size of the hash table.  The RowGroups
     in that case use 600MB, so 3.4GB is used by the hash table.  3.4GB/100M rows = 34 bytes/row
     */
-    htSizeEstimate += rg.getDataSize() + (34 * rg.getRowCount());
+    htSizeEstimate += rg.getMaxDataSizeWithStrings() + (34 * rg.getRowCount());
 
     if (htSizeEstimate > htTargetSize)
       ret += convertToSplitMode();
