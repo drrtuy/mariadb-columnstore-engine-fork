@@ -108,6 +108,8 @@
 
 2060	ERR_UNION_DECIMAL_OVERFLOW	Union operation exceeds maximum DECIMAL precision of 38.
 
+2063	ERR_TNS_DISTINCT_IS_TOO_BIG	DISTINCT memory limit is exceeded whilst running TNS step.
+
 # Sub-query errors
 3001	ERR_NON_SUPPORT_SUB_QUERY_TYPE	This subquery type is not supported yet.
 3002	ERR_MORE_THAN_1_ROW	Subquery returns more than 1 row.
