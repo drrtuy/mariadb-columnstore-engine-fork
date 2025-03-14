@@ -841,7 +841,7 @@ void GroupConcatOrderBy::merge(GroupConcator* gc)
   GroupConcatOrderBy* go = dynamic_cast<GroupConcatOrderBy*>(gc);
 
   auto& orderByQueue = getQueue();
-  auto mergeQueue = go->getQueue();
+  auto& mergeQueue = go->getQueue();
 
   while (mergeQueue.empty() == false)
   {

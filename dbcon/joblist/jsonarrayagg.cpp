@@ -840,7 +840,7 @@ void JsonArrayAggOrderBy::merge(GroupConcator* gc)
   JsonArrayAggOrderBy* go = dynamic_cast<JsonArrayAggOrderBy*>(gc);
 
   auto& orderByQueue = getQueue();
-  auto mergeQueue = go->getQueue();
+  auto& mergeQueue = go->getQueue();
 
   while (mergeQueue.empty() == false)
   {
