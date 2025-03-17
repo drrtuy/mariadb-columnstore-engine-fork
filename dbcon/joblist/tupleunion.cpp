@@ -1382,10 +1382,6 @@ void TupleUnion::readInput(uint32_t which)
   Row inRow, outRow, tmpRow;
   bool distinct;
   uint64_t memUsageBefore, memUsageAfter, memDiff;
-  StepTeleStats sts;
-  sts.query_uuid = fQueryUuid;
-  sts.step_uuid = fStepUuid;
-
   l_outputRG = outputRG;
   dl = inputs[which];
   l_inputRG = inputRGs[which];
@@ -1420,8 +1416,7 @@ void TupleUnion::readInput(uint32_t which)
 
     if (fStartTime == -1)
     {
-      sts.msg_type = StepTeleStats::ST_START;
-      sts.total_units_of_work = 1;
+      StepTeleStats sts(fQueryUuid, fStepUuid, StepTeleStats::ST_START, 1);
       postStepStartTele(sts);
     }
 
@@ -1548,9 +1543,7 @@ void TupleUnion::readInput(uint32_t which)
     {
       output->endOfInput();
 
-      sts.msg_type = StepTeleStats::ST_SUMMARY;
-      sts.total_units_of_work = sts.units_of_work_completed = 1;
-      sts.rows = fRowsReturned;
+      StepTeleStats sts(fQueryUuid, fStepUuid, StepTeleStats::ST_SUMMARY, 1, 1, fRowsReturned);
       postStepSummaryTele(sts);
 
       if (traceOn())
